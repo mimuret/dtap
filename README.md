@@ -2,6 +2,11 @@
 dtap is dnstap message router.
 Supported multi input and multi output.
 
+## Install
+```
+go get -u github.com/mimuret/dtap/dtap
+```
+
 ## Input
 ### Unix Socket
 Make unix domain socket for server software writting DNSTAP Frame.

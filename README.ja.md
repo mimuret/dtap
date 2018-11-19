@@ -3,6 +3,11 @@ dtap はDNSTAP用のメッセージルータです。
 様々な入力元からFSTRM形式のDNSTAPメッセージを取得し、
 様々な出力先へ出力します。
 
+## Install
+```
+go get -u github.com/mimuret/dtap/dtap
+```
+
 ## 入力
 ### Unix Socket
 サーバソフトウェアからの書き込みのため、Unixソケットを作りListenします。
