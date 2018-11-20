@@ -165,7 +165,7 @@ func main() {
 	log.Info("finish boot dtap")
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 	select {
 	case <-sigCh:
 		cancel()
