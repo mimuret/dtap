@@ -23,7 +23,7 @@ import (
 )
 
 var FlushTimeout = 1 * time.Second
-var OutputChannelSize = 10000
+var OutputBufferSize uint = 10000
 
 var nodename string
 var hostname string

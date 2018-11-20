@@ -18,7 +18,6 @@ package dtap
 
 import (
 	"compress/gzip"
-	"context"
 	"io"
 	"os"
 	"strings"
@@ -28,26 +27,24 @@ import (
 	framestream "github.com/farsightsec/golang-framestream"
 	strftime "github.com/jehiah/go-strftime"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/ulikunitz/xz"
 )
 
 type DnstapFstrmFileOutput struct {
 	config          *OutputFileConfig
 	currentFilename string
-	outputChannel   chan []byte
 	enc             *framestream.Encoder
-	finished        bool
+	opened          chan bool
 }
 
-func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapFstrmFileOutput {
-	return &DnstapFstrmFileOutput{
-		config:        config,
-		outputChannel: make(chan []byte, config.GetChannelSize()),
+func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
+	file := &DnstapFstrmFileOutput{
+		config: config,
 	}
+	return NewDnstapOutput(config.GetBufferSize(), file)
 }
 
-func (o *DnstapFstrmFileOutput) newFile() error {
+func (o *DnstapFstrmFileOutput) open() error {
 	var w io.Writer
 	filename := strftime.Format(o.config.GetPath(), time.Now())
 	f, err := os.Create(filename)
@@ -70,82 +67,32 @@ func (o *DnstapFstrmFileOutput) newFile() error {
 		return errors.Wrapf(err, "can't create framestream encorder %s", filename)
 	}
 	o.currentFilename = filename
+	o.opened = make(chan bool)
+	go func() {
+		ticker := time.NewTicker(FlushTimeout)
+		for {
+			select {
+			case <-o.opened:
+				return
+			case <-ticker.C:
+				o.enc.Flush()
+				filename := strftime.Format(o.config.GetPath(), time.Now())
+				if filename != o.currentFilename {
+					o.enc.Close()
+				}
+			}
+		}
+	}()
 	return nil
 }
 
-func (o *DnstapFstrmFileOutput) runWrite(ctx context.Context, errCh chan error) bool {
-	ticker := time.NewTicker(FlushTimeout)
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		case <-ticker.C:
-			o.enc.Flush()
-			filename := strftime.Format(o.config.GetPath(), time.Now())
-			if filename != o.currentFilename {
-				o.enc.Close()
-				return true
-			}
-		case frame := <-o.outputChannel:
-			if _, err := o.enc.Write(frame); err != nil {
-				if log.GetLevel() >= log.DebugLevel {
-					errCh <- errors.Wrap(err, "can't write frame")
-				}
-				o.enc.Flush()
-				o.enc.Close()
-				return true
-			}
-		}
-	}
-	return false
+func (o *DnstapFstrmFileOutput) write(frame []byte) error {
+	o.enc.Write(frame)
+	return nil
 }
 
-func (o *DnstapFstrmFileOutput) runOpen(ctx context.Context, errCh chan error) bool {
-	ticker := time.NewTicker(FlushTimeout)
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		case <-ticker.C:
-			if err := o.newFile(); err != nil {
-				if log.GetLevel() >= log.WarnLevel {
-					errCh <- errors.Wrap(err, "can't create file")
-				}
-			} else {
-				if log.GetLevel() >= log.DebugLevel {
-					errCh <- errors.New("create file scussesful")
-				}
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (o *DnstapFstrmFileOutput) Run(ctx context.Context, errCh chan error) {
-	for {
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.New("start runOpen")
-		}
-		if !o.runOpen(ctx, errCh) {
-			break
-		}
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.New("start runWrite")
-		}
-		if !o.runWrite(ctx, errCh) {
-			break
-		}
-	}
+func (o *DnstapFstrmFileOutput) close() {
 	o.enc.Flush()
 	o.enc.Close()
-	o.finished = true
-}
-
-func (o *DnstapFstrmFileOutput) GetOutputChannel() chan []byte {
-	return o.outputChannel
-}
-
-func (o *DnstapFstrmFileOutput) Finished() bool {
-	return o.finished
+	close(o.opened)
 }

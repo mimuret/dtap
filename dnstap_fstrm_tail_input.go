@@ -76,7 +76,7 @@ func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context, errCh chan err
 		}
 	}
 }
-func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string, inputChannel chan []byte, errCh chan error) {
+func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string, rbuf *RBuf, errCh chan error) {
 	modify := make(chan bool)
 	f, err := os.Open(filename)
 	if err != nil {
@@ -120,7 +120,6 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 					return
 				}
 				if log.GetLevel() >= log.DebugLevel {
-
 					errCh <- errors.Wrapf(err, "watch error path: %s", filename)
 				}
 			}
@@ -131,7 +130,7 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 		return
 	}
 	for {
-		input.Read(ctx, inputChannel, errCh)
+		input.Read(ctx, rbuf, errCh)
 		timer := time.NewTimer(5 * time.Minute)
 		select {
 		case <-timer.C:
@@ -143,10 +142,10 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 	}
 	delete(i.readers, filename)
 }
-func (i *DnstapFstrmTailInput) Run(ctx context.Context, inputChannel chan []byte, errCh chan error) {
+func (i *DnstapFstrmTailInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
 	go i.runSearchPath(ctx, errCh)
 	for filename := range i.modifies {
 		i.readers[filename] = true
-		go i.runReadFile(ctx, filename, inputChannel, errCh)
+		go i.runReadFile(ctx, filename, rbuf, errCh)
 	}
 }

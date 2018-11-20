@@ -17,93 +17,55 @@
 package dtap
 
 import (
-	"context"
 	"time"
 
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
 	framestream "github.com/farsightsec/golang-framestream"
+	"github.com/pkg/errors"
 )
 
 type DnstapFstrmSocketOutput struct {
-	handler       SocketOutput
-	outputChannel chan []byte
-	enc           *framestream.Encoder
-	finished      bool
+	handler SocketOutput
+	enc     *framestream.Encoder
+	opened  chan bool
 }
 
-func NewDnstapFstrmSocketOutput(outputChannelSize int, handler SocketOutput) *DnstapFstrmSocketOutput {
-	return &DnstapFstrmSocketOutput{
-		handler:       handler,
-		outputChannel: make(chan []byte, outputChannelSize),
+func NewDnstapFstrmSocketOutput(outputBufferSize uint, handler SocketOutput) *DnstapOutput {
+	fsock := &DnstapFstrmSocketOutput{
+		handler: handler,
 	}
+	return NewDnstapOutput(outputBufferSize, fsock)
 }
-func (o *DnstapFstrmSocketOutput) runWrite(ctx context.Context, errCh chan error) bool {
-	ticker := time.NewTicker(FlushTimeout)
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		case <-ticker.C:
-			o.enc.Flush()
-		case frame := <-o.outputChannel:
-			if _, err := o.enc.Write(frame); err != nil {
+
+func (o *DnstapFstrmSocketOutput) open() error {
+	var err error
+	if o.enc, err = o.handler.newConnect(); err != nil {
+		return errors.Wrapf(err, "can't connect socket")
+	}
+	o.opened = make(chan bool)
+	go func() {
+		ticker := time.NewTicker(FlushTimeout)
+		for {
+			select {
+			case <-o.opened:
+				return
+			case <-ticker.C:
 				o.enc.Flush()
-				o.enc.Close()
-				return true
 			}
 		}
-	}
-	return false
+	}()
+	return nil
 }
 
-func (o *DnstapFstrmSocketOutput) runOpen(ctx context.Context, errCh chan error) bool {
-	ticker := time.NewTicker(FlushTimeout)
-	for {
-		select {
-		case <-ticker.C:
-			if enc, err := o.handler.newConnect(); err != nil {
-				if log.GetLevel() >= log.InfoLevel {
-
-					errCh <- errors.Wrapf(err, "can't connect socket")
-				}
-			} else {
-				o.enc = enc
-			}
-		case <-ctx.Done():
-			return true
-			break
-		}
+func (o *DnstapFstrmSocketOutput) write(frame []byte) error {
+	if _, err := o.enc.Write(frame); err != nil {
+		o.close()
+		return err
 	}
-	return false
+	return nil
 }
 
-func (o *DnstapFstrmSocketOutput) Run(ctx context.Context, errCh chan error) {
-	for {
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.New("start runOpen")
-		}
-		if !o.runOpen(ctx, errCh) {
-			break
-		}
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.New("start runWrite")
-		}
-		if !o.runWrite(ctx, errCh) {
-			break
-		}
-	}
-	close(o.outputChannel)
+func (o *DnstapFstrmSocketOutput) close() {
 	o.enc.Flush()
 	o.enc.Close()
-	o.finished = true
-}
-
-func (o *DnstapFstrmSocketOutput) GetOutputChannel() chan []byte {
-	return o.outputChannel
-}
-
-func (o *DnstapFstrmSocketOutput) Finished() bool {
-	return o.finished
+	close(o.opened)
 }

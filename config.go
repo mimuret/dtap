@@ -28,19 +28,22 @@ import (
 )
 
 type Config struct {
-	InputChannelSize uint
-	InputUnix        []*InputUnixSocketConfig
-	InputFile        []*InputFileConfig
-	InputTail        []*InputTailConfig
-	InputTCP         []*InputTCPSocketConfig
-	OutputUnix       []*OutputUnixSocketConfig
-	OutputFile       []*OutputFileConfig
-	OutputTCP        []*OutputTCPSocketConfig
-	OutputFluent     []*OutputFluentConfig
+	InputMsgBuffer uint
+	InputUnix      []*InputUnixSocketConfig
+	InputFile      []*InputFileConfig
+	InputTail      []*InputTailConfig
+	InputTCP       []*InputTCPSocketConfig
+	OutputUnix     []*OutputUnixSocketConfig
+	OutputFile     []*OutputFileConfig
+	OutputTCP      []*OutputTCPSocketConfig
+	OutputFluent   []*OutputFluentConfig
 }
 
 func (c *Config) Validate() []error {
 	errs := []error{}
+	if c.InputMsgBuffer < 128 {
+		errs = append(errs, errors.New("InputMsgBuffer must not small 128"))
+	}
 	for n, i := range c.InputUnix {
 		if err := i.Validate(); err != nil {
 			err.configType = "InputUnix"
@@ -129,7 +132,7 @@ func NewConfigFromFile(filename string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(filename)
 	v.SetConfigType("toml")
-	v.SetDefault("InputChannelSize", 10000)
+	v.SetDefault("InputMsgBuffer", 10000)
 	if err := v.ReadInConfig(); err != nil {
 		return nil, errors.Wrap(err, "can't read config")
 	}
@@ -220,8 +223,8 @@ func (i *InputTCPSocketConfig) GetNet() string {
 }
 
 type OutputUnixSocketConfig struct {
-	Path        string
-	ChannelSize uint
+	Path       string
+	BufferSize uint
 }
 
 func (o *OutputUnixSocketConfig) Validate() *ValidationError {
@@ -236,17 +239,17 @@ func (o *OutputUnixSocketConfig) GetPath() string {
 	return o.Path
 }
 
-func (o *OutputUnixSocketConfig) GetChannelSize() int {
-	if o.ChannelSize == 0 {
-		return OutputChannelSize
+func (o *OutputUnixSocketConfig) GetBufferSize() uint {
+	if o.BufferSize == 0 {
+		return OutputBufferSize
 	}
-	return int(o.ChannelSize)
+	return o.BufferSize
 }
 
 type OutputFileConfig struct {
-	Path        string
-	User        string
-	ChannelSize uint
+	Path       string
+	User       string
+	BufferSize uint
 }
 
 func (o *OutputFileConfig) Validate() *ValidationError {
@@ -264,17 +267,17 @@ func (o *OutputFileConfig) GetUser() string {
 	return o.User
 }
 
-func (o *OutputFileConfig) GetChannelSize() int {
-	if o.ChannelSize == 0 {
-		return OutputChannelSize
+func (o *OutputFileConfig) GetBufferSize() uint {
+	if o.BufferSize == 0 {
+		return OutputBufferSize
 	}
-	return int(o.ChannelSize)
+	return o.BufferSize
 }
 
 type OutputTCPSocketConfig struct {
-	Host        string
-	Port        uint16
-	ChannelSize uint
+	Host       string
+	Port       uint16
+	BufferSize uint
 }
 
 func (o *OutputTCPSocketConfig) Validate() *ValidationError {
@@ -297,20 +300,20 @@ func (o *OutputTCPSocketConfig) GetAddress() string {
 	return host + ":" + strconv.Itoa(int(port))
 }
 
-func (o *OutputTCPSocketConfig) GetChannelSize() int {
-	if o.ChannelSize == 0 {
-		return OutputChannelSize
+func (o *OutputTCPSocketConfig) GetBufferSize() uint {
+	if o.BufferSize == 0 {
+		return OutputBufferSize
 	}
-	return int(o.ChannelSize)
+	return o.BufferSize
 }
 
 type OutputFluentConfig struct {
-	Host        string
-	Tag         string
-	Port        uint16
-	IPv4Mask    uint8
-	IPv6Mask    uint8
-	ChannelSize int
+	Host       string
+	Tag        string
+	Port       uint16
+	IPv4Mask   uint8
+	IPv6Mask   uint8
+	BufferSize uint
 }
 
 func (o *OutputFluentConfig) Validate() *ValidationError {
@@ -378,9 +381,9 @@ func (o *OutputFluentConfig) GetIPv6Mask() int {
 	return int(o.IPv6Mask)
 }
 
-func (o *OutputFluentConfig) GetChannelSize() int {
-	if o.ChannelSize == 0 {
-		return OutputChannelSize
+func (o *OutputFluentConfig) GetBufferSize() uint {
+	if o.BufferSize == 0 {
+		return OutputBufferSize
 	}
-	return o.ChannelSize
+	return o.BufferSize
 }

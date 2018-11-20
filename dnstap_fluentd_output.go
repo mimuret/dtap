@@ -17,10 +17,7 @@
 package dtap
 
 import (
-	"context"
-
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/farsightsec/golang-framestream"
@@ -29,60 +26,44 @@ import (
 )
 
 type DnstapFluentdOutput struct {
-	config        *OutputFluentConfig
-	outputChannel chan []byte
-	enc           *framestream.Encoder
-	logger        *fluent.Fluent
-	finished      bool
-	handler       FluetOutput
+	config      *OutputFluentConfig
+	fluetConfig fluent.Config
+	enc         *framestream.Encoder
+	logger      *fluent.Fluent
+	handler     FluetOutput
 }
 
-func NewDnstapFluentdOutput(config *OutputFluentConfig, handler FluetOutput) (*DnstapFluentdOutput, error) {
-	var err error
+func NewDnstapFluentdOutput(config *OutputFluentConfig, handler FluetOutput) *DnstapOutput {
 	o := &DnstapFluentdOutput{
-		config:        config,
-		outputChannel: make(chan []byte, config.GetChannelSize()),
-		handler:       handler,
+		config: config,
+		fluetConfig: fluent.Config{
+			FluentHost: config.GetHost(),
+			FluentPort: config.GetPort(),
+			Async:      false},
+		handler: handler,
 	}
-	o.logger, err = fluent.New(fluent.Config{
-		FluentHost: config.GetHost(),
-		FluentPort: config.GetPort(),
-		Async:      false},
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't create fluent logger")
-	}
-	return o, nil
+	return NewDnstapOutput(config.GetBufferSize(), o)
 }
 
-func (o *DnstapFluentdOutput) handle(frame []byte, errCh chan error) {
+func (o *DnstapFluentdOutput) open() error {
+	var err error
+	o.logger, err = fluent.New(o.fluetConfig)
+	if err != nil {
+		return errors.Wrapf(err, "can't create fluent logger")
+	}
+
+	return nil
+}
+
+func (o *DnstapFluentdOutput) write(frame []byte) error {
 	dt := &dnstap.Dnstap{}
 	if err := proto.Unmarshal(frame, dt); err != nil {
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.Wrapf(err, "proto.Unmarshal() failed: %s: %s\n", err)
-		}
-		return
+		return err
 	}
-	o.handler.handle(o.logger, dt, errCh)
+	o.handler.handle(o.logger, dt)
+	return nil
 }
 
-func (o *DnstapFluentdOutput) Run(ctx context.Context, errCh chan error) {
-	for {
-		select {
-		case frame := <-o.outputChannel:
-			o.handle(frame, errCh)
-		case <-ctx.Done():
-			break
-		}
-	}
+func (o *DnstapFluentdOutput) close() {
 	o.logger.Close()
-	o.finished = true
-}
-
-func (o *DnstapFluentdOutput) GetOutputChannel() chan []byte {
-	return o.outputChannel
-}
-
-func (o *DnstapFluentdOutput) Finished() bool {
-	return o.finished
 }

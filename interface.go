@@ -25,17 +25,21 @@ import (
 )
 
 type FluetOutput interface {
-	handle(*fluent.Fluent, *dnstap.Dnstap, chan error)
+	handle(*fluent.Fluent, *dnstap.Dnstap) error
 }
 type Output interface {
 	Run(context.Context, chan error)
-	GetOutputChannel() chan []byte
+	SetMessage([]byte)
 	Finished() bool
 }
 type Input interface {
-	Run(context.Context, chan []byte, chan error)
+	Run(context.Context, *RBuf, chan error)
 }
-
+type OutputHandler interface {
+	open() error
+	write([]byte) error
+	close()
+}
 type SocketOutput interface {
 	newConnect() (*framestream.Encoder, error)
 }

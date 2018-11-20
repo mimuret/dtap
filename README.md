@@ -1,5 +1,5 @@
-# dtap - DNSTAP Message router
-dtap is dnstap message router.
+# DTAP - DNSTAP Message router
+DTAP is dnstap message router.
 Supported multi input and multi output.
 
 ## Install

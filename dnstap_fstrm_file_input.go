@@ -68,6 +68,6 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	return i, nil
 }
 
-func (i *DnstapFstrmFileInput) Run(ctx context.Context, inputChannel chan []byte, errCh chan error) {
-	i.input.Read(ctx, inputChannel, errCh)
+func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
+	i.input.Read(ctx, rbuf, errCh)
 }

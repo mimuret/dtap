@@ -35,7 +35,7 @@ func NewDnstapFstrmSocketInput(listener net.Listener) (*DnstapFstrmSocketInput, 
 	}, nil
 }
 
-func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, inputChannel chan []byte, errCh chan error) {
+func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf, errCh chan error) {
 	if log.GetLevel() >= log.DebugLevel {
 		errCh <- errors.New("start socket input")
 	}
@@ -59,12 +59,12 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, inputChannel chan 
 			}
 			continue
 		}
-		go input.Read(ctx, inputChannel, errCh)
+		go input.Read(ctx, rbuf, errCh)
 	}
 }
 
-func (i *DnstapFstrmSocketInput) Run(ctx context.Context, inputChannel chan []byte, errCh chan error) {
-	go i.runRead(ctx, inputChannel, errCh)
+func (i *DnstapFstrmSocketInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
+	go i.runRead(ctx, rbuf, errCh)
 	select {
 	case <-ctx.Done():
 		i.listener.Close()

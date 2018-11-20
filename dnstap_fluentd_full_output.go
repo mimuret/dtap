@@ -17,7 +17,6 @@
 package dtap
 
 import (
-	"context"
 	"net"
 	"strings"
 	"time"
@@ -25,8 +24,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/fluent/fluent-logger-golang/fluent"
-
-	log "github.com/sirupsen/logrus"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
@@ -46,23 +43,16 @@ var names = map[int]string{
 	5: "4ld",
 }
 
-func NewDnstapFluentFullOutput(config *OutputFluentConfig) (*DnstapFluentdOutput, error) {
+func NewDnstapFluentFullOutput(config *OutputFluentConfig) *DnstapOutput {
 	mo := &DnstapFluentFullOutput{
 		config:   config,
 		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
 		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
 		tag:      config.GetTag(),
 	}
-	o, err := NewDnstapFluentdOutput(config, mo)
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't create DnstapFluentdOutput")
-	}
-	return o, nil
+	return NewDnstapFluentdOutput(config, mo)
 }
-func (o *DnstapFluentFullOutput) setup(ctx context.Context) {
-
-}
-func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap, errCh chan error) {
+func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap) error {
 	var dnsMessage []byte
 	msg := dt.GetMessage()
 	dnsMsg := dns.Msg{}
@@ -72,10 +62,7 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		dnsMessage = msg.GetResponseMessage()
 	}
 	if err := dnsMsg.Unpack(dnsMessage); err != nil {
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.Wrapf(err, "can't parse dns message() failed: %s\n", err)
-		}
-		return
+		return err
 	}
 
 	var data = map[string]interface{}{}
@@ -130,8 +117,7 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		}
 	}
 	if err := client.Post(o.tag, data); err != nil {
-		if log.GetLevel() >= log.WarnLevel {
-			errCh <- errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
-		}
+		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
 	}
+	return nil
 }

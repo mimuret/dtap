@@ -45,15 +45,17 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func outputLoop(ctx context.Context, sockets []dtap.Output, inputChannel chan []byte) {
+func outputLoop(ctx context.Context, sockets []dtap.Output, irbuf *dtap.RBuf) {
 	for {
 		select {
-		case frame := <-inputChannel:
-			for _, o := range sockets {
-				o.GetOutputChannel() <- frame
-			}
 		case <-ctx.Done():
 			break
+		default:
+			if frame := o.rbuf.Read(); buf != nil {
+				for _, o := range sockets {
+					o.SetMessage(frame)
+				}
+			}
 		}
 	}
 }
@@ -121,7 +123,6 @@ func main() {
 
 	for _, oc := range config.OutputFile {
 		o := dtap.NewDnstapFstrmFileOutput(oc)
-		fatalCheck(err)
 		output = append(output, o)
 	}
 
@@ -136,19 +137,16 @@ func main() {
 	}
 
 	for _, oc := range config.OutputFluent {
-		if o, err := dtap.NewDnstapFluentFullOutput(oc); err != nil {
-			fatalCheck(err)
-		} else {
-			output = append(output, o)
-		}
+		o := dtap.NewDnstapFluentFullOutput(oc)
+		output = append(output, o)
 	}
 
 	if len(output) == 0 {
 		log.Fatal("No output settings")
 	}
 
-	inputChannel := make(chan []byte, config.InputChannelSize)
-	errCh := make(chan error, config.InputChannelSize)
+	iRBuf := dtap.NewRbuf(config.InputMsgBuffer)
+	errCh := make(chan error, 128)
 	go outputError(errCh)
 	log.Info("start err outputer")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -156,10 +154,10 @@ func main() {
 		go o.Run(ctx, errCh)
 	}
 	log.Info("start output loop")
-	go outputLoop(ctx, output, inputChannel)
+	go outputLoop(ctx, output, iRBuf)
 	log.Info("start main output loop")
 	for _, i := range input {
-		go i.Run(ctx, inputChannel, errCh)
+		go i.Run(ctx, iRBuf, errCh)
 	}
 	log.Info("start input loop")
 	log.Info("finish boot dtap")
@@ -175,6 +173,4 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}
-	close(inputChannel)
-
 }
