@@ -24,7 +24,6 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/mimuret/dtap"
 	log "github.com/sirupsen/logrus"
@@ -51,7 +50,7 @@ func outputLoop(ctx context.Context, sockets []dtap.Output, irbuf *dtap.RBuf) {
 		case <-ctx.Done():
 			break
 		default:
-			if frame := o.rbuf.Read(); buf != nil {
+			if frame := irbuf.Read(); frame != nil {
 				for _, o := range sockets {
 					o.SetMessage(frame)
 				}
@@ -149,17 +148,20 @@ func main() {
 	errCh := make(chan error, 128)
 	go outputError(errCh)
 	log.Info("start err outputer")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	for _, o := range output {
 		go o.Run(ctx, errCh)
 	}
 	log.Info("start output loop")
+
 	go outputLoop(ctx, output, iRBuf)
 	log.Info("start main output loop")
 	for _, i := range input {
 		go i.Run(ctx, iRBuf, errCh)
 	}
 	log.Info("start input loop")
+
 	log.Info("finish boot dtap")
 
 	sigCh := make(chan os.Signal, 1)
@@ -168,9 +170,15 @@ func main() {
 	case <-sigCh:
 		cancel()
 	}
-	for _, o := range output {
-		for !o.Finished() {
-			time.Sleep(1 * time.Second)
-		}
+	log.Info("wait finish input task")
+	for _, i := range input {
+		<-i.ReadDone()
 	}
+	log.Info("done")
+	log.Info("wait finish output task")
+	for _, o := range output {
+		<-o.WriteDone()
+	}
+	log.Info("done")
+
 }

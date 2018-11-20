@@ -30,12 +30,13 @@ import (
 
 type DnstapFstrmInput struct {
 	decoder  *framestream.Decoder
+	rc       io.ReadCloser
+	readDone chan struct{}
 	finished bool
-	readDone chan bool
 }
 
-func NewDnstapFstrmInput(r io.Reader, bi bool) (*DnstapFstrmInput, error) {
-	decoder, err := framestream.NewDecoder(r, &framestream.DecoderOptions{
+func NewDnstapFstrmInput(rc io.ReadCloser, bi bool) (*DnstapFstrmInput, error) {
+	decoder, err := framestream.NewDecoder(rc, &framestream.DecoderOptions{
 		ContentType:   dnstap.FSContentType,
 		Bidirectional: bi,
 	})
@@ -43,12 +44,13 @@ func NewDnstapFstrmInput(r io.Reader, bi bool) (*DnstapFstrmInput, error) {
 		return nil, errors.Wrapf(err, "can't create framestream Decoder")
 	}
 	return &DnstapFstrmInput{
+		rc:       rc,
 		decoder:  decoder,
-		readDone: make(chan bool),
+		readDone: make(chan struct{}),
 	}, nil
 }
 func (i *DnstapFstrmInput) read(rbuf *RBuf, errCh chan error) {
-	for i.finished == false {
+	for {
 		buf, err := i.decoder.Decode()
 		if err != nil {
 			if err == io.EOF {
@@ -56,7 +58,6 @@ func (i *DnstapFstrmInput) read(rbuf *RBuf, errCh chan error) {
 				return
 			}
 			if log.GetLevel() >= log.DebugLevel {
-
 				errCh <- errors.Wrapf(err, "fstrm decode error")
 			}
 			break
@@ -68,11 +69,16 @@ func (i *DnstapFstrmInput) read(rbuf *RBuf, errCh chan error) {
 }
 func (i *DnstapFstrmInput) Read(ctx context.Context, rbuf *RBuf, errCh chan error) {
 	go i.read(rbuf, errCh)
-	select {
-	case <-ctx.Done():
-		break
-	case <-i.readDone:
-		break
+	for {
+		select {
+		case <-ctx.Done():
+			i.rc.Close()
+		case <-i.ReadDone():
+			break
+		}
 	}
-	i.finished = true
+}
+
+func (i *DnstapFstrmInput) ReadDone() <-chan struct{} {
+	return i.readDone
 }

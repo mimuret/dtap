@@ -29,12 +29,31 @@ import (
 )
 
 type DnstapFstrmFileInput struct {
-	config *InputFileConfig
-	input  *DnstapFstrmInput
+	config   *InputFileConfig
+	input    *DnstapFstrmInput
+	readDone chan struct{}
+}
+
+type DnstapFstrmFileReadCloser struct {
+	reader io.Reader
+	file   *os.File
+}
+
+func NewDnstapFstrmFileReadCloser(r io.Reader, f *os.File) *DnstapFstrmFileReadCloser {
+	return &DnstapFstrmFileReadCloser{
+		reader: r,
+		file:   f,
+	}
+}
+func (rc *DnstapFstrmFileReadCloser) Read(p []byte) (int, error) {
+	return rc.reader.Read(p)
+}
+func (rc *DnstapFstrmFileReadCloser) Close() error {
+	return rc.file.Close()
 }
 
 func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, error) {
-	var r io.Reader
+	var r io.ReadCloser
 	f, err := os.Open(config.GetPath())
 	if err != nil {
 		return nil, errors.Wrapf(err, "watch failed, path: %s", config.GetPath())
@@ -46,9 +65,11 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 			return nil, errors.Wrapf(err, "failed to create gzip reader, path: %s", config.GetPath())
 		}
 	} else if strings.HasSuffix(config.GetPath(), "bz2") {
-		r = bzip2.NewReader(f)
+		cmp := bzip2.NewReader(f)
+		r = NewDnstapFstrmFileReadCloser(cmp, f)
 	} else if strings.HasSuffix(config.GetPath(), "xz") {
-		r, err = xz.NewReader(f)
+		cmp, err := xz.NewReader(f)
+		r = NewDnstapFstrmFileReadCloser(cmp, f)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create xz reader, path: %s", config.GetPath())
 		}
@@ -62,12 +83,22 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	}
 
 	i := &DnstapFstrmFileInput{
-		config: config,
-		input:  input,
+		config:   config,
+		input:    input,
+		readDone: make(chan struct{}),
 	}
 	return i, nil
 }
 
 func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	i.input.Read(ctx, rbuf, errCh)
+	go i.input.Read(ctx, rbuf, errCh)
+	select {
+	case <-i.input.ReadDone():
+		close(i.readDone)
+		break
+	}
+}
+
+func (i *DnstapFstrmFileInput) ReadDone() <-chan struct{} {
+	return i.readDone
 }

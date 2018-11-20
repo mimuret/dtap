@@ -26,12 +26,13 @@ import (
 
 type DnstapFstrmSocketInput struct {
 	listener net.Listener
-	finished bool
+	readDone chan struct{}
 }
 
 func NewDnstapFstrmSocketInput(listener net.Listener) (*DnstapFstrmSocketInput, error) {
 	return &DnstapFstrmSocketInput{
 		listener: listener,
+		readDone: make(chan struct{}),
 	}, nil
 }
 
@@ -43,9 +44,9 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf, errCh 
 		conn, err := i.listener.Accept()
 		if err != nil {
 			if log.GetLevel() >= log.InfoLevel {
-
 				errCh <- errors.Wrapf(err, "can't accept unix socket")
 			}
+			close(i.readDone)
 			break
 		}
 		if log.GetLevel() >= log.DebugLevel {
@@ -54,7 +55,6 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf, errCh 
 		input, err := NewDnstapFstrmInput(conn, true)
 		if err != nil {
 			if log.GetLevel() >= log.InfoLevel {
-
 				errCh <- errors.Wrapf(err, "can't create NewDnstapFstrmInput")
 			}
 			continue
@@ -68,5 +68,11 @@ func (i *DnstapFstrmSocketInput) Run(ctx context.Context, rbuf *RBuf, errCh chan
 	select {
 	case <-ctx.Done():
 		i.listener.Close()
+	case <-i.ReadDone():
+		break
 	}
+}
+
+func (i *DnstapFstrmSocketInput) ReadDone() <-chan struct{} {
+	return i.readDone
 }

@@ -30,10 +30,11 @@ type FluetOutput interface {
 type Output interface {
 	Run(context.Context, chan error)
 	SetMessage([]byte)
-	Finished() bool
+	WriteDone() <-chan struct{}
 }
 type Input interface {
 	Run(context.Context, *RBuf, chan error)
+	ReadDone() <-chan struct{}
 }
 type OutputHandler interface {
 	open() error
