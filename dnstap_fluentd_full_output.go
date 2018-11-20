@@ -55,14 +55,10 @@ func NewDnstapFluentFullOutput(config *OutputFluentConfig) *DnstapOutput {
 func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap) error {
 	var dnsMessage []byte
 	msg := dt.GetMessage()
-	dnsMsg := dns.Msg{}
 	if msg.GetQueryMessage != nil {
 		dnsMessage = msg.GetQueryMessage()
 	} else {
 		dnsMessage = msg.GetResponseMessage()
-	}
-	if err := dnsMsg.Unpack(dnsMessage); err != nil {
-		return err
 	}
 
 	var data = map[string]interface{}{}
@@ -96,9 +92,25 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	data["socket_protocol"] = msg.GetSocketProtocol().String()
 	data["version"] = dt.GetVersion()
 	data["extra"] = dt.GetExtra()
-	data["qname"] = dnsMsg.Question[0].Name
-	data["qclass"] = dns.ClassToString[dnsMsg.Question[0].Qclass]
-	data["qtype"] = dns.TypeToString[dnsMsg.Question[0].Qtype]
+	dnsMsg := dns.Msg{}
+	if err := dnsMsg.Unpack(dnsMessage); err != nil {
+		return errors.Wrapf(err, "can't parse dns message() failed: %s\n", err)
+	}
+
+	if len(dnsMsg.Question) > 0 {
+		data["qname"] = dnsMsg.Question[0].Name
+		data["qclass"] = dns.ClassToString[dnsMsg.Question[0].Qclass]
+		data["qtype"] = dns.TypeToString[dnsMsg.Question[0].Qtype]
+		labels := strings.Split(dnsMsg.Question[0].Name, ".")
+		labelsLen := len(labels)
+		for i, n := range names {
+			if labelsLen-i >= 0 {
+				data[n] = strings.Join(labels[labelsLen-i:labelsLen-1], ".")
+			} else {
+				data[n] = dnsMsg.Question[0].Name
+			}
+		}
+	}
 	data["rcode"] = dns.RcodeToString[dnsMsg.Rcode]
 	data["aa"] = dnsMsg.Authoritative
 	data["tc"] = dnsMsg.Truncated
@@ -107,15 +119,6 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	data["ad"] = dnsMsg.AuthenticatedData
 	data["cd"] = dnsMsg.CheckingDisabled
 
-	labels := strings.Split(dnsMsg.Question[0].Name, ".")
-	labelsLen := len(labels)
-	for i, n := range names {
-		if labelsLen-i >= 0 {
-			data[n] = strings.Join(labels[labelsLen-i:labelsLen-1], ".")
-		} else {
-			data[n] = dnsMsg.Question[0].Name
-		}
-	}
 	if err := client.Post(o.tag, data); err != nil {
 		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
 	}
