@@ -5,48 +5,33 @@ import (
 )
 
 type RBuf struct {
-	values [][]byte
-	size   uint
-	rp     uint
-	wp     uint
-	rCh    chan []byte
-	rmux   sync.Mutex
-	wmux   sync.Mutex
+	channel chan []byte
+	mux     sync.Mutex
 }
 
 func NewRbuf(size uint) *RBuf {
 	rbuf := &RBuf{
-		values: make([][]byte, size),
-		size:   size,
-		rp:     0,
-		wp:     0,
-		rCh:    make(chan []byte),
-		wmux:   sync.Mutex{},
-		rmux:   sync.Mutex{},
+		channel: make(chan []byte, size),
+		mux:     sync.Mutex{},
 	}
 	return rbuf
 }
 
-func (r *RBuf) Read() []byte {
-	r.rmux.Lock()
-	defer r.rmux.Lock()
-
-	if r.rp != r.wp {
-		r.rp++
-		return r.values[r.rp]
-	}
-
-	return nil
+func (r *RBuf) Read() <-chan []byte {
+	return r.channel
 }
 
 func (r *RBuf) Write(b []byte) {
-	r.wmux.Lock()
-	defer r.wmux.Lock()
-
-	r.values[r.wp] = b
-	r.wp = (r.wp + 1) % r.size
+	select {
+	case r.channel <- b:
+	default:
+		r.mux.Lock()
+		<-r.channel
+		r.channel <- b
+		r.mux.Unlock()
+	}
 }
 
 func (r *RBuf) Close() {
-	close(r.rCh)
+	close(r.channel)
 }

@@ -49,11 +49,9 @@ func outputLoop(ctx context.Context, sockets []dtap.Output, irbuf *dtap.RBuf) {
 		select {
 		case <-ctx.Done():
 			break
-		default:
-			if frame := irbuf.Read(); frame != nil {
-				for _, o := range sockets {
-					o.SetMessage(frame)
-				}
+		case frame := <-irbuf.Read():
+			for _, o := range sockets {
+				o.SetMessage(frame)
 			}
 		}
 	}
