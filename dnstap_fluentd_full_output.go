@@ -88,6 +88,12 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	data["identity"] = dt.GetIdentity()
 	if data["identity"] == nil {
 		data["identity"] = hostname
+	} else {
+		if identity, ok := data["indentity"].([]byte); ok {
+			if len(identity) == 0 {
+				data["identity"] = hostname
+			}
+		}
 	}
 	data["type"] = msg.GetType().String()
 	data["socket_family"] = msg.GetSocketFamily().String()
