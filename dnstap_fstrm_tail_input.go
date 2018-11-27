@@ -143,9 +143,11 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 	delete(i.readers, filename)
 }
 func (i *DnstapFstrmTailInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.runSearchPath(ctx, errCh)
+	childCtx, _ := context.WithCancel(ctx)
+	go i.runSearchPath(childCtx, errCh)
 	for filename := range i.modifies {
 		i.readers[filename] = true
-		go i.runReadFile(ctx, filename, rbuf, errCh)
+		childCtx, _ := context.WithCancel(ctx)
+		go i.runReadFile(childCtx, filename, rbuf, errCh)
 	}
 }

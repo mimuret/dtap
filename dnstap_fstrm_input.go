@@ -69,12 +69,13 @@ func (i *DnstapFstrmInput) read(rbuf *RBuf, errCh chan error) {
 }
 func (i *DnstapFstrmInput) Read(ctx context.Context, rbuf *RBuf, errCh chan error) {
 	go i.read(rbuf, errCh)
+L:
 	for {
 		select {
 		case <-ctx.Done():
 			i.rc.Close()
 		case <-i.ReadDone():
-			break
+			break L
 		}
 	}
 }

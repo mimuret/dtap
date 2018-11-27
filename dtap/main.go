@@ -44,22 +44,21 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func outputLoop(ctx context.Context, sockets []dtap.Output, irbuf *dtap.RBuf) {
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		case frame := <-irbuf.Read():
-			for _, o := range sockets {
-				o.SetMessage(frame)
-			}
+func outputLoop(sockets []dtap.Output, irbuf *dtap.RBuf) {
+	log.Info("start outputLoop")
+	for frame := range irbuf.Read() {
+		for _, o := range sockets {
+			o.SetMessage(frame)
 		}
 	}
+	log.Info("finish outputLoop")
 }
 func outputError(errCh chan error) {
+	log.Info("start outputErrorLoop")
 	for err := range errCh {
 		log.Warnf("%+v", err)
 	}
+	log.Info("finish outputErrorLoop")
 }
 
 func fatalCheck(err error) {
@@ -144,39 +143,45 @@ func main() {
 
 	iRBuf := dtap.NewRbuf(config.InputMsgBuffer)
 	errCh := make(chan error, 128)
+
 	go outputError(errCh)
 	log.Info("start err outputer")
 
-	ctx, cancel := context.WithCancel(context.Background())
+	outputCtx, outputCancel := context.WithCancel(context.Background())
 	for _, o := range output {
-		go o.Run(ctx, errCh)
+		child, _ := context.WithCancel(outputCtx)
+		go o.Run(child, errCh)
 	}
-	log.Info("start output loop")
 
-	go outputLoop(ctx, output, iRBuf)
-	log.Info("start main output loop")
+	go outputLoop(output, iRBuf)
+
+	inputCtx, intputCancel := context.WithCancel(context.Background())
+
 	for _, i := range input {
-		go i.Run(ctx, iRBuf, errCh)
+		child, _ := context.WithCancel(inputCtx)
+		go i.Run(child, iRBuf, errCh)
 	}
-	log.Info("start input loop")
 
 	log.Info("finish boot dtap")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
-	select {
-	case <-sigCh:
-		cancel()
-	}
+
+	<-sigCh
+	log.Info("recieve signal")
+	intputCancel()
 	log.Info("wait finish input task")
 	for _, i := range input {
 		<-i.ReadDone()
 	}
 	log.Info("done")
+
 	log.Info("wait finish output task")
+	outputCancel()
 	for _, o := range output {
 		<-o.WriteDone()
 	}
 	log.Info("done")
-
+	iRBuf.Close()
+	close(errCh)
 }

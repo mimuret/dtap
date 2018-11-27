@@ -91,12 +91,10 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 }
 
 func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.input.Read(ctx, rbuf, errCh)
-	select {
-	case <-i.input.ReadDone():
-		close(i.readDone)
-		break
-	}
+	childCtx, _ := context.WithCancel(ctx)
+	go i.input.Read(childCtx, rbuf, errCh)
+	<-i.input.ReadDone()
+	close(i.readDone)
 }
 
 func (i *DnstapFstrmFileInput) ReadDone() <-chan struct{} {
