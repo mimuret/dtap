@@ -82,9 +82,8 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	}
 
 	i := &DnstapFstrmFileInput{
-		config:   config,
-		input:    input,
-		readDone: make(chan struct{}),
+		config: config,
+		input:  input,
 	}
 	return i, nil
 }
@@ -92,10 +91,5 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf) error {
 	childCtx, _ := context.WithCancel(ctx)
 	err := i.input.Read(childCtx, rbuf)
-	close(i.readDone)
 	return err
-}
-
-func (i *DnstapFstrmFileInput) ReadDone() <-chan struct{} {
-	return i.readDone
 }

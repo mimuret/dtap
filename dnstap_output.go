@@ -23,16 +23,14 @@ import (
 )
 
 type DnstapOutput struct {
-	handler   OutputHandler
-	rbuf      *RBuf
-	writeDone chan struct{}
+	handler OutputHandler
+	rbuf    *RBuf
 }
 
 func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput {
 	return &DnstapOutput{
-		handler:   handler,
-		rbuf:      NewRbuf(outputBufferSize),
-		writeDone: make(chan struct{}),
+		handler: handler,
+		rbuf:    NewRbuf(outputBufferSize),
 	}
 }
 func (o *DnstapOutput) Run(ctx context.Context) {
@@ -56,7 +54,6 @@ L:
 	}
 	log.Debug("close handle close")
 	o.handler.close()
-	close(o.writeDone)
 	log.Debug("output close")
 	return
 }
@@ -79,8 +76,4 @@ L:
 
 func (o *DnstapOutput) SetMessage(b []byte) {
 	o.rbuf.Write(b)
-}
-
-func (o *DnstapOutput) WriteDone() <-chan struct{} {
-	return o.writeDone
 }

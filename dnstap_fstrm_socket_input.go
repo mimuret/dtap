@@ -29,7 +29,6 @@ var closeWant string = "use of closed network connection"
 
 type DnstapFstrmSocketInput struct {
 	listener  net.Listener
-	readDone  chan struct{}
 	readError chan error
 }
 
@@ -37,7 +36,6 @@ func NewDnstapFstrmSocketInput(listener net.Listener) (*DnstapFstrmSocketInput, 
 	return &DnstapFstrmSocketInput{
 		listener:  listener,
 		readError: make(chan error),
-		readDone:  make(chan struct{}),
 	}, nil
 }
 
@@ -46,22 +44,18 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf) {
 	for {
 		conn, err := i.listener.Accept()
 		if err != nil {
-			if !strings.Contains(err.Error(), closeWant) && log.GetLevel() >= log.InfoLevel {
-				i.readError <- errors.Wrapf(err, "can't accept unix socket")
+			readCancel()
+			if strings.Contains(err.Error(), closeWant) {
+				i.readError <- nil
 				return
 			}
-			readCancel()
-			close(i.readDone)
-			break
+			i.readError <- errors.Wrapf(err, "can't accept unix socket")
+			return
 		}
 		input, err := NewDnstapFstrmInput(conn, true)
 		if err != nil {
-			if log.GetLevel() >= log.InfoLevel {
-				readCancel()
-				close(i.readDone)
-				i.readError <- errors.Wrapf(err, "can't create NewDnstapFstrmInput")
-				return
-			}
+			log.Debugf("can't create NewDnstapFstrmInput: %s", err)
+			continue
 		}
 		childCtx, _ := context.WithCancel(readCtx)
 		go input.Read(childCtx, rbuf)
@@ -78,13 +72,7 @@ func (i *DnstapFstrmSocketInput) Run(ctx context.Context, rbuf *RBuf) error {
 		i.listener.Close()
 	case err = <-i.readError:
 		break
-	case <-i.ReadDone():
-		break
 	}
 	log.Info("finish input")
 	return err
-}
-
-func (i *DnstapFstrmSocketInput) ReadDone() <-chan struct{} {
-	return i.readDone
 }
