@@ -62,35 +62,27 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	}
 
 	var data = map[string]interface{}{}
-	switch msg.GetType() {
-	case dnstap.Message_AUTH_QUERY, dnstap.Message_RESOLVER_QUERY,
-		dnstap.Message_CLIENT_QUERY, dnstap.Message_FORWARDER_QUERY,
-		dnstap.Message_STUB_QUERY, dnstap.Message_TOOL_QUERY:
-		data["@timestamp"] = time.Unix(int64(msg.GetQueryTimeSec()), int64(msg.GetQueryTimeNsec())).Format(time.RFC3339Nano)
-		if len(msg.GetQueryAddress()) == 4 {
-			data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv4Mask).String()
-		} else {
-			data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv6Mask).String()
-		}
-		data["query_port"] = msg.GetQueryPort()
-	case dnstap.Message_AUTH_RESPONSE, dnstap.Message_RESOLVER_RESPONSE,
-		dnstap.Message_CLIENT_RESPONSE, dnstap.Message_FORWARDER_RESPONSE,
-		dnstap.Message_STUB_RESPONSE, dnstap.Message_TOOL_RESPONSE:
-		data["@timestamp"] = time.Unix(int64(msg.GetResponseTimeSec()), int64(msg.GetResponseTimeNsec())).Format(time.RFC3339Nano)
-		if len(msg.GetResponseAddress()) == 4 {
-			data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv4Mask).String()
-		} else {
-			data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv6Mask).String()
-		}
-		data["response_port"] = msg.GetResponsePort()
-		data["response_zone"] = msg.GetQueryZone()
+	data["query_time"] = time.Unix(int64(msg.GetQueryTimeSec()), int64(msg.GetQueryTimeNsec())).Format(time.RFC3339Nano)
+	data["response_time"] = time.Unix(int64(msg.GetResponseTimeSec()), int64(msg.GetResponseTimeNsec())).Format(time.RFC3339Nano)
+	if len(msg.GetQueryAddress()) == 4 {
+		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv4Mask).String()
+	} else {
+		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv6Mask).String()
 	}
+	data["query_port"] = msg.GetQueryPort()
+	if len(msg.GetResponseAddress()) == 4 {
+		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv4Mask).String()
+	} else {
+		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv6Mask).String()
+	}
+	data["response_port"] = msg.GetResponsePort()
+	data["response_zone"] = msg.GetQueryZone()
 	data["identity"] = dt.GetIdentity()
 	if data["identity"] == nil {
 		data["identity"] = hostname
 	} else {
 		if identity, ok := data["indentity"].([]byte); ok {
-			if len(identity) == 0 {
+			if string(identity) == "" {
 				data["identity"] = hostname
 			}
 		}
@@ -126,6 +118,17 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	data["ra"] = dnsMsg.RecursionAvailable
 	data["ad"] = dnsMsg.AuthenticatedData
 	data["cd"] = dnsMsg.CheckingDisabled
+
+	switch msg.GetType() {
+	case dnstap.Message_AUTH_QUERY, dnstap.Message_RESOLVER_QUERY,
+		dnstap.Message_CLIENT_QUERY, dnstap.Message_FORWARDER_QUERY,
+		dnstap.Message_STUB_QUERY, dnstap.Message_TOOL_QUERY:
+		data["@timestamp"] = data["query_time"]
+	case dnstap.Message_AUTH_RESPONSE, dnstap.Message_RESOLVER_RESPONSE,
+		dnstap.Message_CLIENT_RESPONSE, dnstap.Message_FORWARDER_RESPONSE,
+		dnstap.Message_STUB_RESPONSE, dnstap.Message_TOOL_RESPONSE:
+		data["@timestamp"] = data["response_time"]
+	}
 
 	if err := client.Post(o.tag, data); err != nil {
 		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
