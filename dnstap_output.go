@@ -49,7 +49,7 @@ func (o *DnstapOutput) run(ctx context.Context, errCh chan error) {
 		case <-ctx.Done():
 			break
 		default:
-			if buf := o.rbuf.Read(); buf != nil {
+			if buf := <-o.rbuf.Read(); buf != nil {
 				if err := o.handler.write(buf); err != nil {
 					errCh <- err
 					break
