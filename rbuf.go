@@ -2,17 +2,23 @@ package dtap
 
 import (
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type RBuf struct {
-	channel chan []byte
-	mux     sync.Mutex
+	channel     chan []byte
+	mux         sync.Mutex
+	inCounter   prometheus.Counter
+	lostCounter prometheus.Counter
 }
 
-func NewRbuf(size uint) *RBuf {
+func NewRbuf(size uint, inCounter prometheus.Counter, lostCounter prometheus.Counter) *RBuf {
 	rbuf := &RBuf{
-		channel: make(chan []byte, size),
-		mux:     sync.Mutex{},
+		channel:     make(chan []byte, size),
+		mux:         sync.Mutex{},
+		inCounter:   inCounter,
+		lostCounter: lostCounter,
 	}
 	return rbuf
 }
@@ -24,8 +30,10 @@ func (r *RBuf) Read() <-chan []byte {
 func (r *RBuf) Write(b []byte) {
 	select {
 	case r.channel <- b:
+		r.inCounter.Inc()
 	default:
 		r.mux.Lock()
+		r.lostCounter.Inc()
 		<-r.channel
 		r.channel <- b
 		r.mux.Unlock()

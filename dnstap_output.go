@@ -30,7 +30,7 @@ type DnstapOutput struct {
 func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput {
 	return &DnstapOutput{
 		handler: handler,
-		rbuf:    NewRbuf(outputBufferSize),
+		rbuf:    NewRbuf(outputBufferSize, TotalRecvOutputFrame, TotalLostOutputFrame),
 	}
 }
 func (o *DnstapOutput) Run(ctx context.Context) {
