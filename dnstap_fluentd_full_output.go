@@ -55,7 +55,7 @@ func NewDnstapFluentFullOutput(config *OutputFluentConfig) *DnstapOutput {
 func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap) error {
 	var dnsMessage []byte
 	msg := dt.GetMessage()
-	if msg.GetQueryMessage != nil {
+	if msg.GetQueryMessage() != nil {
 		dnsMessage = msg.GetQueryMessage()
 	} else {
 		dnsMessage = msg.GetResponseMessage()
