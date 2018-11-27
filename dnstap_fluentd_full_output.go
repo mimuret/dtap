@@ -67,7 +67,6 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		dnstap.Message_CLIENT_QUERY, dnstap.Message_FORWARDER_QUERY,
 		dnstap.Message_STUB_QUERY, dnstap.Message_TOOL_QUERY:
 		data["@timestamp"] = time.Unix(int64(msg.GetQueryTimeSec()), int64(msg.GetQueryTimeNsec())).Format(time.RFC3339Nano)
-		data["identity"] = dt.GetIdentity()
 		if len(msg.GetQueryAddress()) == 4 {
 			data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv4Mask).String()
 		} else {
@@ -78,7 +77,6 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		dnstap.Message_CLIENT_RESPONSE, dnstap.Message_FORWARDER_RESPONSE,
 		dnstap.Message_STUB_RESPONSE, dnstap.Message_TOOL_RESPONSE:
 		data["@timestamp"] = time.Unix(int64(msg.GetResponseTimeSec()), int64(msg.GetResponseTimeNsec())).Format(time.RFC3339Nano)
-		data["identity"] = dt.GetIdentity()
 		if len(msg.GetResponseAddress()) == 4 {
 			data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv4Mask).String()
 		} else {
@@ -86,6 +84,10 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		}
 		data["response_port"] = msg.GetResponsePort()
 		data["response_zone"] = msg.GetQueryZone()
+	}
+	data["identity"] = dt.GetIdentity()
+	if data["identity"] == nil {
+		data["identity"] = hostname
 	}
 	data["type"] = msg.GetType().String()
 	data["socket_family"] = msg.GetSocketFamily().String()
