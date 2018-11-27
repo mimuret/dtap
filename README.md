@@ -79,6 +79,8 @@ Path = "/var/dnstap/dnstap-%Y%m%d-%H%M.fstrm"
 Make flatting DNSTAP message,And it forawrd to fluend host.
 If can't open socket, try reconnect interval 1s.
 
+Example setting is [here](elasticsearch.md)
+
 ```
 [[OutputFluent]]
 Host = "fluent.example.jp"
