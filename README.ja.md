@@ -79,6 +79,8 @@ Path = "/var/dnstap/dnstap-%Y%m%d-%H%M.fstrm"
 ### Fluent
 Inputで受け取ったメッセージをFlattingし、fluentdに転送します。
 
+設定例は[ここ](elasticsearch.md)
+
 ```
 [[OutputFluent]]
 Host = "fluent.example.jp"
