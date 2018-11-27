@@ -47,6 +47,9 @@ dnstap:
 
 ## dtap.toml
 ```
-[[InputUnixSocket]]
+[[InputUnix]]
+Path = "/var/run/unbound/dnstap.sock"
 
+[[OutputFluent]]
+Host = "localhost"
 ```
