@@ -78,7 +78,6 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	}
 	input, err := NewDnstapFstrmInput(r, false)
 	if err != nil {
-
 		return nil, errors.Wrapf(err, "failed to create fstrm input, path: %s", config.GetPath())
 	}
 
@@ -90,13 +89,11 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	return i, nil
 }
 
-func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.input.Read(ctx, rbuf, errCh)
-	select {
-	case <-i.input.ReadDone():
-		close(i.readDone)
-		break
-	}
+func (i *DnstapFstrmFileInput) Run(ctx context.Context, rbuf *RBuf) error {
+	childCtx, _ := context.WithCancel(ctx)
+	err := i.input.Read(childCtx, rbuf)
+	close(i.readDone)
+	return err
 }
 
 func (i *DnstapFstrmFileInput) ReadDone() <-chan struct{} {

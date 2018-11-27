@@ -19,58 +19,70 @@ package dtap
 import (
 	"context"
 	"net"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
+var closeWant string = "use of closed network connection"
+
 type DnstapFstrmSocketInput struct {
-	listener net.Listener
-	readDone chan struct{}
+	listener  net.Listener
+	readDone  chan struct{}
+	readError chan error
 }
 
 func NewDnstapFstrmSocketInput(listener net.Listener) (*DnstapFstrmSocketInput, error) {
 	return &DnstapFstrmSocketInput{
-		listener: listener,
-		readDone: make(chan struct{}),
+		listener:  listener,
+		readError: make(chan error),
+		readDone:  make(chan struct{}),
 	}, nil
 }
 
-func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	if log.GetLevel() >= log.DebugLevel {
-		errCh <- errors.New("start socket input")
-	}
+func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf) {
+	readCtx, readCancel := context.WithCancel(ctx)
 	for {
 		conn, err := i.listener.Accept()
 		if err != nil {
-			if log.GetLevel() >= log.InfoLevel {
-				errCh <- errors.Wrapf(err, "can't accept unix socket")
+			if !strings.Contains(err.Error(), closeWant) && log.GetLevel() >= log.InfoLevel {
+				i.readError <- errors.Wrapf(err, "can't accept unix socket")
+				return
 			}
+			readCancel()
 			close(i.readDone)
 			break
-		}
-		if log.GetLevel() >= log.DebugLevel {
-			errCh <- errors.New("accept connection")
 		}
 		input, err := NewDnstapFstrmInput(conn, true)
 		if err != nil {
 			if log.GetLevel() >= log.InfoLevel {
-				errCh <- errors.Wrapf(err, "can't create NewDnstapFstrmInput")
+				readCancel()
+				close(i.readDone)
+				i.readError <- errors.Wrapf(err, "can't create NewDnstapFstrmInput")
+				return
 			}
-			continue
 		}
-		go input.Read(ctx, rbuf, errCh)
+		childCtx, _ := context.WithCancel(readCtx)
+		go input.Read(childCtx, rbuf)
 	}
+	return
 }
 
-func (i *DnstapFstrmSocketInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.runRead(ctx, rbuf, errCh)
+func (i *DnstapFstrmSocketInput) Run(ctx context.Context, rbuf *RBuf) error {
+	var err error
+	childCtx, _ := context.WithCancel(ctx)
+	go i.runRead(childCtx, rbuf)
 	select {
 	case <-ctx.Done():
 		i.listener.Close()
+	case err = <-i.readError:
+		break
 	case <-i.ReadDone():
 		break
 	}
+	log.Info("finish input")
+	return err
 }
 
 func (i *DnstapFstrmSocketInput) ReadDone() <-chan struct{} {

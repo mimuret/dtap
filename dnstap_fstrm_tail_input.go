@@ -29,29 +29,28 @@ import (
 )
 
 type DnstapFstrmTailInput struct {
-	config   *InputTailConfig
-	modifies chan string
-	readers  map[string]bool
+	config    *InputTailConfig
+	readError chan error
+	modifies  chan string
+	readers   map[string]bool
 }
 
 func NewDnstapFstrmTailInput(config *InputTailConfig) *DnstapFstrmTailInput {
 	i := &DnstapFstrmTailInput{
-		config:   config,
-		modifies: make(chan string, 128),
-		readers:  map[string]bool{},
+		config:    config,
+		readError: make(chan error),
+		modifies:  make(chan string, 128),
+		readers:   map[string]bool{},
 	}
 	return i
 }
-func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context, errCh chan error) {
+func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context) error {
 	var last time.Time = time.Now()
 	mainTicker := time.NewTicker(time.Duration(60) * time.Second)
 	for {
 		matches, err := filepath.Glob(i.config.GetPath())
 		if err != nil {
-			if log.GetLevel() >= log.InfoLevel {
-
-				errCh <- errors.Wrapf(err, "search file error, path: %s", i.config.GetPath())
-			}
+			return errors.Wrapf(err, "search file error, path: %s", i.config.GetPath())
 		} else {
 			for _, filename := range matches {
 				if _, ok := i.readers[filename]; ok != false {
@@ -60,10 +59,7 @@ func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context, errCh chan err
 							i.modifies <- filename
 						}
 					} else {
-						if log.GetLevel() >= log.DebugLevel {
-
-							errCh <- errors.Wrapf(err, "stat file error, path: %s", filename)
-						}
+						log.Debugf("stat file error, %s, path: %s", err, filename)
 					}
 				}
 			}
@@ -71,28 +67,20 @@ func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context, errCh chan err
 		}
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case <-mainTicker.C:
 		}
 	}
 }
-func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string, rbuf *RBuf, errCh chan error) {
+func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string, rbuf *RBuf) error {
 	modify := make(chan bool)
 	f, err := os.Open(filename)
 	if err != nil {
-		if log.GetLevel() >= log.InfoLevel {
-
-			errCh <- errors.Wrapf(err, "can't open file, path: %s", filename)
-		}
-		return
+		return errors.Wrapf(err, "can't open file, path: %s", filename)
 	}
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		if log.GetLevel() >= log.InfoLevel {
-
-			errCh <- errors.Wrapf(err, "can't create file watcher")
-		}
-		return
+		return errors.Wrapf(err, "can't create file watcher")
 	}
 	defer watcher.Close()
 	watcher.Add(filename)
@@ -104,10 +92,7 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 				return
 			case event, ok := <-watcher.Events:
 				if !ok {
-					if log.GetLevel() >= log.DebugLevel {
-
-						errCh <- errors.Wrapf(err, "watch failed, path: %s", filename)
-					}
+					log.Debugf("watch failed, %s, path: %s", err, filename)
 					cancel()
 					return
 				}
@@ -119,33 +104,44 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 					cancel()
 					return
 				}
-				if log.GetLevel() >= log.DebugLevel {
-					errCh <- errors.Wrapf(err, "watch error path: %s", filename)
-				}
+				log.Debugf("watch failed, %s, path: %s", err, filename)
 			}
 		}
 	}()
 	input, err := NewDnstapFstrmInput(f, false)
 	if err != nil {
-		return
+		return err
 	}
 	for {
-		input.Read(ctx, rbuf, errCh)
+		input.Read(ctx, rbuf)
 		timer := time.NewTimer(5 * time.Minute)
 		select {
 		case <-timer.C:
 		case <-subCtx.Done():
 		case <-ctx.Done():
-			return
+			return nil
 		case <-modify:
 		}
 	}
 	delete(i.readers, filename)
+	return nil
 }
-func (i *DnstapFstrmTailInput) Run(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.runSearchPath(ctx, errCh)
-	for filename := range i.modifies {
-		i.readers[filename] = true
-		go i.runReadFile(ctx, filename, rbuf, errCh)
+func (i *DnstapFstrmTailInput) Run(ctx context.Context, rbuf *RBuf) error {
+	var err error
+	childCtx, _ := context.WithCancel(ctx)
+	go i.runSearchPath(childCtx)
+L:
+	for {
+		select {
+		case filename := <-i.modifies:
+			i.readers[filename] = true
+			childCtx, _ := context.WithCancel(ctx)
+			go i.runReadFile(childCtx, filename, rbuf)
+		case err = <-i.readError:
+			break L
+		case <-ctx.Done():
+			break L
+		}
 	}
+	return err
 }

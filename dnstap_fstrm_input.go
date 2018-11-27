@@ -23,16 +23,15 @@ import (
 	"github.com/pkg/errors"
 
 	dnstap "github.com/dnstap/golang-dnstap"
-	log "github.com/sirupsen/logrus"
 
 	framestream "github.com/farsightsec/golang-framestream"
 )
 
 type DnstapFstrmInput struct {
-	decoder  *framestream.Decoder
-	rc       io.ReadCloser
-	readDone chan struct{}
-	finished bool
+	decoder   *framestream.Decoder
+	rc        io.ReadCloser
+	readError chan error
+	finished  bool
 }
 
 func NewDnstapFstrmInput(rc io.ReadCloser, bi bool) (*DnstapFstrmInput, error) {
@@ -44,41 +43,38 @@ func NewDnstapFstrmInput(rc io.ReadCloser, bi bool) (*DnstapFstrmInput, error) {
 		return nil, errors.Wrapf(err, "can't create framestream Decoder")
 	}
 	return &DnstapFstrmInput{
-		rc:       rc,
-		decoder:  decoder,
-		readDone: make(chan struct{}),
+		rc:        rc,
+		decoder:   decoder,
+		readError: make(chan error),
 	}, nil
 }
-func (i *DnstapFstrmInput) read(rbuf *RBuf, errCh chan error) {
+func (i *DnstapFstrmInput) read(rbuf *RBuf) {
 	for {
 		buf, err := i.decoder.Decode()
 		if err != nil {
 			if err == io.EOF {
-				close(i.readDone)
+				i.readError <- nil
 				return
 			}
-			if log.GetLevel() >= log.DebugLevel {
-				errCh <- errors.Wrapf(err, "fstrm decode error")
-			}
-			break
+			i.readError <- errors.Wrap(err, "decode error")
+			return
 		}
 		newbuf := make([]byte, len(buf))
 		copy(newbuf, buf)
 		rbuf.Write(newbuf)
 	}
 }
-func (i *DnstapFstrmInput) Read(ctx context.Context, rbuf *RBuf, errCh chan error) {
-	go i.read(rbuf, errCh)
+func (i *DnstapFstrmInput) Read(ctx context.Context, rbuf *RBuf) error {
+	var err error
+	go i.read(rbuf)
+L:
 	for {
 		select {
 		case <-ctx.Done():
 			i.rc.Close()
-		case <-i.ReadDone():
-			break
+		case err = <-i.readError:
+			break L
 		}
 	}
-}
-
-func (i *DnstapFstrmInput) ReadDone() <-chan struct{} {
-	return i.readDone
+	return err
 }

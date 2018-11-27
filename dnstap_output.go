@@ -18,6 +18,8 @@ package dtap
 
 import (
 	"context"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type DnstapOutput struct {
@@ -33,30 +35,46 @@ func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput
 		writeDone: make(chan struct{}),
 	}
 }
-func (o *DnstapOutput) Run(ctx context.Context, errCh chan error) {
-	for {
-		if o.handler.open() != nil {
-			continue
-		}
-		o.run(ctx, errCh)
-	}
-	o.handler.close()
-	close(o.writeDone)
-}
-func (o *DnstapOutput) run(ctx context.Context, errCh chan error) {
+func (o *DnstapOutput) Run(ctx context.Context) {
+	var err error
+L:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			log.Debug("Run ctx done")
+			break L
 		default:
-			if buf := <-o.rbuf.Read(); buf != nil {
+			if o.handler.open() != nil {
+				continue
+			}
+			childCtx, _ := context.WithCancel(ctx)
+			if err = o.run(childCtx); err == nil {
+				break L
+			}
+			log.Debug("run loop")
+		}
+	}
+	log.Debug("close handle close")
+	o.handler.close()
+	close(o.writeDone)
+	log.Debug("output close")
+	return
+}
+func (o *DnstapOutput) run(ctx context.Context) error {
+L:
+	for {
+		select {
+		case <-ctx.Done():
+			break L
+		case buf := <-o.rbuf.Read():
+			if buf != nil {
 				if err := o.handler.write(buf); err != nil {
-					errCh <- err
-					break
+					return err
 				}
 			}
 		}
 	}
+	return nil
 }
 
 func (o *DnstapOutput) SetMessage(b []byte) {

@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 
 	"github.com/mimuret/dtap"
@@ -44,22 +45,14 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func outputLoop(ctx context.Context, sockets []dtap.Output, irbuf *dtap.RBuf) {
-	for {
-		select {
-		case <-ctx.Done():
-			break
-		case frame := <-irbuf.Read():
-			for _, o := range sockets {
-				o.SetMessage(frame)
-			}
+func outputLoop(sockets []dtap.Output, irbuf *dtap.RBuf) {
+	log.Info("start outputLoop")
+	for frame := range irbuf.Read() {
+		for _, o := range sockets {
+			o.SetMessage(frame)
 		}
 	}
-}
-func outputError(errCh chan error) {
-	for err := range errCh {
-		log.Warnf("%+v", err)
-	}
+	log.Info("finish outputLoop")
 }
 
 func fatalCheck(err error) {
@@ -143,40 +136,66 @@ func main() {
 	}
 
 	iRBuf := dtap.NewRbuf(config.InputMsgBuffer)
-	errCh := make(chan error, 128)
-	go outputError(errCh)
-	log.Info("start err outputer")
+	fatalCh := make(chan error)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	outputCtx, outputCancel := context.WithCancel(context.Background())
+	owg := &sync.WaitGroup{}
 	for _, o := range output {
-		go o.Run(ctx, errCh)
+		child, _ := context.WithCancel(outputCtx)
+		go func() {
+			owg.Add(1)
+			o.Run(child)
+			owg.Done()
+		}()
 	}
-	log.Info("start output loop")
 
-	go outputLoop(ctx, output, iRBuf)
-	log.Info("start main output loop")
+	go outputLoop(output, iRBuf)
+
+	inputCtx, intputCancel := context.WithCancel(context.Background())
+
+	iwg := &sync.WaitGroup{}
 	for _, i := range input {
-		go i.Run(ctx, iRBuf, errCh)
+		child, _ := context.WithCancel(inputCtx)
+		go func() {
+			iwg.Add(1)
+			err := i.Run(child, iRBuf)
+			iwg.Done()
+			if err != nil {
+				fatalCh <- err
+			}
+		}()
 	}
-	log.Info("start input loop")
+	inputFinish := make(chan struct{})
+	go func() {
+		iwg.Wait()
+		close(inputFinish)
+	}()
 
 	log.Info("finish boot dtap")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+
 	select {
 	case <-sigCh:
-		cancel()
+		log.Info("recieve signal")
+	case err := <-fatalCh:
+		log.Error(err)
+	case <-inputFinish:
+		log.Debug("finish all input task")
 	}
+
 	log.Info("wait finish input task")
-	for _, i := range input {
-		<-i.ReadDone()
-	}
-	log.Info("done")
-	log.Info("wait finish output task")
-	for _, o := range output {
-		<-o.WriteDone()
-	}
+	intputCancel()
+	iwg.Wait()
 	log.Info("done")
 
+	log.Info("wait finish output task")
+	outputCancel()
+	owg.Wait()
+	log.Info("done")
+
+	iRBuf.Close()
+
+	os.Exit(0)
 }
