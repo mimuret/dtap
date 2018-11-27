@@ -29,9 +29,8 @@ import (
 )
 
 type DnstapFstrmFileInput struct {
-	config   *InputFileConfig
-	input    *DnstapFstrmInput
-	readDone chan struct{}
+	config *InputFileConfig
+	input  *DnstapFstrmInput
 }
 
 type DnstapFstrmFileReadCloser struct {
