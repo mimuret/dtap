@@ -81,7 +81,7 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	if data["identity"] == nil {
 		data["identity"] = hostname
 	} else {
-		if identity, ok := data["indentity"].([]byte); ok {
+		if identity, ok := data["identity"].([]byte); ok {
 			if string(identity) == "" {
 				data["identity"] = hostname
 			}
