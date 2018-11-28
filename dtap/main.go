@@ -136,7 +136,7 @@ func main() {
 		log.Fatal("No output settings")
 	}
 
-	iRBuf := dtap.NewRbuf(config.InputMsgBuffer, dtap.TotalInputRecvFrame, TotalLostInputFrame)
+	iRBuf := dtap.NewRbuf(config.InputMsgBuffer, dtap.TotalRecvInputFrame, dtap.TotalLostInputFrame)
 	fatalCh := make(chan error)
 
 	outputCtx, outputCancel := context.WithCancel(context.Background())
