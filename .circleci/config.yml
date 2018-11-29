@@ -1,0 +1,26 @@
+version: 2
+jobs:
+  deploy:
+    environment:
+      - GOPATH: /home/circleci/go
+    docker:
+     - image: circleci/golang:1
+    steps:
+      - run: echo 'export PATH=${GOPATH}/bin/:${PATH}' >> $BASH_ENV
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: go get github.com/mitchellh/gox
+      - run: go get github.com/tcnksm/ghr
+      - run: gox -output "${GOPATH}/pkg/{{.Dir}}_{{.OS}}_{{.Arch}}"  ./ ./...
+      - run: ghr -u $CIRCLE_PROJECT_USERNAME $CIRCLE_TAG $GOPATH/pkg/
+
+workflows:
+  version: 2
+  deploy:
+    jobs:
+      - deploy:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
