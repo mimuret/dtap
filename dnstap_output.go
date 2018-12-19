@@ -42,11 +42,13 @@ L:
 			log.Debug("Run ctx done")
 			break L
 		default:
-			if o.handler.open() != nil {
+			if err := o.handler.open(); err != nil {
+				log.Debug(err)
 				continue
 			}
 			childCtx, _ := context.WithCancel(ctx)
 			if err = o.run(childCtx); err == nil {
+				log.Debug(err)
 				break L
 			}
 			log.Debug("run loop")

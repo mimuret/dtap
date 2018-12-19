@@ -46,10 +46,10 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func outputLoop(sockets []dtap.Output, irbuf *dtap.RBuf) {
+func outputLoop(outputs []dtap.Output, irbuf *dtap.RBuf) {
 	log.Info("start outputLoop")
 	for frame := range irbuf.Read() {
-		for _, o := range sockets {
+		for _, o := range outputs {
 			o.SetMessage(frame)
 		}
 	}
