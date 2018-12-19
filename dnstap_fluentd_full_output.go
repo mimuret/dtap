@@ -110,6 +110,8 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 				data[n] = dnsMsg.Question[0].Name
 			}
 		}
+		data["message_size"] = len(dnsMessage)
+		data["txid"] = dnsMsg.MsgHdr.Id
 	}
 	data["rcode"] = dns.RcodeToString[dnsMsg.Rcode]
 	data["aa"] = dnsMsg.Authoritative
