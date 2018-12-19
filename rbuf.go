@@ -28,16 +28,17 @@ func (r *RBuf) Read() <-chan []byte {
 }
 
 func (r *RBuf) Write(b []byte) {
+	r.mux.Lock()
 	select {
 	case r.channel <- b:
 		r.inCounter.Inc()
 	default:
-		r.mux.Lock()
 		r.lostCounter.Inc()
+		r.inCounter.Inc()
 		<-r.channel
 		r.channel <- b
-		r.mux.Unlock()
 	}
+	r.mux.Unlock()
 }
 
 func (r *RBuf) Close() {

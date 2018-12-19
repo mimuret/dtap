@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -30,5 +32,8 @@ var (
 
 func PrometheusExporter(ctx context.Context, listen string) {
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(listen, nil)
+	err := http.ListenAndServe(listen, nil)
+	if err != nil {
+		log.Error(err)
+	}
 }

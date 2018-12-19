@@ -35,6 +35,7 @@ func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput
 }
 func (o *DnstapOutput) Run(ctx context.Context) {
 	var err error
+	log.Debug("start output run")
 L:
 	for {
 		select {
@@ -46,6 +47,7 @@ L:
 				log.Debug(err)
 				continue
 			}
+			log.Debug("success open")
 			childCtx, _ := context.WithCancel(ctx)
 			if err = o.run(childCtx); err == nil {
 				log.Debug(err)
@@ -60,19 +62,21 @@ L:
 	return
 }
 func (o *DnstapOutput) run(ctx context.Context) error {
+	log.Debug("start writer")
 L:
 	for {
 		select {
 		case <-ctx.Done():
 			break L
-		case buf := <-o.rbuf.Read():
-			if buf != nil {
-				if err := o.handler.write(buf); err != nil {
+		case frame := <-o.rbuf.Read():
+			if frame != nil {
+				if err := o.handler.write(frame); err != nil {
 					return err
 				}
 			}
 		}
 	}
+	log.Debug("end writer")
 	return nil
 }
 

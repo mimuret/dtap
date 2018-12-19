@@ -27,6 +27,7 @@ import (
 	framestream "github.com/farsightsec/golang-framestream"
 	strftime "github.com/jehiah/go-strftime"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/ulikunitz/xz"
 )
 
@@ -38,15 +39,17 @@ type DnstapFstrmFileOutput struct {
 }
 
 func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
-	file := &DnstapFstrmFileOutput{
+	f := &DnstapFstrmFileOutput{
 		config: config,
 	}
-	return NewDnstapOutput(config.GetBufferSize(), file)
+	return NewDnstapOutput(config.GetBufferSize(), f)
 }
 
 func (o *DnstapFstrmFileOutput) open() error {
 	var w io.Writer
 	filename := strftime.Format(o.config.GetPath(), time.Now())
+	log.Debugf("open output file %s\n", filename)
+
 	f, err := os.Create(filename)
 	if err != nil {
 		return errors.Wrapf(err, "can't create file %s", filename)
@@ -75,10 +78,13 @@ func (o *DnstapFstrmFileOutput) open() error {
 			case <-o.opened:
 				return
 			case <-ticker.C:
-				o.enc.Flush()
+				if err := o.enc.Flush(); err != nil {
+					return
+				}
 				filename := strftime.Format(o.config.GetPath(), time.Now())
 				if filename != o.currentFilename {
 					o.enc.Close()
+					return
 				}
 			}
 		}
@@ -87,7 +93,10 @@ func (o *DnstapFstrmFileOutput) open() error {
 }
 
 func (o *DnstapFstrmFileOutput) write(frame []byte) error {
-	o.enc.Write(frame)
+	if _, err := o.enc.Write(frame); err != nil {
+		o.close()
+		return err
+	}
 	return nil
 }
 

@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mimuret/dtap"
 	log "github.com/sirupsen/logrus"
@@ -46,10 +47,10 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func outputLoop(outputs []dtap.Output, irbuf *dtap.RBuf) {
+func outputLoop(output []dtap.Output, irbuf *dtap.RBuf) {
 	log.Info("start outputLoop")
 	for frame := range irbuf.Read() {
-		for _, o := range outputs {
+		for _, o := range output {
 			o.SetMessage(frame)
 		}
 	}
@@ -143,13 +144,13 @@ func main() {
 	owg := &sync.WaitGroup{}
 	for _, o := range output {
 		child, _ := context.WithCancel(outputCtx)
-		go func() {
+		go func(o dtap.Output) {
 			owg.Add(1)
 			o.Run(child)
 			owg.Done()
-		}()
+		}(o)
 	}
-
+	time.Sleep(time.Second)
 	go outputLoop(output, iRBuf)
 
 	inputCtx, intputCancel := context.WithCancel(context.Background())
@@ -157,14 +158,15 @@ func main() {
 	iwg := &sync.WaitGroup{}
 	for _, i := range input {
 		child, _ := context.WithCancel(inputCtx)
-		go func() {
+		go func(i dtap.Input) {
 			iwg.Add(1)
 			err := i.Run(child, iRBuf)
-			iwg.Done()
 			if err != nil {
+				log.Error(err)
 				fatalCh <- err
 			}
-		}()
+			iwg.Done()
+		}(i)
 	}
 	inputFinish := make(chan struct{})
 	go func() {

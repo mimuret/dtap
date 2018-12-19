@@ -49,7 +49,9 @@ func (o *DnstapFstrmSocketOutput) open() error {
 			case <-o.opened:
 				return
 			case <-ticker.C:
-				o.enc.Flush()
+				if err := o.enc.Flush(); err != nil {
+					return
+				}
 			}
 		}
 	}()
