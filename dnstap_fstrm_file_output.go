@@ -46,7 +46,6 @@ func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
 }
 
 func (o *DnstapFstrmFileOutput) open() error {
-	var w io.Writer
 	filename := strftime.Format(o.config.GetPath(), time.Now())
 	f, err := os.Create(filename)
 	if err != nil {
