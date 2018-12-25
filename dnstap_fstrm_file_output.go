@@ -35,6 +35,7 @@ type DnstapFstrmFileOutput struct {
 	config          *OutputFileConfig
 	currentFilename string
 	enc             *framestream.Encoder
+	writer          io.WriteCloser
 	opened          chan bool
 }
 
@@ -46,7 +47,6 @@ func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
 }
 
 func (o *DnstapFstrmFileOutput) open() error {
-	var w io.Writer
 	filename := strftime.Format(o.config.GetPath(), time.Now())
 	log.Debugf("open output file %s\n", filename)
 
@@ -55,17 +55,17 @@ func (o *DnstapFstrmFileOutput) open() error {
 		return errors.Wrapf(err, "can't create file %s", filename)
 	}
 	if strings.HasSuffix(filename, "gz") {
-		w = gzip.NewWriter(f)
+		o.writer = gzip.NewWriter(f)
 	} else if strings.HasSuffix(filename, "xz") {
-		w, err = xz.NewWriter(f)
+		o.writer, err = xz.NewWriter(f)
 		if err != nil {
 			return errors.Wrapf(err, "can't create xz wirter file %s", filename)
 		}
 	} else {
-		w = f
+		o.writer = f
 	}
 
-	o.enc, err = framestream.NewEncoder(w, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: false})
+	o.enc, err = framestream.NewEncoder(o.writer, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: false})
 	if err != nil {
 		return errors.Wrapf(err, "can't create framestream encorder %s", filename)
 	}
@@ -84,6 +84,8 @@ func (o *DnstapFstrmFileOutput) open() error {
 				filename := strftime.Format(o.config.GetPath(), time.Now())
 				if filename != o.currentFilename {
 					o.enc.Close()
+					o.writer.Close()
+					ticker.Stop()
 					return
 				}
 			}
@@ -103,5 +105,6 @@ func (o *DnstapFstrmFileOutput) write(frame []byte) error {
 func (o *DnstapFstrmFileOutput) close() {
 	o.enc.Flush()
 	o.enc.Close()
+	o.writer.Close()
 	close(o.opened)
 }
