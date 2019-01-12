@@ -86,3 +86,13 @@ Example setting is [here](elasticsearch.md)
 Host = "fluent.example.jp"
 Tag  = "dnstap.message"
 ```
+
+### Fluent
+Make flatting DNSTAP message,And it forawrd to kafka host.
+
+
+```
+[[OutputKafks]]
+Hosts = ["kafka.example.jp"]
+Topic  = "dnstap_message"
+```

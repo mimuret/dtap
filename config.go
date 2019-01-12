@@ -37,6 +37,7 @@ type Config struct {
 	OutputFile     []*OutputFileConfig
 	OutputTCP      []*OutputTCPSocketConfig
 	OutputFluent   []*OutputFluentConfig
+	OutputKafka    []*OutputKafkaConfig
 }
 
 func (c *Config) Validate() []error {
@@ -89,6 +90,13 @@ func (c *Config) Validate() []error {
 	for n, o := range c.OutputFluent {
 		if err := o.Validate(); err != nil {
 			err.configType = "OutputFluent"
+			err.no = n
+			errs = append(errs, err)
+		}
+	}
+	for n, o := range c.OutputKafka {
+		if err := o.Validate(); err != nil {
+			err.configType = "OutputKafka"
 			err.no = n
 			errs = append(errs, err)
 		}
@@ -223,8 +231,8 @@ func (i *InputTCPSocketConfig) GetNet() string {
 }
 
 type OutputUnixSocketConfig struct {
-	Path       string
-	BufferSize uint
+	Path string
+	OutputBufferConfig
 }
 
 func (o *OutputUnixSocketConfig) Validate() *ValidationError {
@@ -239,17 +247,10 @@ func (o *OutputUnixSocketConfig) GetPath() string {
 	return o.Path
 }
 
-func (o *OutputUnixSocketConfig) GetBufferSize() uint {
-	if o.BufferSize == 0 {
-		return OutputBufferSize
-	}
-	return o.BufferSize
-}
-
 type OutputFileConfig struct {
-	Path       string
-	User       string
-	BufferSize uint
+	Path string
+	User string
+	OutputBufferConfig
 }
 
 func (o *OutputFileConfig) Validate() *ValidationError {
@@ -267,17 +268,10 @@ func (o *OutputFileConfig) GetUser() string {
 	return o.User
 }
 
-func (o *OutputFileConfig) GetBufferSize() uint {
-	if o.BufferSize == 0 {
-		return OutputBufferSize
-	}
-	return o.BufferSize
-}
-
 type OutputTCPSocketConfig struct {
-	Host       string
-	Port       uint16
-	BufferSize uint
+	Host string
+	Port uint16
+	OutputBufferConfig
 }
 
 func (o *OutputTCPSocketConfig) Validate() *ValidationError {
@@ -300,56 +294,41 @@ func (o *OutputTCPSocketConfig) GetAddress() string {
 	return host + ":" + strconv.Itoa(int(port))
 }
 
-func (o *OutputTCPSocketConfig) GetBufferSize() uint {
-	if o.BufferSize == 0 {
-		return OutputBufferSize
-	}
-	return o.BufferSize
-}
-
 type OutputFluentConfig struct {
-	Host       string
-	Tag        string
-	Port       uint16
-	IPv4Mask   uint8
-	IPv6Mask   uint8
-	BufferSize uint
+	Host string
+	Tag  string
+	Port uint16
+	OutputCommonConfig
+	OutputBufferConfig
 }
 
 func (o *OutputFluentConfig) Validate() *ValidationError {
-	err := NewValidationError()
+	valerr := NewValidationError()
 	if o.Host == "" {
-		err.Add(errors.New("Host must not be empty"))
+		valerr.Add(errors.New("Host must not be empty"))
 	}
 	if o.Tag == "" {
-		err.Add(errors.New("Tag must not be empty"))
+		valerr.Add(errors.New("Tag must not be empty"))
 	} else {
 		r := regexp.MustCompile(`^[a-z0-9_]+$`)
 		labels := strings.Split(o.Tag, ".")
 		for _, label := range labels {
 			if r.MatchString(label) {
-				err.Add(errors.New("Tag characters must only include lower-case alphabets, digits underscore and dot"))
+				valerr.Add(errors.New("Tag characters must only include lower-case alphabets, digits underscore and dot"))
 				break
 			}
 		}
 		if o.Tag[0] == '.' {
-			err.Add(errors.New("First part of a tag is empty"))
+			valerr.Add(errors.New("First part of a tag is empty"))
 		}
 		if o.Tag[len(o.Tag)-1] == '.' {
-			err.Add(errors.New("Last part of a tag is empty"))
-		}
-		if o.IPv4Mask != 0 {
-			if o.IPv4Mask > 32 {
-				err.Add(errors.New("IPv4Mask must include range 0 to 32"))
-			}
-		}
-		if o.IPv6Mask != 0 {
-			if o.IPv6Mask > 128 {
-				err.Add(errors.New("IPv4Mask must include range 0 to 128"))
-			}
+			valerr.Add(errors.New("Last part of a tag is empty"))
 		}
 	}
-	return err.Err()
+	if err := o.OutputCommonConfig.Validate(); err != nil {
+		valerr.Add(err)
+	}
+	return valerr.Err()
 }
 
 func (o *OutputFluentConfig) GetHost() string {
@@ -367,23 +346,79 @@ func (o *OutputFluentConfig) GetPort() int {
 	return int(o.Port)
 }
 
-func (o *OutputFluentConfig) GetIPv4Mask() int {
+type OutputKafkaConfig struct {
+	Hosts []string
+	Retry uint
+	Topic string
+	OutputCommonConfig
+	OutputBufferConfig
+}
+
+func (o *OutputKafkaConfig) Validate() *ValidationError {
+	valerr := NewValidationError()
+	if o.Topic == "" {
+		valerr.Add(errors.New("Topic must not be empty"))
+	}
+	if len(o.Hosts) == 0 {
+		valerr.Add(errors.New("Hosts must not be empty"))
+	}
+	if err := o.OutputCommonConfig.Validate(); err != nil {
+		valerr.Add(err)
+	}
+	return valerr.Err()
+}
+
+func (o *OutputKafkaConfig) GetHosts() []string {
+	return o.Hosts
+}
+func (o *OutputKafkaConfig) GetRetry() uint {
+	return o.Retry
+}
+func (o *OutputKafkaConfig) GetTopic() string {
+	return o.Topic
+}
+
+type OutputBufferConfig struct {
+	BufferSize uint
+}
+
+func (o *OutputBufferConfig) GetBufferSize() uint {
+	if o.BufferSize == 0 {
+		return OutputBufferSize
+	}
+	return o.BufferSize
+}
+
+type OutputCommonConfig struct {
+	IPv4Mask uint8
+	IPv6Mask uint8
+}
+
+func (o *OutputCommonConfig) GetIPv4Mask() int {
 	if o.IPv4Mask == 0 {
 		return 24
 	}
 	return int(o.IPv4Mask)
 }
 
-func (o *OutputFluentConfig) GetIPv6Mask() int {
+func (o *OutputCommonConfig) GetIPv6Mask() int {
 	if o.IPv4Mask == 0 {
 		return 48
 	}
 	return int(o.IPv6Mask)
 }
 
-func (o *OutputFluentConfig) GetBufferSize() uint {
-	if o.BufferSize == 0 {
-		return OutputBufferSize
+func (o *OutputCommonConfig) Validate() *ValidationError {
+	valerr := NewValidationError()
+	if o.IPv4Mask != 0 {
+		if o.IPv4Mask > 32 {
+			valerr.Add(errors.New("IPv4Mask must include range 0 to 32"))
+		}
 	}
-	return o.BufferSize
+	if o.IPv6Mask != 0 {
+		if o.IPv6Mask > 128 {
+			valerr.Add(errors.New("IPv4Mask must include range 0 to 128"))
+		}
+	}
+	return valerr.Err()
 }

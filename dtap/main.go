@@ -129,7 +129,12 @@ func main() {
 	}
 
 	for _, oc := range config.OutputFluent {
-		o := dtap.NewDnstapFluentFullOutput(oc)
+		o := dtap.NewDnstapFluentdOutput(oc)
+		output = append(output, o)
+	}
+
+	for _, oc := range config.OutputKafka {
+		o := dtap.NewDnstapKafkaOutput(oc)
 		output = append(output, o)
 	}
 
