@@ -87,7 +87,7 @@ Host = "fluent.example.jp"
 Tag  = "dnstap.message"
 ```
 
-### Fluent
+### Kafka
 Make flatting DNSTAP message,And it forawrd to kafka host.
 
 
