@@ -17,9 +17,10 @@
 package dtap
 
 import (
+	"net"
+
 	"github.com/pkg/errors"
 
-	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/farsightsec/golang-framestream"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"github.com/golang/protobuf/proto"
@@ -29,25 +30,29 @@ type DnstapFluentdOutput struct {
 	config      *OutputFluentConfig
 	fluetConfig fluent.Config
 	enc         *framestream.Encoder
-	logger      *fluent.Fluent
-	handler     FluetOutput
+	client      *fluent.Fluent
+	ipv4Mask    net.IPMask
+	ipv6Mask    net.IPMask
+	tag         string
 }
 
-func NewDnstapFluentdOutput(config *OutputFluentConfig, handler FluetOutput) *DnstapOutput {
+func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 	o := &DnstapFluentdOutput{
-		config: config,
+		config:   config,
+		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
+		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
 		fluetConfig: fluent.Config{
 			FluentHost: config.GetHost(),
 			FluentPort: config.GetPort(),
 			Async:      false},
-		handler: handler,
+		tag: config.GetTag(),
 	}
 	return NewDnstapOutput(config.GetBufferSize(), o)
 }
 
 func (o *DnstapFluentdOutput) open() error {
 	var err error
-	o.logger, err = fluent.New(o.fluetConfig)
+	o.client, err = fluent.New(o.fluetConfig)
 	if err != nil {
 		return errors.Wrapf(err, "can't create fluent logger")
 	}
@@ -56,14 +61,18 @@ func (o *DnstapFluentdOutput) open() error {
 }
 
 func (o *DnstapFluentdOutput) write(frame []byte) error {
-	dt := &dnstap.Dnstap{}
+	dt := &Dnstap{}
 	if err := proto.Unmarshal(frame, dt); err != nil {
 		return err
 	}
-	o.handler.handle(o.logger, dt)
+	if data, err := dt.Flat(o.ipv4Mask, o.ipv6Mask); err != nil {
+		return err
+	} else if err := o.client.Post(o.tag, data); err != nil {
+		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
+	}
 	return nil
 }
 
 func (o *DnstapFluentdOutput) close() {
-	o.logger.Close()
+	o.client.Close()
 }

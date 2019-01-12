@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Manabu Sonoda
+ * Copyright (c) 2019 Manabu Sonoda
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,37 +23,24 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/fluent/fluent-logger-golang/fluent"
-
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
 )
 
-type DnstapFluentFullOutput struct {
-	config   *OutputFluentConfig
-	ipv4Mask net.IPMask
-	ipv6Mask net.IPMask
-	tag      string
+type Dnstap struct {
+	dnstap.Dnstap
 }
 
-var names = map[int]string{
-	2: "tld",
-	3: "2ld",
-	4: "3ld",
-	5: "4ld",
-}
-
-func NewDnstapFluentFullOutput(config *OutputFluentConfig) *DnstapOutput {
-	mo := &DnstapFluentFullOutput{
-		config:   config,
-		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
-		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
-		tag:      config.GetTag(),
+func (dt *Dnstap) Flat(ipv4Mask net.IPMask, ipv6Mask net.IPMask) (map[string]interface{}, error) {
+	var names = map[int]string{
+		2: "tld",
+		3: "2ld",
+		4: "3ld",
+		5: "4ld",
 	}
-	return NewDnstapFluentdOutput(config, mo)
-}
-func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap) error {
+
 	var dnsMessage []byte
+	var data = make(map[string]interface{})
 	msg := dt.GetMessage()
 	if msg.GetQueryMessage() != nil {
 		dnsMessage = msg.GetQueryMessage()
@@ -61,20 +48,20 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		dnsMessage = msg.GetResponseMessage()
 	}
 
-	var data = map[string]interface{}{}
 	data["query_time"] = time.Unix(int64(msg.GetQueryTimeSec()), int64(msg.GetQueryTimeNsec())).Format(time.RFC3339Nano)
 	data["response_time"] = time.Unix(int64(msg.GetResponseTimeSec()), int64(msg.GetResponseTimeNsec())).Format(time.RFC3339Nano)
 	if len(msg.GetQueryAddress()) == 4 {
-		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv4Mask).String()
+		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(ipv4Mask).String()
 	} else {
-		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(o.ipv6Mask).String()
+		data["query_address"] = net.IP(msg.GetQueryAddress()).Mask(ipv6Mask).String()
 	}
 	data["query_port"] = msg.GetQueryPort()
 	if len(msg.GetResponseAddress()) == 4 {
-		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv4Mask).String()
+		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(ipv4Mask).String()
 	} else {
-		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(o.ipv6Mask).String()
+		data["response_address"] = net.IP(msg.GetResponseAddress()).Mask(ipv6Mask).String()
 	}
+
 	data["response_port"] = msg.GetResponsePort()
 	data["response_zone"] = msg.GetQueryZone()
 	data["identity"] = dt.GetIdentity()
@@ -94,7 +81,7 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 	data["extra"] = dt.GetExtra()
 	dnsMsg := dns.Msg{}
 	if err := dnsMsg.Unpack(dnsMessage); err != nil {
-		return errors.Wrapf(err, "can't parse dns message() failed: %s\n", err)
+		return nil, errors.Wrapf(err, "can't parse dns message() failed: %s\n", err)
 	}
 
 	if len(dnsMsg.Question) > 0 {
@@ -132,8 +119,5 @@ func (o *DnstapFluentFullOutput) handle(client *fluent.Fluent, dt *dnstap.Dnstap
 		data["@timestamp"] = data["response_time"]
 	}
 
-	if err := client.Post(o.tag, data); err != nil {
-		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
-	}
-	return nil
+	return data, nil
 }
