@@ -38,6 +38,7 @@ type Config struct {
 	OutputTCP      []*OutputTCPSocketConfig
 	OutputFluent   []*OutputFluentConfig
 	OutputKafka    []*OutputKafkaConfig
+	OutputNats     []*OutputNatsConfig
 }
 
 func (c *Config) Validate() []error {
@@ -376,6 +377,37 @@ func (o *OutputKafkaConfig) GetRetry() uint {
 }
 func (o *OutputKafkaConfig) GetTopic() string {
 	return o.Topic
+}
+
+type OutputNatsConfig struct {
+	Host     string
+	Subject  string
+	User     string
+	Password string
+	Token    string
+	OutputCommonConfig
+	OutputBufferConfig
+}
+
+func (o *OutputNatsConfig) Validate() *ValidationError {
+	valerr := NewValidationError()
+	if err := o.OutputCommonConfig.Validate(); err != nil {
+		valerr.Add(err)
+	}
+	return valerr.Err()
+}
+
+func (o *OutputNatsConfig) GetHost() string {
+	return o.Host
+}
+func (o *OutputNatsConfig) GetSubject() string {
+	return o.Subject
+}
+func (o *OutputNatsConfig) GetUser() string {
+	return o.User
+}
+func (o *OutputNatsConfig) GetPassword() string {
+	return o.Password
 }
 
 type OutputBufferConfig struct {

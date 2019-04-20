@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/farsightsec/golang-framestream"
+	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )

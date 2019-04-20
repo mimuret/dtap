@@ -17,10 +17,8 @@
 package dtap
 
 import (
-	"compress/gzip"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
@@ -28,7 +26,6 @@ import (
 	strftime "github.com/jehiah/go-strftime"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/ulikunitz/xz"
 )
 
 type DnstapFstrmFileOutput struct {
@@ -50,20 +47,11 @@ func (o *DnstapFstrmFileOutput) open() error {
 	filename := strftime.Format(o.config.GetPath(), time.Now())
 	log.Debugf("open output file %s\n", filename)
 
-	f, err := os.Create(filename)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		return errors.Wrapf(err, "can't create file %s", filename)
 	}
-	if strings.HasSuffix(filename, "gz") {
-		o.writer = gzip.NewWriter(f)
-	} else if strings.HasSuffix(filename, "xz") {
-		o.writer, err = xz.NewWriter(f)
-		if err != nil {
-			return errors.Wrapf(err, "can't create xz wirter file %s", filename)
-		}
-	} else {
-		o.writer = f
-	}
+	o.writer = f
 
 	o.enc, err = framestream.NewEncoder(o.writer, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: false})
 	if err != nil {
