@@ -27,11 +27,37 @@ import (
 	"github.com/miekg/dns"
 )
 
-type Dnstap struct {
-	dnstap.Dnstap
+type DnstapFlatT struct {
+	Timestamp       time.Time `json:timestamp`
+	QueryTime       time.Time `json:"query_time,omitempty"`
+	QueryAddress    string    `json:"query_address,omitempty"`
+	QueryPort       uint32    `json:"query_port,omitempty"`
+	ResponseTime    time.Time `json:"response_time,omitempty"`
+	ResponseAddress string    `json:"response_address,omitempty"`
+	ResponsePort    uint32    `json:"response_port,omitempty"`
+	ResponseZone    string    `json:"response_zone,omitempty"`
+	Identity        string    `json:"identity,omitempty"`
+	Type            string    `json:"type"`
+	SocketFamily    string    `json:"socket_family"`
+	SocketProtocol  string    `json:"socket_protocol"`
+	Version         string    `json:"version"`
+	Extra           string    `json:"extra"`
+	Names           []string  `json:"names"`
+	Qname           string    `json:"qname"`
+	Qclass          string    `json:"qclass"`
+	Qtype           string    `json:"qtype"`
+	MessageSize     int       `json:"message_size"`
+	Txid            uint16    `json:"txid"`
+	Rcode           string    `json:"rcode"`
+	AA              bool      `json:"aa"`
+	TC              bool      `json:"tc"`
+	RD              bool      `json:"rd"`
+	RA              bool      `json:"ra"`
+	AD              bool      `json:"ad"`
+	CD              bool      `json:"cd"`
 }
 
-func (dt *Dnstap) Flat(ipv4Mask net.IPMask, ipv6Mask net.IPMask) (map[string]interface{}, error) {
+func FlatDnstap(dt *dnstap.Dnstap, ipv4Mask net.IPMask, ipv6Mask net.IPMask) (map[string]interface{}, error) {
 	var names = map[int]string{
 		2: "tld",
 		3: "2ld",

@@ -138,6 +138,11 @@ func main() {
 		output = append(output, o)
 	}
 
+	for _, oc := range config.OutputNats {
+		o := dtap.NewDnstapNatsOutput(oc)
+		output = append(output, o)
+	}
+
 	if len(output) == 0 {
 		log.Fatal("No output settings")
 	}

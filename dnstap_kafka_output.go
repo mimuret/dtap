@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -62,11 +63,11 @@ func (o *DnstapKafkaOutput) open() error {
 }
 
 func (o *DnstapKafkaOutput) write(frame []byte) error {
-	dt := &Dnstap{}
-	if err := proto.Unmarshal(frame, dt); err != nil {
+	dt := dnstap.Dnstap{}
+	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	data, err := dt.Flat(o.ipv4Mask, o.ipv6Mask)
+	data, err := FlatDnstap(&dt, o.ipv4Mask, o.ipv6Mask)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,6 @@ func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput
 	}
 }
 func (o *DnstapOutput) Run(ctx context.Context) {
-	var err error
 	log.Debug("start output run")
 L:
 	for {
@@ -49,14 +48,17 @@ L:
 			}
 			log.Debug("success open")
 			childCtx, _ := context.WithCancel(ctx)
-			if err = o.run(childCtx); err == nil {
+			err := o.run(childCtx)
+			log.Debug("close handle close")
+			o.handler.close()
+
+			if err != nil {
 				log.Debug(err)
+			} else {
 				break L
 			}
-			log.Debug("run loop")
 		}
 	}
-	log.Debug("close handle close")
 	o.handler.close()
 	log.Debug("output close")
 	return
@@ -71,6 +73,7 @@ L:
 		case frame := <-o.rbuf.Read():
 			if frame != nil {
 				if err := o.handler.write(frame); err != nil {
+					log.Debugf("writer error: %v", err)
 					return err
 				}
 			}

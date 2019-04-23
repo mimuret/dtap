@@ -19,9 +19,10 @@ package dtap
 import (
 	"net"
 
+	dnstap "github.com/dnstap/golang-dnstap"
+	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/pkg/errors"
 
-	"github.com/farsightsec/golang-framestream"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"github.com/golang/protobuf/proto"
 )
@@ -61,11 +62,11 @@ func (o *DnstapFluentdOutput) open() error {
 }
 
 func (o *DnstapFluentdOutput) write(frame []byte) error {
-	dt := &Dnstap{}
-	if err := proto.Unmarshal(frame, dt); err != nil {
+	dt := dnstap.Dnstap{}
+	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	if data, err := dt.Flat(o.ipv4Mask, o.ipv6Mask); err != nil {
+	if data, err := FlatDnstap(&dt, o.ipv4Mask, o.ipv6Mask); err != nil {
 		return err
 	} else if err := o.client.Post(o.tag, data); err != nil {
 		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)

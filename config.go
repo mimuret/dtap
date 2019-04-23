@@ -409,6 +409,9 @@ func (o *OutputNatsConfig) GetUser() string {
 func (o *OutputNatsConfig) GetPassword() string {
 	return o.Password
 }
+func (o *OutputNatsConfig) GetToken() string {
+	return o.Token
+}
 
 type OutputBufferConfig struct {
 	BufferSize uint
