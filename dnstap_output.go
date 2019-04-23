@@ -59,8 +59,6 @@ L:
 			}
 		}
 	}
-	o.handler.close()
-	log.Debug("output close")
 	return
 }
 func (o *DnstapOutput) run(ctx context.Context) error {

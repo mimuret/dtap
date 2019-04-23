@@ -20,12 +20,14 @@ import (
 	"encoding/json"
 	"net"
 	"sync"
+	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/log"
 )
 
 type DnstapNatsOutput struct {
@@ -34,9 +36,10 @@ type DnstapNatsOutput struct {
 	con        *nats.Conn
 	mux        *sync.Mutex
 	dataString []byte
-	data       []string
+	data       []*DnstapFlatT
 	ipv4Mask   net.IPMask
 	ipv6Mask   net.IPMask
+	closeCh    chan struct{}
 }
 
 func NewDnstapNatsOutput(config *OutputNatsConfig) *DnstapOutput {
@@ -44,7 +47,7 @@ func NewDnstapNatsOutput(config *OutputNatsConfig) *DnstapOutput {
 		config:   config,
 		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
 		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
-		data:     []string{},
+		data:     []*DnstapFlatT{},
 		mux:      new(sync.Mutex),
 	}
 	return NewDnstapOutput(config.GetBufferSize(), o)
@@ -62,6 +65,8 @@ func (o *DnstapNatsOutput) open() error {
 	if err != nil {
 		return errors.Wrapf(err, "can't create nats producer")
 	}
+	o.closeCh = make(chan struct{})
+	go o.flush()
 	return nil
 }
 
@@ -74,31 +79,41 @@ func (o *DnstapNatsOutput) write(frame []byte) error {
 	if err != nil {
 		return err
 	}
-	bs, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	o.data = append(o.data, string(bs))
-	o.dataString, err = json.Marshal(o.data)
-	if err != nil {
-		return err
-	}
-	if len(o.dataString) > int(o.config.GetBufferSize()) {
-		o.publish()
-	}
+	o.mux.Lock()
+	o.data = append(o.data, data)
+	o.mux.Unlock()
 	return nil
 }
+
+func (o *DnstapNatsOutput) flush() {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	for {
+		select {
+		case <-ticker.C:
+			o.publish()
+		}
+	}
+}
+
 func (o *DnstapNatsOutput) publish() {
 	o.mux.Lock()
-	if len(o.dataString) != 0 {
-		o.con.Publish(o.config.GetSubject(), o.dataString)
+	if len(o.data) == 0 {
+		o.mux.Unlock()
+		return
 	}
-	o.dataString = []byte{}
-	o.data = []string{}
+	buf, err := json.Marshal(o.data)
+	o.data = []*DnstapFlatT{}
 	o.mux.Unlock()
+	if err != nil {
+		return
+	}
+	if err := o.con.Publish(o.config.GetSubject(), buf); err != nil {
+		log.Warn("publish error: %v", err)
+	}
 }
 
 func (o *DnstapNatsOutput) close() {
+	close(o.closeCh)
 	o.publish()
 	o.con.Close()
 }
