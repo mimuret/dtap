@@ -3,22 +3,7 @@ type = "sock"
 path = "/var/run/unbound/dnstap.sock"
 user = "unbound"
 
-[[OutputUnix]]
-path = "/var/run/dtap/tap1.sock"
-user = "dnstap"
-
-[[OutputUnix]]
-path = "/var/run/dtap/tap2.sock"
-user = "root"
-
-[[OutputTCP]]
-type = "tcp"
-host = "dnstap.example.jp"
-port = "10053"
-
 [[OutputFluent]]
-type = "tcp"
 host = "fluent.example.jp"
 port = 24224
 tag = "dnstap-message"
-
