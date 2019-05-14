@@ -425,8 +425,9 @@ func (o *OutputBufferConfig) GetBufferSize() uint {
 }
 
 type OutputCommonConfig struct {
-	IPv4Mask uint8
-	IPv6Mask uint8
+	IPv4Mask  uint8
+	IPv6Mask  uint8
+	EnableECS bool
 }
 
 func (o *OutputCommonConfig) GetIPv4Mask() int {

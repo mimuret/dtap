@@ -32,16 +32,18 @@ type DnstapFluentdOutput struct {
 	fluetConfig fluent.Config
 	enc         *framestream.Encoder
 	client      *fluent.Fluent
-	ipv4Mask    net.IPMask
-	ipv6Mask    net.IPMask
+	flatOption  DnstapFlatOption
 	tag         string
 }
 
 func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 	o := &DnstapFluentdOutput{
-		config:   config,
-		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
-		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
+		config: config,
+		flatOption: DnstapFlatOption{
+			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
+			EnableECS: config.EnableECS,
+		},
 		fluetConfig: fluent.Config{
 			FluentHost: config.GetHost(),
 			FluentPort: config.GetPort(),
@@ -66,7 +68,7 @@ func (o *DnstapFluentdOutput) write(frame []byte) error {
 	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	if data, err := FlatDnstap(&dt, o.ipv4Mask, o.ipv6Mask); err != nil {
+	if data, err := FlatDnstap(&dt, o.flatOption); err != nil {
 		return err
 	} else if err := o.client.Post(o.tag, data); err != nil {
 		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)

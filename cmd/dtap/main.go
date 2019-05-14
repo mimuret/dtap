@@ -25,7 +25,6 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/mimuret/dtap"
 	log "github.com/sirupsen/logrus"
@@ -154,13 +153,12 @@ func main() {
 	owg := &sync.WaitGroup{}
 	for _, o := range output {
 		child, _ := context.WithCancel(outputCtx)
+		owg.Add(1)
 		go func(o dtap.Output) {
-			owg.Add(1)
 			o.Run(child)
 			owg.Done()
 		}(o)
 	}
-	time.Sleep(time.Second)
 	go outputLoop(output, iRBuf)
 
 	inputCtx, intputCancel := context.WithCancel(context.Background())
@@ -168,8 +166,8 @@ func main() {
 	iwg := &sync.WaitGroup{}
 	for _, i := range input {
 		child, _ := context.WithCancel(inputCtx)
+		iwg.Add(1)
 		go func(i dtap.Input) {
-			iwg.Add(1)
 			err := i.Run(child, iRBuf)
 			if err != nil {
 				log.Error(err)

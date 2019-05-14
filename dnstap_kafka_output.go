@@ -34,8 +34,7 @@ type DnstapKafkaOutput struct {
 	enc         *framestream.Encoder
 	kafkaConfig *sarama.Config
 	producer    sarama.AsyncProducer
-	ipv4Mask    net.IPMask
-	ipv6Mask    net.IPMask
+	flatOption  DnstapFlatOption
 }
 
 func NewDnstapKafkaOutput(config *OutputKafkaConfig) *DnstapOutput {
@@ -47,8 +46,11 @@ func NewDnstapKafkaOutput(config *OutputKafkaConfig) *DnstapOutput {
 	o := &DnstapKafkaOutput{
 		config:      config,
 		kafkaConfig: kafkaConfig,
-		ipv4Mask:    net.CIDRMask(config.GetIPv4Mask(), 32),
-		ipv6Mask:    net.CIDRMask(config.GetIPv6Mask(), 128),
+		flatOption: DnstapFlatOption{
+			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
+			EnableECS: config.EnableECS,
+		},
 	}
 	return NewDnstapOutput(config.GetBufferSize(), o)
 }
@@ -67,7 +69,7 @@ func (o *DnstapKafkaOutput) write(frame []byte) error {
 	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	data, err := FlatDnstap(&dt, o.ipv4Mask, o.ipv6Mask)
+	data, err := FlatDnstap(&dt, o.flatOption)
 	if err != nil {
 		return err
 	}

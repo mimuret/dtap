@@ -37,18 +37,20 @@ type DnstapNatsOutput struct {
 	mux        *sync.Mutex
 	dataString []byte
 	data       []*DnstapFlatT
-	ipv4Mask   net.IPMask
-	ipv6Mask   net.IPMask
+	flatOption DnstapFlatOption
 	closeCh    chan struct{}
 }
 
 func NewDnstapNatsOutput(config *OutputNatsConfig) *DnstapOutput {
 	o := &DnstapNatsOutput{
-		config:   config,
-		ipv4Mask: net.CIDRMask(config.GetIPv4Mask(), 32),
-		ipv6Mask: net.CIDRMask(config.GetIPv6Mask(), 128),
-		data:     []*DnstapFlatT{},
-		mux:      new(sync.Mutex),
+		config: config,
+		flatOption: DnstapFlatOption{
+			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
+			EnableECS: config.EnableECS,
+		},
+		data: []*DnstapFlatT{},
+		mux:  new(sync.Mutex),
 	}
 	return NewDnstapOutput(config.GetBufferSize(), o)
 }
@@ -75,7 +77,7 @@ func (o *DnstapNatsOutput) write(frame []byte) error {
 	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	data, err := FlatDnstap(&dt, o.ipv4Mask, o.ipv6Mask)
+	data, err := FlatDnstap(&dt, o.flatOption)
 	if err != nil {
 		return err
 	}

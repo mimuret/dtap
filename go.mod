@@ -13,6 +13,7 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869
 	github.com/miekg/dns v1.1.8
+	github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223 // indirect
 	github.com/nats-io/go-nats v1.7.2
 	github.com/nats-io/nkeys v0.0.2 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
