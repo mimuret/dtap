@@ -96,3 +96,17 @@ Make flatting DNSTAP message,And it forawrd to kafka host.
 Hosts = ["kafka.example.jp"]
 Topic  = "dnstap_message"
 ```
+
+
+### Nats
+Make flatting DNSTAP message,And it forawrd to nats host.
+
+
+```
+[[OutputNats]]
+Host = "nats://kafka.example.jp:5000"]
+Subject  = "dnstap"
+User = "dnstap"
+Password = "hogehoge
+
+```
