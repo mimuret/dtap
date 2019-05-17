@@ -32,7 +32,7 @@ type DnstapFlatT struct {
 	QueryTime             string    `json:"query_time,omitempty"`
 	QueryAddress          net.IP    `json:"query_address,omitempty"`
 	QueryPort             uint32    `json:"query_port,omitempty"`
-	ResponseTime          string    `json:"query_port,omitempty"`
+	ResponseTime          string    `json:"response_time,omitempty"`
 	ResponseAddress       net.IP    `json:"response_address,omitempty"`
 	ResponsePort          uint32    `json:"response_port,omitempty"`
 	ResponseZone          string    `json:"response_zone,omitempty"`
@@ -110,9 +110,9 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	}
 	data.QueryPort = msg.GetQueryPort()
 	if len(msg.GetResponseAddress()) == 4 {
-		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv4Mask())
+		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv4Mask()).To4()
 	} else {
-		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv6Mask())
+		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv6Mask()).To16()
 	}
 
 	data.ResponsePort = msg.GetResponsePort()
