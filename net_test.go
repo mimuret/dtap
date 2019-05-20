@@ -37,6 +37,7 @@ func TestNet(t *testing.T) {
 	n = dtap.Net{}
 	err = n.UnmarshalJSON(bs)
 	assert.NoError(t, err)
+	assert.Equal(t, n.String(), "192.168.0.1/32")
 
 	n = dtap.Net{
 		IP:           net.ParseIP("2001:db8::1"),
@@ -49,6 +50,7 @@ func TestNet(t *testing.T) {
 	n = dtap.Net{}
 	err = n.UnmarshalJSON(bs)
 	assert.NoError(t, err)
+	assert.Equal(t, n.String(), "2001:db8::1/48")
 
 	n = dtap.Net{}
 	bs, err = n.MarshalJSON()

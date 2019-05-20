@@ -49,7 +49,7 @@ func (n *Net) UnmarshalJSON(b []byte) error {
 	if strlen < 3 || str[0] != '"' || str[strlen-1] != '"' {
 		return fmt.Errorf("can't parse Net: %v", str)
 	}
-	bs := strings.Split(string(b[1:strlen-2]), "/")
+	bs := strings.Split(string(b[1:strlen-1]), "/")
 
 	n.IP = net.ParseIP(bs[0])
 	if n.IP == nil {
