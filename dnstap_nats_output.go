@@ -104,11 +104,12 @@ func (o *DnstapNatsOutput) publish() {
 		return
 	}
 	buf, err := json.Marshal(o.data)
-	o.data = []*DnstapFlatT{}
-	o.mux.Unlock()
 	if err != nil {
+		log.Debug(err)
 		return
 	}
+	o.data = []*DnstapFlatT{}
+	o.mux.Unlock()
 	if err := o.con.Publish(o.config.GetSubject(), buf); err != nil {
 		log.Warnf("publish error: %v", err)
 	}

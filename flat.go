@@ -17,9 +17,7 @@
 package dtap
 
 import (
-	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -61,38 +59,6 @@ type DnstapFlatT struct {
 	RA                    bool   `json:"ra"`
 	AD                    bool   `json:"ad"`
 	CD                    bool   `json:"cd"`
-}
-
-type Net struct {
-	IP           net.IP
-	PrefixLength int
-}
-
-func (n *Net) String() string {
-	return n.IP.String() + "/" + strconv.Itoa(n.PrefixLength)
-}
-
-func (n *Net) MarshalJSON() ([]byte, error) {
-	if n.IP == nil {
-		return []byte("<nil>"), nil
-	}
-	return []byte(n.String()), nil
-}
-
-func (n *Net) UnmarshalJSON(b []byte) error {
-	var err error
-	bs := strings.Split(string(b), "/")
-	n.IP = net.ParseIP(bs[0])
-	if n.IP == nil {
-		return fmt.Errorf("can't parse IP: %v", bs[0])
-	}
-	if len(bs) > 1 {
-		n.PrefixLength, err = strconv.Atoi(bs[1])
-		if err != nil {
-			return fmt.Errorf("can't parse Prefixlength: %v", bs[1])
-		}
-	}
-	return nil
 }
 
 var (
