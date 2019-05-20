@@ -68,11 +68,15 @@ type Net struct {
 	PrefixLength int
 }
 
+func (n *Net) String() string {
+	return n.IP.String() + "/" + strconv.Itoa(n.PrefixLength)
+}
+
 func (n *Net) MarshalJSON() ([]byte, error) {
 	if n.IP == nil {
 		return []byte("<nil>"), nil
 	}
-	return []byte(n.IP.String() + "/" + strconv.Itoa(n.PrefixLength)), nil
+	return []byte(n.String()), nil
 }
 
 func (n *Net) UnmarshalJSON(b []byte) error {
