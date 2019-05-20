@@ -40,9 +40,9 @@ func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 	o := &DnstapFluentdOutput{
 		config: config,
 		flatOption: DnstapFlatOption{
-			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
-			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
-			EnableECS: config.EnableECS,
+			Ipv4Mask:  net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
+			EnableECS: config.Flat.GetEnableEcs(),
 		},
 		fluetConfig: fluent.Config{
 			FluentHost: config.GetHost(),
@@ -50,7 +50,7 @@ func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 			Async:      false},
 		tag: config.GetTag(),
 	}
-	return NewDnstapOutput(config.GetBufferSize(), o)
+	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
 }
 
 func (o *DnstapFluentdOutput) open() error {

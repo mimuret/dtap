@@ -45,14 +45,14 @@ func NewDnstapNatsOutput(config *OutputNatsConfig) *DnstapOutput {
 	o := &DnstapNatsOutput{
 		config: config,
 		flatOption: DnstapFlatOption{
-			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
-			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
-			EnableECS: config.EnableECS,
+			Ipv4Mask:  net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
+			EnableECS: config.Flat.GetEnableEcs(),
 		},
 		data: []*DnstapFlatT{},
 		mux:  new(sync.Mutex),
 	}
-	return NewDnstapOutput(config.GetBufferSize(), o)
+	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
 }
 
 func (o *DnstapNatsOutput) open() error {
@@ -110,7 +110,7 @@ func (o *DnstapNatsOutput) publish() {
 		return
 	}
 	if err := o.con.Publish(o.config.GetSubject(), buf); err != nil {
-		log.Warn("publish error: %v", err)
+		log.Warnf("publish error: %v", err)
 	}
 }
 

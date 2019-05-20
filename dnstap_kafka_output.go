@@ -47,12 +47,12 @@ func NewDnstapKafkaOutput(config *OutputKafkaConfig) *DnstapOutput {
 		config:      config,
 		kafkaConfig: kafkaConfig,
 		flatOption: DnstapFlatOption{
-			Ipv4Mask:  net.CIDRMask(config.GetIPv4Mask(), 32),
-			Ipv6Mask:  net.CIDRMask(config.GetIPv6Mask(), 128),
-			EnableECS: config.EnableECS,
+			Ipv4Mask:  net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
+			Ipv6Mask:  net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
+			EnableECS: config.Flat.GetEnableEcs(),
 		},
 	}
-	return NewDnstapOutput(config.GetBufferSize(), o)
+	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
 }
 
 func (o *DnstapKafkaOutput) open() error {

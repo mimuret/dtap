@@ -33,7 +33,7 @@ func NewDnstapFstrmUnixSockOutput(config *OutputUnixSocketConfig) *DnstapOutput 
 	unix := &DnstapFstrmUnixSockOutput{
 		config: config,
 	}
-	return NewDnstapFstrmSocketOutput(config.GetBufferSize(), unix)
+	return NewDnstapFstrmSocketOutput(config.Buffer.GetBufferSize(), unix)
 }
 
 func (o *DnstapFstrmUnixSockOutput) newConnect() (*framestream.Encoder, error) {

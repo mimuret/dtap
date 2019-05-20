@@ -18,6 +18,8 @@ package dtap
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -135,14 +137,21 @@ func NewValidationError() *ValidationError {
 		errors: []error{},
 	}
 }
-
 func NewConfigFromFile(filename string) (*Config, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return NewConfigFromReader(f)
+}
+
+func NewConfigFromReader(r io.Reader) (*Config, error) {
 	c := &Config{}
 	v := viper.New()
-	v.SetConfigFile(filename)
 	v.SetConfigType("toml")
 	v.SetDefault("InputMsgBuffer", 10000)
-	if err := v.ReadInConfig(); err != nil {
+	if err := v.ReadConfig(r); err != nil {
 		return nil, errors.Wrap(err, "can't read config")
 	}
 	if err := v.Unmarshal(c); err != nil {
@@ -232,8 +241,8 @@ func (i *InputTCPSocketConfig) GetNet() string {
 }
 
 type OutputUnixSocketConfig struct {
-	Path string
-	OutputBufferConfig
+	Path   string
+	Buffer OutputBufferConfig
 }
 
 func (o *OutputUnixSocketConfig) Validate() *ValidationError {
@@ -249,9 +258,9 @@ func (o *OutputUnixSocketConfig) GetPath() string {
 }
 
 type OutputFileConfig struct {
-	Path string
-	User string
-	OutputBufferConfig
+	Path   string
+	User   string
+	Buffer OutputBufferConfig
 }
 
 func (o *OutputFileConfig) Validate() *ValidationError {
@@ -270,9 +279,9 @@ func (o *OutputFileConfig) GetUser() string {
 }
 
 type OutputTCPSocketConfig struct {
-	Host string
-	Port uint16
-	OutputBufferConfig
+	Host   string
+	Port   uint16
+	Buffer OutputBufferConfig
 }
 
 func (o *OutputTCPSocketConfig) Validate() *ValidationError {
@@ -296,11 +305,11 @@ func (o *OutputTCPSocketConfig) GetAddress() string {
 }
 
 type OutputFluentConfig struct {
-	Host string
-	Tag  string
-	Port uint16
-	OutputCommonConfig
-	OutputBufferConfig
+	Host   string
+	Tag    string
+	Port   uint16
+	Flat   OutputCommonConfig
+	Buffer OutputBufferConfig
 }
 
 func (o *OutputFluentConfig) Validate() *ValidationError {
@@ -326,7 +335,7 @@ func (o *OutputFluentConfig) Validate() *ValidationError {
 			valerr.Add(errors.New("Last part of a tag is empty"))
 		}
 	}
-	if err := o.OutputCommonConfig.Validate(); err != nil {
+	if err := o.Flat.Validate(); err != nil {
 		valerr.Add(err)
 	}
 	return valerr.Err()
@@ -348,11 +357,11 @@ func (o *OutputFluentConfig) GetPort() int {
 }
 
 type OutputKafkaConfig struct {
-	Hosts []string
-	Retry uint
-	Topic string
-	OutputCommonConfig
-	OutputBufferConfig
+	Hosts  []string
+	Retry  uint
+	Topic  string
+	Flat   OutputCommonConfig
+	Buffer OutputBufferConfig
 }
 
 func (o *OutputKafkaConfig) Validate() *ValidationError {
@@ -363,7 +372,7 @@ func (o *OutputKafkaConfig) Validate() *ValidationError {
 	if len(o.Hosts) == 0 {
 		valerr.Add(errors.New("Hosts must not be empty"))
 	}
-	if err := o.OutputCommonConfig.Validate(); err != nil {
+	if err := o.Flat.Validate(); err != nil {
 		valerr.Add(err)
 	}
 	return valerr.Err()
@@ -385,13 +394,13 @@ type OutputNatsConfig struct {
 	User     string
 	Password string
 	Token    string
-	OutputCommonConfig
-	OutputBufferConfig
+	Flat     OutputCommonConfig
+	Buffer   OutputBufferConfig
 }
 
 func (o *OutputNatsConfig) Validate() *ValidationError {
 	valerr := NewValidationError()
-	if err := o.OutputCommonConfig.Validate(); err != nil {
+	if err := o.Flat.Validate(); err != nil {
 		valerr.Add(err)
 	}
 	return valerr.Err()
@@ -442,6 +451,9 @@ func (o *OutputCommonConfig) GetIPv6Mask() int {
 		return 48
 	}
 	return int(o.IPv6Mask)
+}
+func (o *OutputCommonConfig) GetEnableEcs() bool {
+	return o.EnableECS
 }
 
 func (o *OutputCommonConfig) Validate() *ValidationError {

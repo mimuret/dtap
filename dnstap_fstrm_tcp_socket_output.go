@@ -30,7 +30,7 @@ type DnstapFstrmTCPSocketOutput struct {
 
 func NewDnstapFstrmTCPSocketOutput(config *OutputTCPSocketConfig) *DnstapOutput {
 	tcp := &DnstapFstrmTCPSocketOutput{config: config}
-	return NewDnstapFstrmSocketOutput(config.GetBufferSize(), tcp)
+	return NewDnstapFstrmSocketOutput(config.Buffer.GetBufferSize(), tcp)
 }
 
 func (o *DnstapFstrmTCPSocketOutput) newConnect() (*framestream.Encoder, error) {

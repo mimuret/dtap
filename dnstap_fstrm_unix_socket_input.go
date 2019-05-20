@@ -41,7 +41,7 @@ func NewDnstapFstrmUnixSocketInput(config *InputUnixSocketConfig) (*DnstapFstrmS
 			}
 			gid, err := strconv.Atoi(u.Gid)
 			if err := os.Chown(config.GetPath(), uid, gid); err != nil {
-				return nil, errors.Wrapf(err, "can't chown user %s (%d:%d)", config.GetUser(), u.Uid, u.Gid)
+				return nil, errors.Wrapf(err, "can't chown user %s (%s:%s)", config.GetUser(), u.Uid, u.Gid)
 			}
 		}
 	}

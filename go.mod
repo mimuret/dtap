@@ -23,6 +23,7 @@ require (
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/viper v1.3.2
+	github.com/stretchr/testify v1.3.0
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/ulikunitz/xz v0.5.6
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect

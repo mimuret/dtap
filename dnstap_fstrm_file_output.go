@@ -40,7 +40,7 @@ func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
 	f := &DnstapFstrmFileOutput{
 		config: config,
 	}
-	return NewDnstapOutput(config.GetBufferSize(), f)
+	return NewDnstapOutput(config.Buffer.GetBufferSize(), f)
 }
 
 func (o *DnstapFstrmFileOutput) open() error {
