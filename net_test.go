@@ -25,17 +25,17 @@ import (
 	"github.com/mimuret/dtap"
 )
 
-func TestingNet(t *testing.T) {
+func TestNet(t *testing.T) {
 	n := dtap.Net{
 		IP:           net.ParseIP("192.168.0.1"),
 		PrefixLength: 32,
 	}
 	bs, err := n.MarshalJSON()
 	assert.NoError(t, err)
-	assert.Equal(t, string(bs), "192.168.0.1/32")
+	assert.Equal(t, string(bs), `"192.168.0.1/32"`)
 
 	n = dtap.Net{}
-	err = n.UnmarshalJSON([]byte("192.168.0.1/32"))
+	err = n.UnmarshalJSON(bs)
 	assert.NoError(t, err)
 
 	n = dtap.Net{
@@ -44,19 +44,19 @@ func TestingNet(t *testing.T) {
 	}
 	bs, err = n.MarshalJSON()
 	assert.NoError(t, err)
-	assert.Equal(t, string(bs), "2001:db8::1/48")
+	assert.Equal(t, string(bs), `"2001:db8::1/48"`)
 
 	n = dtap.Net{}
-	err = n.UnmarshalJSON([]byte("2001:db8::1/48"))
+	err = n.UnmarshalJSON(bs)
 	assert.NoError(t, err)
 
 	n = dtap.Net{}
 	bs, err = n.MarshalJSON()
 	assert.NoError(t, err)
-	assert.Equal(t, string(bs), "<nil>")
+	assert.Equal(t, string(bs), `"<nil>"`)
 
 	n = dtap.Net{}
-	err = n.UnmarshalJSON([]byte("<nil>"))
+	err = n.UnmarshalJSON(bs)
 	assert.Nil(t, n.IP)
 
 }
