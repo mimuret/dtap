@@ -79,7 +79,6 @@ type DnstapFlatOption interface {
 
 func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	var data = DnstapFlatT{}
-	h := sha256.New()
 
 	var dnsMessage []byte
 	msg := dt.GetMessage()
@@ -100,7 +99,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetQueryAddress()).To16()...)
-		data.QueryAddressHash = fmt.Sprintf("%x", h.Sum(bs))
+		data.QueryAddressHash = fmt.Sprintf("%x", sha256.Sum256(bs))
 	}
 	data.QueryPort = msg.GetQueryPort()
 	if len(msg.GetResponseAddress()) == 4 {
@@ -112,7 +111,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetResponseAddress()).To16()...)
-		data.ResponseAddressHash = fmt.Sprintf("%x", h.Sum(bs))
+		data.ResponseAddressHash = fmt.Sprintf("%x", sha256.Sum256(bs))
 	}
 
 	data.ResponsePort = msg.GetResponsePort()
