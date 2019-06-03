@@ -17,6 +17,7 @@
 package dtap
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -437,7 +438,7 @@ type OutputCommonConfig struct {
 	IPv4Mask   uint8
 	IPv6Mask   uint8
 	EnableECS  bool
-	IPHashSalt string
+	IPHashSalt []byte
 }
 
 func (o *OutputCommonConfig) GetIPv4Mask() int {
@@ -458,7 +459,11 @@ func (o *OutputCommonConfig) GetEnableEcs() bool {
 	return o.EnableECS
 }
 
-func (o *OutputCommonConfig) GetIPHashSalt() string {
+func (o *OutputCommonConfig) GetIPHashSalt() []byte {
+	if o.IPHashSalt == nil {
+		o.IPHashSalt = make([]byte, 32)
+		rand.Read(o.IPHashSalt)
+	}
 	return o.IPHashSalt
 }
 
