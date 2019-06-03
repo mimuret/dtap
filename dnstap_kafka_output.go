@@ -18,7 +18,6 @@ package dtap
 
 import (
 	"encoding/json"
-	"net"
 	"strconv"
 	"time"
 
@@ -46,13 +45,7 @@ func NewDnstapKafkaOutput(config *OutputKafkaConfig) *DnstapOutput {
 	o := &DnstapKafkaOutput{
 		config:      config,
 		kafkaConfig: kafkaConfig,
-		flatOption: DnstapFlatOption{
-			Ipv4Mask:     net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
-			Ipv6Mask:     net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
-			EnableECS:    config.Flat.GetEnableEcs(),
-			EnableHashIP: config.Flat.GetEnableHashIP(),
-			IPHashSalt:   config.Flat.GetIPHashSalt(),
-		},
+		flatOption:  &config.Flat,
 	}
 	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
 }

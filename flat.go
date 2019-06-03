@@ -68,38 +68,12 @@ var (
 	DefaultIPv6Mask = net.CIDRMask(40, 40)
 )
 
-type DnstapFlatOption struct {
-	Ipv4Mask     net.IPMask
-	Ipv6Mask     net.IPMask
-	EnableECS    bool
-	EnableHashIP bool
-	IPHashSalt   []byte
-}
-
-func (f *DnstapFlatOption) GetIPv4Mask() net.IPMask {
-	if f.Ipv4Mask == nil {
-		return DefaultIPv4Mask
-	}
-	return f.Ipv4Mask
-}
-
-func (f *DnstapFlatOption) GetIPv6Mask() net.IPMask {
-	if f.Ipv6Mask == nil {
-		return DefaultIPv6Mask
-	}
-	return f.Ipv6Mask
-}
-
-func (f *DnstapFlatOption) GetEnableECS() bool {
-	return f.EnableECS
-}
-
-func (f *DnstapFlatOption) GetEnableHashIP() bool {
-	return f.EnableHashIP
-}
-
-func (f *DnstapFlatOption) GetIPHashSalt() []byte {
-	return f.IPHashSalt
+type DnstapFlatOption interface {
+	GetIPv4Mask() net.IPMask
+	GetIPv6Mask() net.IPMask
+	GetEnableEcs() bool
+	GetEnableHashIP() bool
+	GetIPHashSalt() []byte
 }
 
 func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
@@ -170,7 +144,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 		data.MessageSize = len(dnsMessage)
 		data.Txid = dnsMsg.MsgHdr.Id
 	}
-	if opt.GetEnableECS() {
+	if opt.GetEnableEcs() {
 		if len(dnsMsg.Extra) > 0 {
 			for _, rr := range dnsMsg.Extra {
 				if optrr, ok := rr.(*dns.OPT); ok {

@@ -17,16 +17,20 @@
 package dtap
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/log"
 
 	"github.com/spf13/viper"
 )
@@ -437,25 +441,33 @@ func (o *OutputBufferConfig) GetBufferSize() uint {
 
 type OutputCommonConfig struct {
 	IPv4Mask       uint8
+	ipv4Mask       net.IPMask
 	IPv6Mask       uint8
+	ipv6Mask       net.IPMask
 	EnableECS      bool
 	EnableHashIP   bool
 	ipHashSalt     []byte `toml:"-"`
 	IPHashSaltPath string
 }
 
-func (o *OutputCommonConfig) GetIPv4Mask() int {
-	if o.IPv4Mask == 0 {
-		return 24
+func (o *OutputCommonConfig) GetIPv4Mask() net.IPMask {
+	if o.ipv4Mask == nil {
+		if o.IPv4Mask == 0 {
+			o.IPv4Mask = 24
+		}
+		o.ipv4Mask = net.CIDRMask(int(o.IPv4Mask), 32)
 	}
-	return int(o.IPv4Mask)
+	return o.ipv4Mask
 }
 
-func (o *OutputCommonConfig) GetIPv6Mask() int {
-	if o.IPv4Mask == 0 {
-		return 48
+func (o *OutputCommonConfig) GetIPv6Mask() net.IPMask {
+	if o.ipv6Mask == nil {
+		if o.IPv6Mask == 0 {
+			o.IPv6Mask = 48
+		}
+		o.ipv6Mask = net.CIDRMask(int(o.IPv6Mask), 128)
 	}
-	return int(o.IPv6Mask)
+	return o.ipv6Mask
 }
 
 func (o *OutputCommonConfig) GetEnableEcs() bool {
@@ -473,9 +485,7 @@ func (o *OutputCommonConfig) GetIPHashSaltPath() string {
 func (o *OutputCommonConfig) GetIPHashSalt() []byte {
 	if o.ipHashSalt == nil {
 		if o.GetIPHashSaltPath() != "" {
-			if o.GetIPHashSaltPath() != "" {
-				o.ipHashSalt, _ = ioutil.ReadFile(o.GetIPHashSaltPath())
-			}
+			o.LoadSalt()
 		}
 	}
 	if o.ipHashSalt == nil {
@@ -483,6 +493,42 @@ func (o *OutputCommonConfig) GetIPHashSalt() []byte {
 		rand.Read(o.ipHashSalt)
 	}
 	return o.ipHashSalt
+}
+
+func (o *OutputCommonConfig) LoadSalt() {
+	if o.GetIPHashSaltPath() != "" {
+		o.ipHashSalt, _ = ioutil.ReadFile(o.GetIPHashSaltPath())
+	}
+}
+
+func (o *OutputCommonConfig) WatchSalt(ctx context.Context) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+	err = watcher.Add(o.GetIPHashSaltPath())
+	if err != nil {
+		log.Fatal(err)
+	}
+L:
+	for {
+		select {
+		case <-ctx.Done():
+			break L
+		case event, ok := <-watcher.Events:
+			if !ok {
+				break L
+			}
+			log.Info("event:", event)
+			o.LoadSalt()
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Info("error:", err)
+		}
+	}
 }
 
 func (o *OutputCommonConfig) Validate() *ValidationError {

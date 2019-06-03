@@ -130,16 +130,25 @@ func main() {
 	for _, oc := range config.OutputFluent {
 		o := dtap.NewDnstapFluentdOutput(oc)
 		output = append(output, o)
+		if oc.Flat.GetIPHashSaltPath() != "" {
+			go oc.Flat.WatchSalt(context.Background())
+		}
 	}
 
 	for _, oc := range config.OutputKafka {
 		o := dtap.NewDnstapKafkaOutput(oc)
 		output = append(output, o)
+		if oc.Flat.GetIPHashSaltPath() != "" {
+			go oc.Flat.WatchSalt(context.Background())
+		}
 	}
 
 	for _, oc := range config.OutputNats {
 		o := dtap.NewDnstapNatsOutput(oc)
 		output = append(output, o)
+		if oc.Flat.GetIPHashSaltPath() != "" {
+			go oc.Flat.WatchSalt(context.Background())
+		}
 	}
 
 	if len(output) == 0 {

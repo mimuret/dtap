@@ -18,7 +18,11 @@ package dtap_test
 
 import (
 	"bytes"
+	"context"
+	"net"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/mimuret/dtap"
 	"github.com/stretchr/testify/assert"
@@ -53,9 +57,50 @@ User="unbound"
 	assert.Equal(t, c.OutputNats[0].GetPassword(), "hogehoge")
 	assert.Equal(t, c.OutputNats[0].GetSubject(), "query")
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableEcs(), true)
-	assert.Equal(t, c.OutputNats[0].Flat.GetIPv4Mask(), 22)
-	assert.Equal(t, c.OutputNats[0].Flat.GetIPv6Mask(), 40)
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPv4Mask(), net.CIDRMask(22, 32))
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPv6Mask(), net.CIDRMask(40, 128))
 
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableHashIP(), true)
 
+}
+
+func TestOutputCommonConfig(t *testing.T) {
+	cfg := `[[InputUnix]]
+Path="/var/log/unbound/dnstap.sock"
+User="unbound"
+
+[[OutputNats]]
+	Host = "nats://host1:4242, nats://host2:4242,  nats://host3:4242"
+	User = "cns"
+	Password = "hogehoge"
+	Subject = "query"
+	[OutputNats.flat]
+		IPv4Mask = 22
+		IPv6Mask = 40
+		EnableECS = true
+		EnableHashIP = true
+		IPHashSaltPath = "/tmp/salt.test"
+`
+	f, _ := os.Create("/tmp/salt.test")
+	defer f.Close()
+	f.Write([]byte{10, 20, 30, 40})
+	f.Close()
+	b := bytes.NewBufferString(cfg)
+	c, err := dtap.NewConfigFromReader(b)
+	assert.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.TODO())
+	go c.OutputNats[0].Flat.WatchSalt(ctx)
+
+	assert.Equal(t, c.OutputNats[0].Flat.GetEnableEcs(), true)
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPv4Mask(), net.CIDRMask(22, 32))
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPv6Mask(), net.CIDRMask(40, 128))
+	assert.Equal(t, c.OutputNats[0].Flat.GetEnableHashIP(), true)
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPHashSalt(), []byte{10, 20, 30, 40})
+	f, _ = os.Create("/tmp/salt.test")
+	defer f.Close()
+	f.Write([]byte{20, 30, 40, 50})
+	f.Close()
+	time.Sleep(10 * time.Second)
+	assert.Equal(t, c.OutputNats[0].Flat.GetIPHashSalt(), []byte{20, 30, 40, 50})
+	cancel()
 }

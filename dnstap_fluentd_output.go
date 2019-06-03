@@ -17,8 +17,6 @@
 package dtap
 
 import (
-	"net"
-
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/pkg/errors"
@@ -38,14 +36,8 @@ type DnstapFluentdOutput struct {
 
 func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 	o := &DnstapFluentdOutput{
-		config: config,
-		flatOption: DnstapFlatOption{
-			Ipv4Mask:     net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
-			Ipv6Mask:     net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
-			EnableECS:    config.Flat.GetEnableEcs(),
-			EnableHashIP: config.Flat.GetEnableHashIP(),
-			IPHashSalt:   config.Flat.GetIPHashSalt(),
-		},
+		config:     config,
+		flatOption: &config.Flat,
 		fluetConfig: fluent.Config{
 			FluentHost: config.GetHost(),
 			FluentPort: config.GetPort(),
