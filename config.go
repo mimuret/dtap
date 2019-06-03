@@ -434,9 +434,10 @@ func (o *OutputBufferConfig) GetBufferSize() uint {
 }
 
 type OutputCommonConfig struct {
-	IPv4Mask  uint8
-	IPv6Mask  uint8
-	EnableECS bool
+	IPv4Mask   uint8
+	IPv6Mask   uint8
+	EnableECS  bool
+	IPHashSalt string
 }
 
 func (o *OutputCommonConfig) GetIPv4Mask() int {
@@ -452,8 +453,13 @@ func (o *OutputCommonConfig) GetIPv6Mask() int {
 	}
 	return int(o.IPv6Mask)
 }
+
 func (o *OutputCommonConfig) GetEnableEcs() bool {
 	return o.EnableECS
+}
+
+func (o *OutputCommonConfig) GetIPHashSalt() string {
+	return o.IPHashSalt
 }
 
 func (o *OutputCommonConfig) Validate() *ValidationError {

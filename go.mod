@@ -26,5 +26,6 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/ulikunitz/xz v0.5.6
+	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 )

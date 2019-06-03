@@ -17,23 +17,25 @@
 package dtap
 
 import (
+	"crypto/sha256"
 	"net"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
+	"github.com/pkg/errors"
 )
 
 type DnstapFlatT struct {
 	Timestamp             string `json:"timestamp"`
 	QueryTime             string `json:"query_time,omitempty"`
 	QueryAddress          net.IP `json:"query_address,omitempty"`
+	QueryAddressHash      string `json:"query_address_hash,omitempty"`
 	QueryPort             uint32 `json:"query_port,omitempty"`
 	ResponseTime          string `json:"response_time,omitempty"`
 	ResponseAddress       net.IP `json:"response_address,omitempty"`
+	ResponseAddressHash   string `json:"response_address,omitempty"`
 	ResponsePort          uint32 `json:"response_port,omitempty"`
 	ResponseZone          string `json:"response_zone,omitempty"`
 	EcsNet                *Net   `json:"ecs_net,omitempty"`
@@ -67,9 +69,10 @@ var (
 )
 
 type DnstapFlatOption struct {
-	Ipv4Mask  net.IPMask
-	Ipv6Mask  net.IPMask
-	EnableECS bool
+	Ipv4Mask   net.IPMask
+	Ipv6Mask   net.IPMask
+	EnableECS  bool
+	IPHashSalt string
 }
 
 func (f *DnstapFlatOption) GetIPv4Mask() net.IPMask {
@@ -90,6 +93,10 @@ func (f *DnstapFlatOption) GetEnableECS() bool {
 	return f.EnableECS
 }
 
+func (f *DnstapFlatOption) GetIPHashSalt() string {
+	return f.IPHashSalt
+}
+
 func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	var data = DnstapFlatT{}
 
@@ -108,11 +115,25 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	} else {
 		data.QueryAddress = net.IP(msg.GetQueryAddress()).Mask(opt.GetIPv6Mask())
 	}
+	if opt.GetIPHashSalt() != "" {
+		h := sha256.New()
+		bs := make([]byte, 64)
+		bs = append(bs, []byte(opt.GetIPHashSalt())...)
+		bs = append(bs, msg.GetQueryAddress()...)
+		data.QueryAddressHash = string(h.Sum(bs))
+	}
 	data.QueryPort = msg.GetQueryPort()
 	if len(msg.GetResponseAddress()) == 4 {
 		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv4Mask()).To4()
 	} else {
 		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv6Mask()).To16()
+	}
+	if opt.GetIPHashSalt() != "" {
+		h := sha256.New()
+		bs := make([]byte, 64)
+		bs = append(bs, []byte(opt.GetIPHashSalt())...)
+		bs = append(bs, msg.GetResponseAddress()...)
+		data.ResponseAddressHash = string(h.Sum(bs))
 	}
 
 	data.ResponsePort = msg.GetResponsePort()
