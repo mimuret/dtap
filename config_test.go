@@ -38,6 +38,8 @@ User="unbound"
 		IPv4Mask = 22
 		IPv6Mask = 40
 		EnableECS = true
+		EnableHashIP = true
+		IPHashSalt = "bb"
 `
 	b := bytes.NewBufferString(cfg)
 	c, err := dtap.NewConfigFromReader(b)
@@ -53,4 +55,7 @@ User="unbound"
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableEcs(), true)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPv4Mask(), 22)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPv6Mask(), 40)
+
+	assert.Equal(t, c.OutputNats[0].Flat.GetEnableHashIP(), true)
+
 }

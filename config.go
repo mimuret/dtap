@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
@@ -435,11 +436,12 @@ func (o *OutputBufferConfig) GetBufferSize() uint {
 }
 
 type OutputCommonConfig struct {
-	IPv4Mask     uint8
-	IPv6Mask     uint8
-	EnableECS    bool
-	EnableHashIP bool
-	IPHashSalt   []byte
+	IPv4Mask       uint8
+	IPv6Mask       uint8
+	EnableECS      bool
+	EnableHashIP   bool
+	ipHashSalt     []byte `toml:"-"`
+	IPHashSaltPath string
 }
 
 func (o *OutputCommonConfig) GetIPv4Mask() int {
@@ -464,12 +466,23 @@ func (o *OutputCommonConfig) GetEnableHashIP() bool {
 	return o.EnableHashIP
 }
 
+func (o *OutputCommonConfig) GetIPHashSaltPath() string {
+	return o.IPHashSaltPath
+}
+
 func (o *OutputCommonConfig) GetIPHashSalt() []byte {
-	if o.IPHashSalt == nil {
-		o.IPHashSalt = make([]byte, 32)
-		rand.Read(o.IPHashSalt)
+	if o.ipHashSalt == nil {
+		if o.GetIPHashSaltPath() != "" {
+			if o.GetIPHashSaltPath() != "" {
+				o.ipHashSalt, _ = ioutil.ReadFile(o.GetIPHashSaltPath())
+			}
+		}
 	}
-	return o.IPHashSalt
+	if o.ipHashSalt == nil {
+		o.ipHashSalt = make([]byte, 32)
+		rand.Read(o.ipHashSalt)
+	}
+	return o.ipHashSalt
 }
 
 func (o *OutputCommonConfig) Validate() *ValidationError {
