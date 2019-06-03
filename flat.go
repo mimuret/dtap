@@ -36,7 +36,7 @@ type DnstapFlatT struct {
 	QueryPort             uint32 `json:"query_port,omitempty"`
 	ResponseTime          string `json:"response_time,omitempty"`
 	ResponseAddress       net.IP `json:"response_address,omitempty"`
-	ResponseAddressHash   string `json:"response_address,omitempty"`
+	ResponseAddressHash   string `json:"response_address_hash,omitempty"`
 	ResponsePort          uint32 `json:"response_port,omitempty"`
 	ResponseZone          string `json:"response_zone,omitempty"`
 	EcsNet                *Net   `json:"ecs_net,omitempty"`
