@@ -40,10 +40,11 @@ func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 	o := &DnstapFluentdOutput{
 		config: config,
 		flatOption: DnstapFlatOption{
-			Ipv4Mask:   net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
-			Ipv6Mask:   net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
-			EnableECS:  config.Flat.GetEnableEcs(),
-			IPHashSalt: config.Flat.GetIPHashSalt(),
+			Ipv4Mask:     net.CIDRMask(config.Flat.GetIPv4Mask(), 32),
+			Ipv6Mask:     net.CIDRMask(config.Flat.GetIPv6Mask(), 128),
+			EnableECS:    config.Flat.GetEnableEcs(),
+			EnableHashIP: config.Flat.GetEnableHashIP(),
+			IPHashSalt:   config.Flat.GetIPHashSalt(),
 		},
 		fluetConfig: fluent.Config{
 			FluentHost: config.GetHost(),

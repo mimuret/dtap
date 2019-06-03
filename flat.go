@@ -69,10 +69,11 @@ var (
 )
 
 type DnstapFlatOption struct {
-	Ipv4Mask   net.IPMask
-	Ipv6Mask   net.IPMask
-	EnableECS  bool
-	IPHashSalt []byte
+	Ipv4Mask     net.IPMask
+	Ipv6Mask     net.IPMask
+	EnableECS    bool
+	EnableHashIP bool
+	IPHashSalt   []byte
 }
 
 func (f *DnstapFlatOption) GetIPv4Mask() net.IPMask {
@@ -91,6 +92,10 @@ func (f *DnstapFlatOption) GetIPv6Mask() net.IPMask {
 
 func (f *DnstapFlatOption) GetEnableECS() bool {
 	return f.EnableECS
+}
+
+func (f *DnstapFlatOption) GetEnableHashIP() bool {
+	return f.EnableHashIP
 }
 
 func (f *DnstapFlatOption) GetIPHashSalt() []byte {
@@ -116,7 +121,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	} else {
 		data.QueryAddress = net.IP(msg.GetQueryAddress()).Mask(opt.GetIPv6Mask())
 	}
-	if opt.GetIPHashSalt() != nil {
+	if opt.GetEnableHashIP() && opt.GetIPHashSalt() != nil {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetQueryAddress()).To16()...)
@@ -128,7 +133,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	} else {
 		data.ResponseAddress = net.IP(msg.GetResponseAddress()).Mask(opt.GetIPv6Mask()).To16()
 	}
-	if opt.GetIPHashSalt() != nil {
+	if opt.GetEnableHashIP() && opt.GetIPHashSalt() != nil {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetResponseAddress()).To16()...)
