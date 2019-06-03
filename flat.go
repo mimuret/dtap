@@ -18,6 +18,7 @@ package dtap
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -99,7 +100,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetQueryAddress()).To16()...)
-		data.QueryAddressHash = string(h.Sum(bs))
+		data.QueryAddressHash = fmt.Sprintf("%x", h.Sum(bs))
 	}
 	data.QueryPort = msg.GetQueryPort()
 	if len(msg.GetResponseAddress()) == 4 {
@@ -111,7 +112,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 		bs := make([]byte, len(opt.GetIPHashSalt())+16)
 		bs = append(bs, opt.GetIPHashSalt()...)
 		bs = append(bs, net.IP(msg.GetResponseAddress()).To16()...)
-		data.ResponseAddressHash = string(h.Sum(bs))
+		data.ResponseAddressHash = fmt.Sprintf("%x", h.Sum(bs))
 	}
 
 	data.ResponsePort = msg.GetResponsePort()
