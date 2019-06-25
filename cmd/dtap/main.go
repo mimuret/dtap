@@ -87,7 +87,7 @@ func main() {
 	}
 	var input []dtap.Input
 	var output []dtap.Output
-	go dtap.PrometheusExporter(context.Background(), *flagExporterListen)
+	go prometheusExporter(context.Background(), *flagExporterListen)
 	config, err := dtap.NewConfigFromFile(*flagConfigFile)
 	fatalCheck(err)
 	for _, ic := range config.InputFile {
@@ -113,22 +113,42 @@ func main() {
 	}
 
 	for _, oc := range config.OutputFile {
-		o := dtap.NewDnstapFstrmFileOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapFstrmFileOutput(oc, params)
 		output = append(output, o)
 	}
 
 	for _, oc := range config.OutputTCP {
-		o := dtap.NewDnstapFstrmTCPSocketOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapFstrmTCPSocketOutput(oc, params)
 		output = append(output, o)
 	}
 
 	for _, oc := range config.OutputUnix {
-		o := dtap.NewDnstapFstrmUnixSockOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapFstrmUnixSockOutput(oc, params)
 		output = append(output, o)
 	}
 
 	for _, oc := range config.OutputFluent {
-		o := dtap.NewDnstapFluentdOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapFluentdOutput(oc, params)
 		output = append(output, o)
 		if oc.Flat.GetIPHashSaltPath() != "" {
 			go oc.Flat.WatchSalt(context.Background())
@@ -136,7 +156,12 @@ func main() {
 	}
 
 	for _, oc := range config.OutputKafka {
-		o := dtap.NewDnstapKafkaOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapKafkaOutput(oc, params)
 		output = append(output, o)
 		if oc.Flat.GetIPHashSaltPath() != "" {
 			go oc.Flat.WatchSalt(context.Background())
@@ -144,7 +169,12 @@ func main() {
 	}
 
 	for _, oc := range config.OutputNats {
-		o := dtap.NewDnstapNatsOutput(oc)
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapNatsOutput(oc, params)
 		output = append(output, o)
 		if oc.Flat.GetIPHashSaltPath() != "" {
 			go oc.Flat.WatchSalt(context.Background())
@@ -155,7 +185,7 @@ func main() {
 		log.Fatal("No output settings")
 	}
 
-	iRBuf := dtap.NewRbuf(config.InputMsgBuffer, dtap.TotalRecvInputFrame, dtap.TotalLostInputFrame)
+	iRBuf := dtap.NewRbuf(config.InputMsgBuffer, TotalRecvInputFrame, TotalLostInputFrame)
 	fatalCh := make(chan error)
 
 	outputCtx, outputCancel := context.WithCancel(context.Background())

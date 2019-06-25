@@ -29,11 +29,11 @@ type DnstapFstrmSocketOutput struct {
 	opened  chan bool
 }
 
-func NewDnstapFstrmSocketOutput(outputBufferSize uint, handler SocketOutput) *DnstapOutput {
-	fsock := &DnstapFstrmSocketOutput{
+func NewDnstapFstrmSocketOutput(handler SocketOutput, params *DnstapOutputParams) *DnstapOutput {
+	params.Handler = &DnstapFstrmSocketOutput{
 		handler: handler,
 	}
-	return NewDnstapOutput(outputBufferSize, fsock)
+	return NewDnstapOutput(params)
 }
 
 func (o *DnstapFstrmSocketOutput) open() error {

@@ -29,11 +29,11 @@ type DnstapFstrmUnixSockOutput struct {
 	config *OutputUnixSocketConfig
 }
 
-func NewDnstapFstrmUnixSockOutput(config *OutputUnixSocketConfig) *DnstapOutput {
+func NewDnstapFstrmUnixSockOutput(config *OutputUnixSocketConfig, params *DnstapOutputParams) *DnstapOutput {
 	unix := &DnstapFstrmUnixSockOutput{
 		config: config,
 	}
-	return NewDnstapFstrmSocketOutput(config.Buffer.GetBufferSize(), unix)
+	return NewDnstapFstrmSocketOutput(unix, params)
 }
 
 func (o *DnstapFstrmUnixSockOutput) newConnect() (*framestream.Encoder, error) {

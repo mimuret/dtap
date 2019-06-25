@@ -36,18 +36,18 @@ type DnstapKafkaOutput struct {
 	flatOption  DnstapFlatOption
 }
 
-func NewDnstapKafkaOutput(config *OutputKafkaConfig) *DnstapOutput {
+func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams) *DnstapOutput {
 	kafkaConfig := sarama.NewConfig()
 	kafkaConfig.Producer.Flush.Messages = 100
 	kafkaConfig.Producer.Return.Successes = true
 	kafkaConfig.Producer.Retry.Max = int(config.GetRetry())
 
-	o := &DnstapKafkaOutput{
+	params.Handler = &DnstapKafkaOutput{
 		config:      config,
 		kafkaConfig: kafkaConfig,
 		flatOption:  &config.Flat,
 	}
-	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
+	return NewDnstapOutput(params)
 }
 
 func (o *DnstapKafkaOutput) open() error {

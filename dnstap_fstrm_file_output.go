@@ -36,11 +36,11 @@ type DnstapFstrmFileOutput struct {
 	opened          chan bool
 }
 
-func NewDnstapFstrmFileOutput(config *OutputFileConfig) *DnstapOutput {
-	f := &DnstapFstrmFileOutput{
+func NewDnstapFstrmFileOutput(config *OutputFileConfig, params *DnstapOutputParams) *DnstapOutput {
+	params.Handler = &DnstapFstrmFileOutput{
 		config: config,
 	}
-	return NewDnstapOutput(config.Buffer.GetBufferSize(), f)
+	return NewDnstapOutput(params)
 }
 
 func (o *DnstapFstrmFileOutput) open() error {

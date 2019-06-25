@@ -34,8 +34,8 @@ type DnstapFluentdOutput struct {
 	tag         string
 }
 
-func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
-	o := &DnstapFluentdOutput{
+func NewDnstapFluentdOutput(config *OutputFluentConfig, params *DnstapOutputParams) *DnstapOutput {
+	params.Handler = &DnstapFluentdOutput{
 		config:     config,
 		flatOption: &config.Flat,
 		fluetConfig: fluent.Config{
@@ -44,7 +44,8 @@ func NewDnstapFluentdOutput(config *OutputFluentConfig) *DnstapOutput {
 			Async:      false},
 		tag: config.GetTag(),
 	}
-	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
+
+	return NewDnstapOutput(params)
 }
 
 func (o *DnstapFluentdOutput) open() error {

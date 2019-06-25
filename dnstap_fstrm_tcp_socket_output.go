@@ -28,9 +28,9 @@ type DnstapFstrmTCPSocketOutput struct {
 	config *OutputTCPSocketConfig
 }
 
-func NewDnstapFstrmTCPSocketOutput(config *OutputTCPSocketConfig) *DnstapOutput {
+func NewDnstapFstrmTCPSocketOutput(config *OutputTCPSocketConfig, params *DnstapOutputParams) *DnstapOutput {
 	tcp := &DnstapFstrmTCPSocketOutput{config: config}
-	return NewDnstapFstrmSocketOutput(config.Buffer.GetBufferSize(), tcp)
+	return NewDnstapFstrmSocketOutput(tcp, params)
 }
 
 func (o *DnstapFstrmTCPSocketOutput) newConnect() (*framestream.Encoder, error) {

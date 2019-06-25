@@ -19,20 +19,29 @@ package dtap
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
+
+type DnstapOutputParams struct {
+	BufferSize  uint
+	InCounter   prometheus.Counter
+	LostCounter prometheus.Counter
+	Handler     OutputHandler
+}
 
 type DnstapOutput struct {
 	handler OutputHandler
 	rbuf    *RBuf
 }
 
-func NewDnstapOutput(outputBufferSize uint, handler OutputHandler) *DnstapOutput {
+func NewDnstapOutput(params *DnstapOutputParams) *DnstapOutput {
 	return &DnstapOutput{
-		handler: handler,
-		rbuf:    NewRbuf(outputBufferSize, TotalRecvOutputFrame, TotalLostOutputFrame),
+		handler: params.Handler,
+		rbuf:    NewRbuf(params.BufferSize, params.InCounter, params.LostCounter),
 	}
 }
+
 func (o *DnstapOutput) Run(ctx context.Context) {
 	log.Debug("start output run")
 L:
