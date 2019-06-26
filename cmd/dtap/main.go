@@ -181,6 +181,16 @@ func main() {
 		}
 	}
 
+	for _, oc := range config.OutputPrometheus {
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapPrometheusOutput(oc, params)
+		output = append(output, o)
+	}
+
 	if len(output) == 0 {
 		log.Fatal("No output settings")
 	}

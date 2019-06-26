@@ -36,18 +36,40 @@ import (
 )
 
 type Config struct {
-	InputMsgBuffer uint
-	InputUnix      []*InputUnixSocketConfig
-	InputFile      []*InputFileConfig
-	InputTail      []*InputTailConfig
-	InputTCP       []*InputTCPSocketConfig
-	OutputUnix     []*OutputUnixSocketConfig
-	OutputFile     []*OutputFileConfig
-	OutputTCP      []*OutputTCPSocketConfig
-	OutputFluent   []*OutputFluentConfig
-	OutputKafka    []*OutputKafkaConfig
-	OutputNats     []*OutputNatsConfig
+	InputMsgBuffer   uint
+	InputUnix        []*InputUnixSocketConfig
+	InputFile        []*InputFileConfig
+	InputTail        []*InputTailConfig
+	InputTCP         []*InputTCPSocketConfig
+	OutputUnix       []*OutputUnixSocketConfig
+	OutputFile       []*OutputFileConfig
+	OutputTCP        []*OutputTCPSocketConfig
+	OutputFluent     []*OutputFluentConfig
+	OutputKafka      []*OutputKafkaConfig
+	OutputNats       []*OutputNatsConfig
+	OutputPrometheus []*OutputPrometheus
 }
+
+var (
+	DefaultCounters = []OutputPrometheusMetrics{
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_qtype_total",
+			Help:   "Total number of queries with a given query type.",
+			Labels: []string{"qtype"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_protocol_total",
+			Help:   "Total number of queries with a given query rotocol.",
+			Labels: []string{"socket_protocol"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_tld_total",
+			Help:   "Total number of queries with a given query tld.",
+			Labels: []string{"tld"},
+			Limit:  100,
+		}
+	}
+)
 
 func (c *Config) Validate() []error {
 	errs := []error{}
@@ -106,6 +128,20 @@ func (c *Config) Validate() []error {
 	for n, o := range c.OutputKafka {
 		if err := o.Validate(); err != nil {
 			err.configType = "OutputKafka"
+			err.no = n
+			errs = append(errs, err)
+		}
+	}
+	for n, o := range c.OutputNats {
+		if err := o.Validate(); err != nil {
+			err.configType = "OutputNats"
+			err.no = n
+			errs = append(errs, err)
+		}
+	}
+	for n, o := range c.OutputPrometheus {
+		if err := o.Validate(); err != nil {
+			err.configType = "OutputPrometheus"
 			err.no = n
 			errs = append(errs, err)
 		}
@@ -426,6 +462,51 @@ func (o *OutputNatsConfig) GetPassword() string {
 }
 func (o *OutputNatsConfig) GetToken() string {
 	return o.Token
+}
+
+type OutputPrometheus struct {
+	Counters []OutputPrometheusMetrics
+	Interval int
+	Flat     OutputCommonConfig
+	Buffer   OutputBufferConfig
+}
+
+func (o *OutputPrometheus) GetCounters() []OutputPrometheusMetrics {
+	if o.Counters == nil {
+		return DefaultCounters
+	}
+	return o.Counters
+}
+
+func (o *OutputPrometheus) GetInternal() int {
+	return o.Interval
+}
+
+func (o *OutputPrometheus) Validate() *ValidationError {
+	return nil
+}
+
+type OutputPrometheusMetrics struct {
+	Name   string
+	Help   string
+	Labels []string
+	Limit  int
+}
+
+func (o *OutputPrometheusMetrics) GetName() string {
+	return o.Name
+}
+
+func (o *OutputPrometheusMetrics) GetHelp() string {
+	return o.Help
+}
+
+func (o *OutputPrometheusMetrics) GetLabels() []string {
+	return o.Labels
+}
+
+func (o *OutputPrometheusMetrics) GetLimit() int {
+	return o.Limit
 }
 
 type OutputBufferConfig struct {
