@@ -67,7 +67,7 @@ var (
 			Help:   "Total number of queries with a given query tld.",
 			Labels: []string{"tld"},
 			Limit:  100,
-		}
+		},
 	}
 )
 
