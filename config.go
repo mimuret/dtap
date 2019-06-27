@@ -55,18 +55,46 @@ var (
 		OutputPrometheusMetrics{
 			Name:   "dtap_query_qtype_total",
 			Help:   "Total number of queries with a given query type.",
-			Labels: []string{"qtype"},
+			Labels: []string{"Qtype"},
 		},
 		OutputPrometheusMetrics{
-			Name:   "dtap_query_protocol_total",
-			Help:   "Total number of queries with a given query rotocol.",
-			Labels: []string{"socket_protocol"},
+			Name:   "dtap_query_rcode_total",
+			Help:   "Total number of queries with a given query type.",
+			Labels: []string{"Rcode"},
 		},
 		OutputPrometheusMetrics{
-			Name:   "dtap_query_tld_total",
-			Help:   "Total number of queries with a given query tld.",
-			Labels: []string{"tld"},
-			Limit:  100,
+			Name:   "dtap_query_tc_bit_total",
+			Help:   "Total number of queries with a given query tc bit.",
+			Labels: []string{"TC"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_ad_bit_total",
+			Help:   "Total number of queries with a given query ad bit.",
+			Labels: []string{"AD"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_socket_protocol_total",
+			Help:   "Total number of queries with a given query transport rotocol.",
+			Labels: []string{"SocketProtocol"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_socket_family_total",
+			Help:   "Total number of queries with a given query IP Protocol.",
+			Labels: []string{"SocketFamily"},
+		},
+		OutputPrometheusMetrics{
+			Name:           "dtap_query_tld_total",
+			Help:           "Total number of queries with a given query tld.",
+			Labels:         []string{"TopLevelDomainName"},
+			ExpireInterval: 5,
+			ExpireSec:      60,
+		},
+		OutputPrometheusMetrics{
+			Name:           "dtap_query_sld_total",
+			Help:           "Total number of queries with a given query tld.",
+			Labels:         []string{"TopLevelDomainName"},
+			ExpireInterval: 5,
+			ExpireSec:      60,
 		},
 	}
 )
@@ -466,7 +494,6 @@ func (o *OutputNatsConfig) GetToken() string {
 
 type OutputPrometheus struct {
 	Counters []OutputPrometheusMetrics
-	Interval int
 	Flat     OutputCommonConfig
 	Buffer   OutputBufferConfig
 }
@@ -478,19 +505,17 @@ func (o *OutputPrometheus) GetCounters() []OutputPrometheusMetrics {
 	return o.Counters
 }
 
-func (o *OutputPrometheus) GetInternal() int {
-	return o.Interval
-}
-
 func (o *OutputPrometheus) Validate() *ValidationError {
 	return nil
 }
 
 type OutputPrometheusMetrics struct {
-	Name   string
-	Help   string
-	Labels []string
-	Limit  int
+	Name           string
+	Help           string
+	Labels         []string
+	Limit          int
+	ExpireInterval int
+	ExpireSec      int
 }
 
 func (o *OutputPrometheusMetrics) GetName() string {
@@ -507,6 +532,14 @@ func (o *OutputPrometheusMetrics) GetLabels() []string {
 
 func (o *OutputPrometheusMetrics) GetLimit() int {
 	return o.Limit
+}
+
+func (o *OutputPrometheusMetrics) GetExpireInterval() int {
+	return o.ExpireInterval
+}
+
+func (o *OutputPrometheusMetrics) GetExpireSec() int {
+	return o.ExpireSec
 }
 
 type OutputBufferConfig struct {
