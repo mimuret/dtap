@@ -40,14 +40,14 @@ type DnstapNatsOutput struct {
 	closeCh    chan struct{}
 }
 
-func NewDnstapNatsOutput(config *OutputNatsConfig) *DnstapOutput {
-	o := &DnstapNatsOutput{
+func NewDnstapNatsOutput(config *OutputNatsConfig, params *DnstapOutputParams) *DnstapOutput {
+	params.Handler = &DnstapNatsOutput{
 		config:     config,
 		flatOption: &config.Flat,
 		data:       []*DnstapFlatT{},
 		mux:        new(sync.Mutex),
 	}
-	return NewDnstapOutput(config.Buffer.GetBufferSize(), o)
+	return NewDnstapOutput(params)
 }
 
 func (o *DnstapNatsOutput) open() error {

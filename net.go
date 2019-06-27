@@ -29,6 +29,9 @@ type Net struct {
 }
 
 func (n *Net) String() string {
+	if n == nil || n.IP == nil {
+		return "<nil>"
+	}
 	return n.IP.String() + "/" + strconv.Itoa(n.PrefixLength)
 }
 

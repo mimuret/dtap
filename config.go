@@ -36,18 +36,68 @@ import (
 )
 
 type Config struct {
-	InputMsgBuffer uint
-	InputUnix      []*InputUnixSocketConfig
-	InputFile      []*InputFileConfig
-	InputTail      []*InputTailConfig
-	InputTCP       []*InputTCPSocketConfig
-	OutputUnix     []*OutputUnixSocketConfig
-	OutputFile     []*OutputFileConfig
-	OutputTCP      []*OutputTCPSocketConfig
-	OutputFluent   []*OutputFluentConfig
-	OutputKafka    []*OutputKafkaConfig
-	OutputNats     []*OutputNatsConfig
+	InputMsgBuffer   uint
+	InputUnix        []*InputUnixSocketConfig
+	InputFile        []*InputFileConfig
+	InputTail        []*InputTailConfig
+	InputTCP         []*InputTCPSocketConfig
+	OutputUnix       []*OutputUnixSocketConfig
+	OutputFile       []*OutputFileConfig
+	OutputTCP        []*OutputTCPSocketConfig
+	OutputFluent     []*OutputFluentConfig
+	OutputKafka      []*OutputKafkaConfig
+	OutputNats       []*OutputNatsConfig
+	OutputPrometheus []*OutputPrometheus
 }
+
+var (
+	DefaultCounters = []OutputPrometheusMetrics{
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_qtype_total",
+			Help:   "Total number of queries with a given query type.",
+			Labels: []string{"Qtype"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_rcode_total",
+			Help:   "Total number of queries with a given query type.",
+			Labels: []string{"Rcode"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_tc_bit_total",
+			Help:   "Total number of queries with a given query tc bit.",
+			Labels: []string{"TC"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_ad_bit_total",
+			Help:   "Total number of queries with a given query ad bit.",
+			Labels: []string{"AD"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_socket_protocol_total",
+			Help:   "Total number of queries with a given query transport rotocol.",
+			Labels: []string{"SocketProtocol"},
+		},
+		OutputPrometheusMetrics{
+			Name:   "dtap_query_socket_family_total",
+			Help:   "Total number of queries with a given query IP Protocol.",
+			Labels: []string{"SocketFamily"},
+		},
+		OutputPrometheusMetrics{
+			Name:           "dtap_query_tld_total",
+			Help:           "Total number of queries with a given query tld.",
+			Labels:         []string{"TopLevelDomainName"},
+			ExpireInterval: 5,
+			ExpireSec:      60,
+		},
+		OutputPrometheusMetrics{
+			Name:           "dtap_query_sld_total",
+			Help:           "Total number of queries with a given query tld.",
+			Labels:         []string{"TopLevelDomainName"},
+			ExpireInterval: 5,
+			ExpireSec:      60,
+		},
+	}
+)
 
 func (c *Config) Validate() []error {
 	errs := []error{}
@@ -106,6 +156,20 @@ func (c *Config) Validate() []error {
 	for n, o := range c.OutputKafka {
 		if err := o.Validate(); err != nil {
 			err.configType = "OutputKafka"
+			err.no = n
+			errs = append(errs, err)
+		}
+	}
+	for n, o := range c.OutputNats {
+		if err := o.Validate(); err != nil {
+			err.configType = "OutputNats"
+			err.no = n
+			errs = append(errs, err)
+		}
+	}
+	for n, o := range c.OutputPrometheus {
+		if err := o.Validate(); err != nil {
+			err.configType = "OutputPrometheus"
 			err.no = n
 			errs = append(errs, err)
 		}
@@ -426,6 +490,56 @@ func (o *OutputNatsConfig) GetPassword() string {
 }
 func (o *OutputNatsConfig) GetToken() string {
 	return o.Token
+}
+
+type OutputPrometheus struct {
+	Counters []OutputPrometheusMetrics
+	Flat     OutputCommonConfig
+	Buffer   OutputBufferConfig
+}
+
+func (o *OutputPrometheus) GetCounters() []OutputPrometheusMetrics {
+	if o.Counters == nil {
+		return DefaultCounters
+	}
+	return o.Counters
+}
+
+func (o *OutputPrometheus) Validate() *ValidationError {
+	return nil
+}
+
+type OutputPrometheusMetrics struct {
+	Name           string
+	Help           string
+	Labels         []string
+	Limit          int
+	ExpireInterval int
+	ExpireSec      int
+}
+
+func (o *OutputPrometheusMetrics) GetName() string {
+	return o.Name
+}
+
+func (o *OutputPrometheusMetrics) GetHelp() string {
+	return o.Help
+}
+
+func (o *OutputPrometheusMetrics) GetLabels() []string {
+	return o.Labels
+}
+
+func (o *OutputPrometheusMetrics) GetLimit() int {
+	return o.Limit
+}
+
+func (o *OutputPrometheusMetrics) GetExpireInterval() int {
+	return o.ExpireInterval
+}
+
+func (o *OutputPrometheusMetrics) GetExpireSec() int {
+	return o.ExpireSec
 }
 
 type OutputBufferConfig struct {

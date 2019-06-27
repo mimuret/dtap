@@ -1,4 +1,4 @@
-package dtap
+package main
 
 import (
 	"context"
@@ -30,7 +30,7 @@ var (
 	})
 )
 
-func PrometheusExporter(ctx context.Context, listen string) {
+func prometheusExporter(ctx context.Context, listen string) {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(listen, nil)
 	if err != nil {
