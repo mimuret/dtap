@@ -17,6 +17,7 @@
 package dtap
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 	"time"
@@ -30,14 +31,15 @@ import (
 )
 
 type DnstapNatsOutput struct {
-	config     *OutputNatsConfig
-	enc        *framestream.Encoder
-	con        *nats.Conn
-	mux        *sync.Mutex
-	dataString []byte
-	data       []*DnstapFlatT
-	flatOption DnstapFlatOption
-	closeCh    chan struct{}
+	config          *OutputNatsConfig
+	enc             *framestream.Encoder
+	con             *nats.Conn
+	mux             *sync.Mutex
+	dataString      []byte
+	data            []*DnstapFlatT
+	flatOption      DnstapFlatOption
+	flushCancelFunc context.CancelFunc
+	closeCh         chan struct{}
 }
 
 func NewDnstapNatsOutput(config *OutputNatsConfig, params *DnstapOutputParams) *DnstapOutput {
@@ -63,7 +65,9 @@ func (o *DnstapNatsOutput) open() error {
 		return errors.Wrapf(err, "can't create nats producer")
 	}
 	o.closeCh = make(chan struct{})
-	go o.flush()
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	o.flushCancelFunc = cancelFunc
+	go o.flush(ctx)
 	return nil
 }
 
@@ -82,10 +86,13 @@ func (o *DnstapNatsOutput) write(frame []byte) error {
 	return nil
 }
 
-func (o *DnstapNatsOutput) flush() {
+func (o *DnstapNatsOutput) flush(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Millisecond)
 	for {
 		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return
 		case <-ticker.C:
 			o.publish()
 		}
@@ -112,6 +119,7 @@ func (o *DnstapNatsOutput) publish() {
 
 func (o *DnstapNatsOutput) close() {
 	close(o.closeCh)
+	o.flushCancelFunc()
 	o.publish()
 	o.con.Close()
 }
