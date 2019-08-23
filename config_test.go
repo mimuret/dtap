@@ -82,7 +82,6 @@ User="unbound"
 		IPHashSaltPath = "/tmp/salt.test"
 `
 	f, _ := os.Create("/tmp/salt.test")
-	defer f.Close()
 	f.Write([]byte{10, 20, 30, 40})
 	f.Close()
 	b := bytes.NewBufferString(cfg)
@@ -97,7 +96,6 @@ User="unbound"
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableHashIP(), true)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPHashSalt(), []byte{10, 20, 30, 40})
 	f, _ = os.Create("/tmp/salt.test")
-	defer f.Close()
 	f.Write([]byte{20, 30, 40, 50})
 	f.Close()
 	time.Sleep(10 * time.Second)
