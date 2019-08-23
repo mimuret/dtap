@@ -3,6 +3,7 @@ jobs:
   deploy:
     environment:
       - GOPATH: /home/circleci/go
+      - CGO_ENABLED: 0
     docker:
      - image: circleci/golang:1
     steps:
