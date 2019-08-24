@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  deploy:
+  build:
     environment:
       GOPATH: /home/circleci/go
       CGO_ENABLED: 0
@@ -33,7 +33,7 @@ workflows:
       - test
   deploy:
     jobs:
-      - deploy:
+      - build:
           filters:
             branches:
               ignore: /.*/
