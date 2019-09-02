@@ -29,39 +29,39 @@ import (
 )
 
 type DnstapFlatT struct {
-	Timestamp             string `json:"timestamp"`
-	QueryTime             string `json:"query_time,omitempty"`
-	QueryAddress          net.IP `json:"query_address,omitempty"`
-	QueryAddressHash      string `json:"query_address_hash,omitempty"`
-	QueryPort             uint32 `json:"query_port,omitempty"`
-	ResponseTime          string `json:"response_time,omitempty"`
-	ResponseAddress       net.IP `json:"response_address,omitempty"`
-	ResponseAddressHash   string `json:"response_address_hash,omitempty"`
-	ResponsePort          uint32 `json:"response_port,omitempty"`
-	ResponseZone          string `json:"response_zone,omitempty"`
-	EcsNet                *Net   `json:"ecs_net,omitempty"`
-	Identity              string `json:"identity,omitempty"`
-	Type                  string `json:"type"`
-	SocketFamily          string `json:"socket_family"`
-	SocketProtocol        string `json:"socket_protocol"`
-	Version               string `json:"version"`
-	Extra                 string `json:"extra"`
-	TopLevelDomainName    string `json:"tld"`
-	SecondLevelDomainName string `json:"2ld"`
-	ThirdLevelDomainName  string `json:"3ld"`
-	FourthLevelDomainName string `json:"4ld"`
-	Qname                 string `json:"qname"`
-	Qclass                string `json:"qclass"`
-	Qtype                 string `json:"qtype"`
-	MessageSize           int    `json:"message_size"`
-	Txid                  uint16 `json:"txid"`
-	Rcode                 string `json:"rcode"`
-	AA                    bool   `json:"aa"`
-	TC                    bool   `json:"tc"`
-	RD                    bool   `json:"rd"`
-	RA                    bool   `json:"ra"`
-	AD                    bool   `json:"ad"`
-	CD                    bool   `json:"cd"`
+	Timestamp             string `json:"timestamp" msg:"timestamp"`
+	QueryTime             string `json:"query_time,omitempty" msg:"query_time"`
+	QueryAddress          net.IP `json:"query_address,omitempty" msg:"query_address"`
+	QueryAddressHash      string `json:"query_address_hash,omitempty" msg:"query_address_hash"`
+	QueryPort             uint32 `json:"query_port,omitempty" msg:"query_port"`
+	ResponseTime          string `json:"response_time,omitempty" msg:"response_time"`
+	ResponseAddress       net.IP `json:"response_address,omitempty" msg:"response_address"`
+	ResponseAddressHash   string `json:"response_address_hash,omitempty" msg:"response_address_hash"`
+	ResponsePort          uint32 `json:"response_port,omitempty" msg:"response_port"`
+	ResponseZone          string `json:"response_zone,omitempty" msg:"response_zone"`
+	EcsNet                *Net   `json:"ecs_net,omitempty" msg:"ecs_net"`
+	Identity              string `json:"identity,omitempty" msg:"identity"`
+	Type                  string `json:"type" msg:"type"`
+	SocketFamily          string `json:"socket_family" msg:"socket_family"`
+	SocketProtocol        string `json:"socket_protocol" msg:"socket_protocol"`
+	Version               string `json:"version" msg:"version"`
+	Extra                 string `json:"extra" msg:"extra"`
+	TopLevelDomainName    string `json:"tld" msg:"tld"`
+	SecondLevelDomainName string `json:"2ld" msg:"2ld"`
+	ThirdLevelDomainName  string `json:"3ld" msg:"3ld"`
+	FourthLevelDomainName string `json:"4ld" msg:"4ld"`
+	Qname                 string `json:"qname" msg:"qname"`
+	Qclass                string `json:"qclass" msg:"qclass"`
+	Qtype                 string `json:"qtype" msg:"qtype"`
+	MessageSize           int    `json:"message_size" msg:"message_size"`
+	Txid                  uint16 `json:"txid" msg:"txid"`
+	Rcode                 string `json:"rcode" msg:"rcode"`
+	AA                    bool   `json:"aa" msg:"aa"`
+	TC                    bool   `json:"tc" msg:"tc"`
+	RD                    bool   `json:"rd" msg:"rd"`
+	RA                    bool   `json:"ra" msg:"ra"`
+	AD                    bool   `json:"ad" msg:"ad"`
+	CD                    bool   `json:"cd" msg:"cd"`
 }
 
 var (

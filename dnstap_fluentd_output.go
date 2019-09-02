@@ -63,9 +63,11 @@ func (o *DnstapFluentdOutput) write(frame []byte) error {
 	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
 	}
-	if data, err := FlatDnstap(&dt, o.flatOption); err != nil {
+	data, err := FlatDnstap(&dt, o.flatOption)
+	if err != nil {
 		return err
-	} else if err := o.client.Post(o.tag, data); err != nil {
+	}
+	if err := o.client.Post(o.tag, *data); err != nil {
 		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
 	}
 	return nil
