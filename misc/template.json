@@ -3,92 +3,105 @@
     "dnstap-*"
   ],
   "mappings": {
-    "dnstap": {
-      "_source": {
-        "enabled": true
+    "_source": {
+      "enabled": true
+    },
+    "properties": {
+      "@timestamp": {
+        "type": "date"
       },
-      "properties": {
-        "@timestamp": {
-          "type": "date"
-        },
-        "tag": {
-          "type": "keyword"
-        },
-        "identity": {
-          "type": "keyword"
-        },
-        "query_address": {
-          "type": "keyword"
-        },
-        "query_port": {
-          "type": "integer"
-        },
-        "response_address": {
-          "type": "keyword"
-        },
-        "response_port": {
-          "type": "integer"
-        },
-        "response_zone": {
-          "type": "keyword"
-        },
-        "type": {
-          "type": "keyword"
-        },
-        "socket_family": {
-          "type": "keyword"
-        },
-        "socket_protocol": {
-          "type": "keyword"
-        },
-        "version": {
-          "type": "keyword"
-        },
-        "extra": {
-          "type": "keyword"
-        },
-        "qname": {
-          "type": "keyword"
-        },
-        "tld": {
-          "type": "keyword"
-        },
-        "2ld": {
-          "type": "keyword"
-        },
-        "3ld": {
-          "type": "keyword"
-        },
-        "4ld": {
-          "type": "keyword"
-        },
-        "qclass": {
-          "type": "keyword"
-        },
-        "qtype": {
-          "type": "keyword"
-        },
-        "rcode": {
-          "type": "keyword"
-        },
-        "aa": {
-          "type": "boolean"
-        },
-        "tc": {
-          "type": "boolean"
-        },
-        "rd": {
-          "type": "boolean"
-        },
-        "ra": {
-          "type": "boolean"
-        },
-        "ad": {
-          "type": "boolean"
-        },
-        "cd": {
-          "type": "boolean"
-        }
+      "tag": {
+        "type": "keyword"
+      },
+      "query_address": {
+        "type": "keyword"
+      },
+      "query_address_hash": {
+        "type": "keyword"
+      },
+      "query_port": {
+        "type": "integer"
+      },
+      "response_address": {
+        "type": "keyword"
+      },
+      "response_address_hash": {
+        "type": "keyword"
+      },
+      "response_port": {
+        "type": "integer"
+      },
+      "response_zone": {
+        "type": "keyword"
+      },
+      "ecs_net": {
+        "type": "keyword"
+      },
+      "identity": {
+        "type": "keyword"
+      },
+      "type": {
+        "type": "keyword"
+      },
+      "socket_family": {
+        "type": "keyword"
+      },
+      "socket_protocol": {
+        "type": "keyword"
+      },
+      "version": {
+        "type": "keyword"
+      },
+      "extra": {
+        "type": "keyword"
+      },
+      "tld": {
+        "type": "keyword"
+      },
+      "2ld": {
+        "type": "keyword"
+      },
+      "3ld": {
+        "type": "keyword"
+      },
+      "4ld": {
+        "type": "keyword"
+      },
+      "qname": {
+        "type": "keyword"
+      },
+      "qclass": {
+        "type": "keyword"
+      },
+      "qtype": {
+        "type": "keyword"
+      },
+      "message_size": {
+        "type": "integer"
+      },
+      "txid": {
+        "type": "integer"
+      },
+      "rcode": {
+        "type": "keyword"
+      },
+      "aa": {
+        "type": "boolean"
+      },
+      "tc": {
+        "type": "boolean"
+      },
+      "rd": {
+        "type": "boolean"
+      },
+      "ra": {
+        "type": "boolean"
+      },
+      "ad": {
+        "type": "boolean"
+      },
+      "cd": {
+        "type": "boolean"
       }
     }
   }
