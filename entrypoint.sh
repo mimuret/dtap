@@ -28,18 +28,18 @@ EOS
   Path="${DTAP_OUTPUT_UNIX_SOCKET}"
 EOS
   fi
-  if [ "${DTAP_OUTPUT_FLUENT_HOST}"] ; then
+  if [ "${DTAP_OUTPUT_FLUENT_HOST}" != "" ] ; then
     cat <<- EOS >> /etc/dtap/dtap.conf
 [[OutputFluent]]
   Host = "${DTAP_OUTPUT_FLUENT_HOST}"
   Port = ${DTAP_OUTPUT_FLUENT_PORT}
   Tag = "${DTAP_OUTPUT_FLUENT_TAG}"
-  [OutputKafka.flat]
+  [OutputFluent.flat]
     IPv4Mask = ${DTAP_IPV4_MASK}
     IPv6Mask = ${DTAP_IPV6_MASK}
     EnableECS = ${DTAP_ENABLE_ECS}
     EnableHashIP = ${DTAP_ENABLE_HASH_IP}
-    IPHashSaltPath = "${DTAP_ENABLE_HASH_SALT}"
+    IPHashSaltPath = "${DTAP_HASH_SALT}"
 EOS
 
   fi
@@ -54,7 +54,7 @@ EOS
     IPv6Mask = ${DTAP_IPV6_MASK}
     EnableECS = ${DTAP_ENABLE_ECS}
     EnableHashIP = ${DTAP_ENABLE_HASH_IP}
-    IPHashSaltPath = "${DTAP_ENABLE_HASH_SALT}"
+    IPHashSaltPath = "${DTAP_HASH_SALT}"
 EOS
   fi
   if [ "${DTAP_OUTPUT_NATS_HOST}" != "" ] ; then
@@ -70,7 +70,7 @@ EOS
     IPv6Mask = ${DTAP_IPV6_MASK}
     EnableECS = ${DTAP_ENABLE_ECS}
     EnableHashIP = ${DTAP_ENABLE_HASH_IP}
-    IPHashSaltPath = "${DTAP_ENABLE_HASH_SALT}"
+    IPHashSaltPath = "${DTAP_HASH_SALT}"
 EOS
   fi
 fi

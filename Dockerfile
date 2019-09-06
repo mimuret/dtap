@@ -27,7 +27,7 @@ ENV DTAP_IPV4_MASK 24
 ENV DTAP_IPV6_MASK 48
 ENV DTAP_ENABLE_ECS "false"
 ENV DTAP_ENABLE_HASH_IP "false"
-ENV DTAP_ENABLE_HASH_SALT ""
+ENV DTAP_HASH_SALT ""
 
 COPY entrypoint.sh /
 COPY --from=builder /build/cmd/dtap/dtap /usr/bin/dtap

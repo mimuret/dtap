@@ -104,7 +104,7 @@ Make flatting DNSTAP message,And it forawrd to nats host.
 
 ```
 [[OutputNats]]
-Host = "nats://kafka.example.jp:5000"]
+Host = "nats://kafka.example.jp:5000"
 Subject  = "dnstap"
 User = "dnstap"
 Password = "hogehoge

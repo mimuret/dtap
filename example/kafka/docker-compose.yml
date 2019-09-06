@@ -1,0 +1,33 @@
+version: "3"
+services:
+  kafka:
+    image: spotify/kafka
+    ports:
+      - "2181:2181"
+      - "9092:9092"
+    KAFKA_ADVERTISED_HOST_NAME: kafka
+  elasticsearch:
+    image: elasticsearch:7.3.1
+    ports:
+      - "9200:9200/tcp"
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+  unbound:
+    image: mimuret/unbound:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - "./volumes/run:/unbound/var/run"
+  dtap:
+    image: mimuret/dtap:latest
+    volumes:
+      - "./volumes/run:/unbound/var/run"
+    command: /usr/bin/dtap -c /etc/dtap/dtap.conf -d debug
+    environment:
+      DTAP_INPUT_UNIX_SOCKET: /unbound/var/run/dnstap.sock
+      DTAP_OUTPUT_KAFKA_HOSTS: kafka
+      DTAP_OUTPUT_KAFKA_TOPIC: query
+    depends_on:
+      - kafka

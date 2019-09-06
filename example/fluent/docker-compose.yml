@@ -1,0 +1,38 @@
+version: "3"
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    ports:
+      - "24224:24224/tcp"
+    command: /fluent-bit/bin/fluent-bit -v -i forward -o es -p Host=elasticsearch -p Logstash_Format=On -p Logstash_Prefix=dnstap -p Type=dnstap -p Generate_ID=On -m '*'
+  elasticsearch:
+    image: elasticsearch:7.3.1
+    ports:
+      - "9200:9200/tcp"
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+  kibana:
+    image: kibana:7.3.1
+    ports:
+      - "5601:5601/tcp"
+    depends_on:
+      - elasticsearch
+  unbound:
+    image: mimuret/unbound:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - "./volumes/run:/unbound/var/run"
+  dtap:
+    image: mimuret/dtap:latest
+    volumes:
+      - "./volumes/run:/unbound/var/run"
+    command: /usr/bin/dtap -c /etc/dtap/dtap.conf -d debug
+    environment:
+      DTAP_INPUT_UNIX_SOCKET: /unbound/var/run/dnstap.sock
+      DTAP_OUTPUT_FLUENT_HOST: fluent-bit
+      DTAP_OUTPUT_FLUENT_TAG: query
+    depends_on:
+      - fluent-bit
