@@ -7,7 +7,10 @@ Supported multi input and multi output.
 go get -u github.com/mimuret/dtap/dtap
 ```
 
-## Input
+## example
+see [example dir](https://github.com/mimuret/dtap/tree/master/example)
+
+## Input config
 ### Unix Socket
 Make unix domain socket for server software writting DNSTAP Frame.
 Required parameter `Path` is unix domain socket path,
@@ -48,7 +51,7 @@ Path=/var/dnstap/*.fstrm
 
 ```
 
-## Output
+## Output config
 ### Unix Socket
 Write DNSTAP frame to unix domain socket.
 If can't open socket, try reconnect interval 1s.
@@ -93,7 +96,7 @@ Make flatting DNSTAP message,And it forawrd to kafka host.
 
 ```
 [[OutputKafks]]
-Hosts = ["kafka.example.jp"]
+Hosts = ["kafka.example.jp:9092"]
 Topic  = "dnstap_message"
 ```
 
