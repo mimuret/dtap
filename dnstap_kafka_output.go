@@ -17,71 +17,155 @@
 package dtap
 
 import (
+	"encoding/binary"
 	"encoding/json"
-	"strconv"
-	"time"
+	"io/ioutil"
+
+	"github.com/dangkaka/go-kafka-avro"
+	"github.com/linkedin/goavro"
+	"github.com/rakyll/statik/fs"
 
 	"github.com/Shopify/sarama"
 	dnstap "github.com/dnstap/golang-dnstap"
-	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
+	_ "github.com/mimuret/dtap/statik"
 	"github.com/pkg/errors"
 )
 
-type DnstapKafkaOutput struct {
-	config      *OutputKafkaConfig
-	enc         *framestream.Encoder
-	kafkaConfig *sarama.Config
-	producer    sarama.AsyncProducer
-	flatOption  DnstapFlatOption
+var schemaStr string
+
+func init() {
+	statikFS, _ := fs.New()
+	f, _ := statikFS.Open("/flat.avsc")
+	b, _ := ioutil.ReadAll(f)
+	schemaStr = string(b)
 }
 
-func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams) *DnstapOutput {
+type KafkaClient interface {
+	Add(string, string, []byte, []byte) error
+}
+
+type DnstapKafkaOutput struct {
+	config        *OutputKafkaConfig
+	kafkaConfig   *sarama.Config
+	producer      sarama.SyncProducer
+	registry      *kafka.CachedSchemaRegistryClient
+	valueCodec    *goavro.Codec
+	valueSchemaID []byte
+	keyCodec      *goavro.Codec
+	keySchemaID   []byte
+}
+
+func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams) (*DnstapOutput, error) {
 	kafkaConfig := sarama.NewConfig()
-	kafkaConfig.Producer.Flush.Messages = 100
 	kafkaConfig.Producer.Return.Successes = true
+	kafkaConfig.Producer.Return.Errors = true
 	kafkaConfig.Producer.Retry.Max = int(config.GetRetry())
+
+	keyCodec, err := goavro.NewCodec(`{"type": "string"}`)
+	if err != nil {
+		return nil, err
+	}
+
+	valueCodec, err := goavro.NewCodec(schemaStr)
+	if err != nil {
+		return nil, err
+	}
 
 	params.Handler = &DnstapKafkaOutput{
 		config:      config,
 		kafkaConfig: kafkaConfig,
-		flatOption:  &config.Flat,
+		keyCodec:    keyCodec,
+		valueCodec:  valueCodec,
 	}
-	return NewDnstapOutput(params)
+	return NewDnstapOutput(params), nil
 }
 
 func (o *DnstapKafkaOutput) open() error {
 	var err error
-	o.producer, err = sarama.NewAsyncProducer(o.config.Hosts, o.kafkaConfig)
+	o.producer, err = sarama.NewSyncProducer(o.config.Hosts, o.kafkaConfig)
 	if err != nil {
 		return errors.Wrapf(err, "can't create kafka producer")
 	}
+	if o.config.GetOutputType() == "avro" {
+		if o.valueSchemaID, err = o.getSchemaID(o.config.GetTopic()+"-value", o.valueCodec); err != nil {
+			return errors.Wrapf(err, "can't get schema id")
+		}
+		if o.keySchemaID, err = o.getSchemaID(o.config.GetTopic()+"-key", o.keyCodec); err != nil {
+			return errors.Wrapf(err, "can't get schema id")
+		}
+	}
 	return nil
+}
+func (o *DnstapKafkaOutput) getSchemaID(subject string, codec *goavro.Codec) ([]byte, error) {
+	registry := kafka.NewCachedSchemaRegistryClient(o.config.GetSchemaRegistries())
+	schemaID, err := registry.CreateSubject(subject, codec)
+	if err != nil {
+		return nil, err
+	}
+	val := make([]byte, 4)
+	binary.BigEndian.PutUint32(val, uint32(schemaID))
+	return val, nil
+}
+
+func (o *DnstapKafkaOutput) GetEncoder(v interface{}, codec *goavro.Codec, schemaID []byte) (sarama.Encoder, error) {
+	binary, err := codec.BinaryFromNative(nil, v)
+	if err != nil {
+		return nil, err
+	}
+	var binaryMsg []byte
+	// first byte is magic byte, always 0 for now
+	binaryMsg = append(binaryMsg, byte(0))
+	//4-byte schema ID as returned by the Schema Registry
+	binaryMsg = append(binaryMsg, schemaID...)
+	//avro serialized data in Avro’s binary encoding
+	binaryMsg = append(binaryMsg, binary...)
+
+	return sarama.ByteEncoder(binaryMsg), nil
 }
 
 func (o *DnstapKafkaOutput) write(frame []byte) error {
-	dt := dnstap.Dnstap{}
-	if err := proto.Unmarshal(frame, &dt); err != nil {
-		return err
+	var v, k sarama.Encoder
+	if o.config.GetOutputType() == "protobuf" {
+		k = sarama.ByteEncoder(o.config.GetKey())
+		v = sarama.ByteEncoder(frame)
+	} else {
+		dt := dnstap.Dnstap{}
+		if err := proto.Unmarshal(frame, &dt); err != nil {
+			return err
+		}
+		data, err := FlatDnstap(&dt, &o.config.Flat)
+		if err != nil {
+			return err
+		}
+		if o.config.GetOutputType() == "avro" {
+			var err error
+			mapString := data.ToMapString()
+			if v, err = o.GetEncoder(mapString, o.valueCodec, o.valueSchemaID); err != nil {
+				return err
+			}
+			if k, err = o.GetEncoder(o.config.GetKey(), o.keyCodec, o.keySchemaID); err != nil {
+				return err
+			}
+		} else {
+			buf, err := json.Marshal(data)
+			if err != nil {
+				return err
+			}
+			k = sarama.StringEncoder(o.config.GetKey())
+			v = sarama.StringEncoder(buf)
+		}
 	}
-	data, err := FlatDnstap(&dt, o.flatOption)
-	if err != nil {
-		return err
-	}
-	jsonStr, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	timestamp := time.Now().UnixNano()
 
-	o.producer.Input() <- &sarama.ProducerMessage{
+	msg := &sarama.ProducerMessage{
 		Topic: o.config.GetTopic(),
-		Key:   sarama.StringEncoder(strconv.FormatInt(timestamp, 10)),
-		Value: sarama.StringEncoder(string(jsonStr)),
+		Key:   k,
+		Value: v,
 	}
-	return nil
+	_, _, err := o.producer.SendMessage(msg)
+
+	return err
 }
 
 func (o *DnstapKafkaOutput) close() {
-	o.producer.Close()
 }

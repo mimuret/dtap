@@ -67,6 +67,15 @@
       "4ld": {
         "type": "keyword"
       },
+      "sld": {
+        "type": "keyword"
+      },
+      "thirdld": {
+        "type": "keyword"
+      },
+      "fourthld": {
+        "type": "keyword"
+      },
       "qname": {
         "type": "keyword"
       },

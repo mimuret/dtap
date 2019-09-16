@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
@@ -48,6 +49,7 @@ type Config struct {
 	OutputKafka      []*OutputKafkaConfig
 	OutputNats       []*OutputNatsConfig
 	OutputPrometheus []*OutputPrometheus
+	OutputStdout     []*OutputStdoutConfig
 }
 
 var (
@@ -378,7 +380,7 @@ type OutputFluentConfig struct {
 	Host   string
 	Tag    string
 	Port   uint16
-	Flat   OutputCommonConfig
+	Flat   FlatConfig
 	Buffer OutputBufferConfig
 }
 
@@ -427,11 +429,14 @@ func (o *OutputFluentConfig) GetPort() int {
 }
 
 type OutputKafkaConfig struct {
-	Hosts  []string
-	Retry  uint
-	Topic  string
-	Flat   OutputCommonConfig
-	Buffer OutputBufferConfig
+	Hosts            []string
+	SchemaRegistries []string
+	Retry            uint
+	Topic            string
+	Key              string
+	OutputType       string
+	Buffer           OutputBufferConfig
+	Flat             FlatConfig
 }
 
 func (o *OutputKafkaConfig) Validate() *ValidationError {
@@ -442,20 +447,38 @@ func (o *OutputKafkaConfig) Validate() *ValidationError {
 	if len(o.Hosts) == 0 {
 		valerr.Add(errors.New("Hosts must not be empty"))
 	}
-	if err := o.Flat.Validate(); err != nil {
-		valerr.Add(err)
+	otype := strings.ToLower(o.OutputType)
+	switch otype {
+	case "json", "flat_json":
+	case "protobuf":
+	case "avro":
+	default:
+		valerr.Add(errors.New("OutputType must be avro, json or protobuf"))
 	}
+	o.OutputType = otype
 	return valerr.Err()
 }
 
 func (o *OutputKafkaConfig) GetHosts() []string {
 	return o.Hosts
 }
+func (o *OutputKafkaConfig) GetSchemaRegistries() []string {
+	return o.SchemaRegistries
+}
 func (o *OutputKafkaConfig) GetRetry() uint {
 	return o.Retry
 }
 func (o *OutputKafkaConfig) GetTopic() string {
 	return o.Topic
+}
+func (o *OutputKafkaConfig) GetKey() string {
+	return o.Key
+}
+func (o *OutputKafkaConfig) GetOutputType() string {
+	if o.OutputType == "" {
+		return "avro"
+	}
+	return o.OutputType
 }
 
 type OutputNatsConfig struct {
@@ -464,7 +487,7 @@ type OutputNatsConfig struct {
 	User     string
 	Password string
 	Token    string
-	Flat     OutputCommonConfig
+	Flat     FlatConfig
 	Buffer   OutputBufferConfig
 }
 
@@ -473,6 +496,7 @@ func (o *OutputNatsConfig) Validate() *ValidationError {
 	if err := o.Flat.Validate(); err != nil {
 		valerr.Add(err)
 	}
+
 	return valerr.Err()
 }
 
@@ -494,7 +518,7 @@ func (o *OutputNatsConfig) GetToken() string {
 
 type OutputPrometheus struct {
 	Counters []OutputPrometheusMetrics
-	Flat     OutputCommonConfig
+	Flat     FlatConfig
 	Buffer   OutputBufferConfig
 }
 
@@ -542,6 +566,44 @@ func (o *OutputPrometheusMetrics) GetExpireSec() int {
 	return o.ExpireSec
 }
 
+type OutputStdoutConfig struct {
+	Type        string             `toml:"type"`
+	TemplateStr string             `toml:"template"`
+	template    *template.Template `toml:"-"`
+	Flat        FlatConfig
+	Buffer      OutputBufferConfig
+}
+
+func (o *OutputStdoutConfig) GetType() string {
+	if o.Type == "" {
+		return "json"
+	}
+	return o.Type
+}
+func (o *OutputStdoutConfig) Validate() error {
+	valerr := NewValidationError()
+	o.Type = strings.ToLower(o.Type)
+	switch o.Type {
+	case "", "json":
+		o.Type = "json"
+	case "gotpl":
+		if o.TemplateStr == "" {
+			valerr.Add(errors.New("Type gotpl need Template string"))
+		}
+		t, err := template.New("stdout").Parse(o.TemplateStr)
+		if err != nil {
+			valerr.Add(errors.Wrap(err, "Template parse error"))
+		}
+		o.template = t
+	default:
+		valerr.Add(errors.New("Type must be json or gotpl"))
+	}
+	if err := o.Flat.Validate(); err != nil {
+		valerr.Add(err)
+	}
+	return valerr.Err()
+}
+
 type OutputBufferConfig struct {
 	BufferSize uint
 }
@@ -553,7 +615,7 @@ func (o *OutputBufferConfig) GetBufferSize() uint {
 	return o.BufferSize
 }
 
-type OutputCommonConfig struct {
+type FlatConfig struct {
 	IPv4Mask       uint8
 	ipv4Mask       net.IPMask
 	IPv6Mask       uint8
@@ -564,7 +626,7 @@ type OutputCommonConfig struct {
 	IPHashSaltPath string
 }
 
-func (o *OutputCommonConfig) GetIPv4Mask() net.IPMask {
+func (o *FlatConfig) GetIPv4Mask() net.IPMask {
 	if o.ipv4Mask == nil {
 		if o.IPv4Mask == 0 {
 			o.IPv4Mask = 24
@@ -574,7 +636,7 @@ func (o *OutputCommonConfig) GetIPv4Mask() net.IPMask {
 	return o.ipv4Mask
 }
 
-func (o *OutputCommonConfig) GetIPv6Mask() net.IPMask {
+func (o *FlatConfig) GetIPv6Mask() net.IPMask {
 	if o.ipv6Mask == nil {
 		if o.IPv6Mask == 0 {
 			o.IPv6Mask = 48
@@ -584,19 +646,19 @@ func (o *OutputCommonConfig) GetIPv6Mask() net.IPMask {
 	return o.ipv6Mask
 }
 
-func (o *OutputCommonConfig) GetEnableEcs() bool {
+func (o *FlatConfig) GetEnableEcs() bool {
 	return o.EnableECS
 }
 
-func (o *OutputCommonConfig) GetEnableHashIP() bool {
+func (o *FlatConfig) GetEnableHashIP() bool {
 	return o.EnableHashIP
 }
 
-func (o *OutputCommonConfig) GetIPHashSaltPath() string {
+func (o *FlatConfig) GetIPHashSaltPath() string {
 	return o.IPHashSaltPath
 }
 
-func (o *OutputCommonConfig) GetIPHashSalt() []byte {
+func (o *FlatConfig) GetIPHashSalt() []byte {
 	if o.ipHashSalt == nil {
 		if o.GetIPHashSaltPath() != "" {
 			o.LoadSalt()
@@ -609,13 +671,13 @@ func (o *OutputCommonConfig) GetIPHashSalt() []byte {
 	return o.ipHashSalt
 }
 
-func (o *OutputCommonConfig) LoadSalt() {
+func (o *FlatConfig) LoadSalt() {
 	if o.GetIPHashSaltPath() != "" {
 		o.ipHashSalt, _ = ioutil.ReadFile(o.GetIPHashSaltPath())
 	}
 }
 
-func (o *OutputCommonConfig) WatchSalt(ctx context.Context) {
+func (o *FlatConfig) WatchSalt(ctx context.Context) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -645,7 +707,7 @@ L:
 	}
 }
 
-func (o *OutputCommonConfig) Validate() *ValidationError {
+func (o *FlatConfig) Validate() *ValidationError {
 	valerr := NewValidationError()
 	if o.IPv4Mask != 0 {
 		if o.IPv4Mask > 32 {

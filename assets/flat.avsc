@@ -1,0 +1,152 @@
+{
+  "type": "record",
+  "name": "DnstapFlatT",
+  "fields": [
+    {
+      "name": "timestamp",
+      "type": "string"
+    },
+    {
+      "name": "query_time",
+      "type": "string",
+      "default": ""
+
+    },
+    {
+      "name": "query_address",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "query_address_hash",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "query_port",
+      "type": "int",
+      "default": 0
+    },
+    {
+      "name": "response_time",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "response_address",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "response_address_hash",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "response_port",
+      "type": "int",
+      "default": 0
+    },
+    {
+      "name": "response_zone",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "ecs_net",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "identity",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "type",
+      "type": "string"
+    },
+    {
+      "name": "socket_family",
+      "type": "string"
+    },
+    {
+      "name": "socket_protocol",
+      "type": "string"
+    },
+    {
+      "name": "version",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "extra",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "name": "tld",
+      "type": "string"
+    },
+    {
+      "name": "sld",
+      "type": "string"
+    },
+    {
+      "name": "thirdld",
+      "type": "string"
+    },
+    {
+      "name": "fourthld",
+      "type": "string"
+    },
+    {
+      "name": "qname",
+      "type": "string"
+    },
+    {
+      "name": "qclass",
+      "type": "string"
+    },
+    {
+      "name": "qtype",
+      "type": "string"
+    },
+    {
+      "name": "message_size",
+      "type": "int"
+    },
+    {
+      "name": "txid",
+      "type": "int"
+    },
+    {
+      "name": "rcode",
+      "type": "string"
+    },
+    {
+      "name": "aa",
+      "type": "boolean"
+    },
+    {
+      "name": "tc",
+      "type": "boolean"
+    },
+    {
+      "name": "rd",
+      "type": "boolean"
+    },
+    {
+      "name": "ra",
+      "type": "boolean"
+    },
+    {
+      "name": "ad",
+      "type": "boolean"
+    },
+    {
+      "name": "cd",
+      "type": "boolean"
+    }
+  ]
+}

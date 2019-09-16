@@ -48,14 +48,15 @@ EOS
     cat <<- EOS >> /etc/dtap/dtap.conf
 [[OutputKafka]]
   Hosts = ["${host}"]
+  ${registries}
   Topic  = "${DTAP_OUTPUT_KAFKA_TOPIC}"
-  [OutputKafka.flat]
-    IPv4Mask = ${DTAP_IPV4_MASK}
-    IPv6Mask = ${DTAP_IPV6_MASK}
-    EnableECS = ${DTAP_ENABLE_ECS}
-    EnableHashIP = ${DTAP_ENABLE_HASH_IP}
-    IPHashSaltPath = "${DTAP_HASH_SALT}"
 EOS
+    if [ "${DTAP_OUTPUT_SCHEMA_REGISTRIES}" != "" ] ; then
+      r=$(echo ${DTAP_OUTPUT_SCHEMA_REGISTRIES} | sed 's/,/","/g')
+      cat <<- EOS >> /etc/dtap/dtap.conf
+  SchemaRegistries = ["${r}"]
+EOS
+    fi
   fi
   if [ "${DTAP_OUTPUT_NATS_HOST}" != "" ] ; then
     cat <<- EOS >> /etc/dtap/dtap.conf

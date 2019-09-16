@@ -64,7 +64,7 @@ User="unbound"
 
 }
 
-func TestOutputCommonConfig(t *testing.T) {
+func TestFlatConfig(t *testing.T) {
 	cfg := `[[InputUnix]]
 Path="/var/log/unbound/dnstap.sock"
 User="unbound"

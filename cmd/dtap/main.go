@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	log.SetOutput(os.Stdout)
+	log.SetOutput(os.Stderr)
 	log.SetLevel(log.InfoLevel)
 }
 
@@ -161,11 +161,11 @@ func main() {
 			InCounter:   TotalRecvOutputFrame,
 			LostCounter: TotalLostInputFrame,
 		}
-		o := dtap.NewDnstapKafkaOutput(oc, params)
-		output = append(output, o)
-		if oc.Flat.GetIPHashSaltPath() != "" {
-			go oc.Flat.WatchSalt(context.Background())
+		o, err := dtap.NewDnstapKafkaOutput(oc, params)
+		if err != nil {
+			log.Fatal(err)
 		}
+		output = append(output, o)
 	}
 
 	for _, oc := range config.OutputNats {
@@ -188,6 +188,15 @@ func main() {
 			LostCounter: TotalLostInputFrame,
 		}
 		o := dtap.NewDnstapPrometheusOutput(oc, params)
+		output = append(output, o)
+	}
+	for _, oc := range config.OutputStdout {
+		params := &dtap.DnstapOutputParams{
+			BufferSize:  oc.Buffer.GetBufferSize(),
+			InCounter:   TotalRecvOutputFrame,
+			LostCounter: TotalLostInputFrame,
+		}
+		o := dtap.NewDnstapStdoutOutput(oc, params)
 		output = append(output, o)
 	}
 

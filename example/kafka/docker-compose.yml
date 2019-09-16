@@ -1,18 +1,39 @@
 version: "3"
 services:
-  kafka:
-    image: spotify/kafka
+  kafka-cluster:
+    image: landoop/fast-data-dev:latest
+    environment:
+      ADV_HOST: 192.168.99.100
+      RUNTESTS: 0
+      CONNECTORS: elasticsearch
     ports:
-      - "2181:2181"
-      - "9092:9092"
-    KAFKA_ADVERTISED_HOST_NAME: kafka
+      - 2181:2181
+      - 3030:3030
+      - 8081-8083:8081-8083
+      - 9581-9585:9581-9585
+      - 9092:9092
+    links:
+      - elasticsearch
+    networks:
+      dtap_kafka:
+        ipv4_address: 192.168.99.100
   elasticsearch:
-    image: elasticsearch:7.3.1
+    image: elasticsearch:6.8.3
     ports:
       - "9200:9200/tcp"
     environment:
       discovery.type: single-node
       ES_JAVA_OPTS: -Xms512m -Xmx512m
+    networks:
+      - dtap_kafka
+  kibana:
+    image: kibana:6.8.3
+    ports:
+      - "5601:5601/tcp"
+    depends_on:
+      - elasticsearch
+    networks:
+      - dtap_kafka
   unbound:
     image: mimuret/unbound:latest
     ports:
@@ -20,14 +41,30 @@ services:
       - "53:53/udp"
     volumes:
       - "./volumes/run:/unbound/var/run"
+    networks:
+      - dtap_kafka
   dtap:
     image: mimuret/dtap:latest
+    ports:
+      - 9520:9520
     volumes:
       - "./volumes/run:/unbound/var/run"
     command: /usr/bin/dtap -c /etc/dtap/dtap.conf -d debug
     environment:
       DTAP_INPUT_UNIX_SOCKET: /unbound/var/run/dnstap.sock
-      DTAP_OUTPUT_KAFKA_HOSTS: kafka
+      DTAP_OUTPUT_KAFKA_HOSTS: kafka-cluster:9092
+      DTAP_OUTPUT_SCHEMA_REGISTRIES: http://kafka-cluster:8081
       DTAP_OUTPUT_KAFKA_TOPIC: query
     depends_on:
-      - kafka
+      - kafka-cluster
+    networks:
+      - dtap_kafka
+    links:
+      - kafka-cluster
+
+networks:
+  dtap_kafka:
+    ipam:
+     driver: default
+     config:
+       - subnet: 192.168.99.0/24

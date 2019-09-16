@@ -1,8 +1,14 @@
-FROM golang:1.12-alpine3.10 as builder
-COPY . /build
-RUN apk --update --no-cache add git gcc musl-dev \
-&& cd /build/cmd/dtap \
-&& go build
+FROM golang:1.12-alpine3.10 as base
+WORKDIR /build
+RUN apk --update --no-cache add git gcc musl-dev
+copy go.mod .
+copy go.sum .
+RUN go mod download
+
+FROM base as builder
+WORKDIR /build
+COPY . .
+RUN cd cmd/dtap && go build
 
 FROM alpine:3.10
 

@@ -47,9 +47,9 @@ type DnstapFlatT struct {
 	Version               string `json:"version" msg:"version"`
 	Extra                 string `json:"extra" msg:"extra"`
 	TopLevelDomainName    string `json:"tld" msg:"tld"`
-	SecondLevelDomainName string `json:"2ld" msg:"2ld"`
-	ThirdLevelDomainName  string `json:"3ld" msg:"3ld"`
-	FourthLevelDomainName string `json:"4ld" msg:"4ld"`
+	SecondLevelDomainName string `json:"sld" msg:"sld"`
+	ThirdLevelDomainName  string `json:"thirdld" msg:"thirdld"`
+	FourthLevelDomainName string `json:"fourthld" msg:"fourthld"`
 	Qname                 string `json:"qname" msg:"qname"`
 	Qclass                string `json:"qclass" msg:"qclass"`
 	Qtype                 string `json:"qtype" msg:"qtype"`
@@ -197,5 +197,56 @@ func getName(labels []string, i int) string {
 	} else {
 		res = strings.Join(labels, ".")
 	}
+	return res
+}
+
+func (d *DnstapFlatT) ToMapString() map[string]interface{} {
+	res := map[string]interface{}{}
+	res["timestamp"] = d.Timestamp
+	res["query_time"] = d.QueryTime
+	if d.QueryAddress != nil {
+		res["query_address"] = d.QueryAddress.String()
+	}
+	res["query_address_hash"] = d.QueryAddressHash
+	res["query_port"] = int64(d.QueryPort)
+	res["response_time"] = d.ResponseTime
+	if d.ResponseAddress != nil {
+		res["response_address"] = d.ResponseAddress.String()
+	}
+	res["response_address_hash"] = d.ResponseAddressHash
+
+	res["response_port"] = int64(d.ResponsePort)
+	res["response_zone"] = d.ResponseZone
+	if d.ResponseAddress != nil {
+		res["ResponseAddressHash"] = d.EcsNet
+	}
+
+	res["identity"] = d.Identity
+	res["type"] = d.Type
+	res["socket_family"] = d.SocketFamily
+	res["socket_protocol"] = d.SocketProtocol
+
+	res["version"] = d.Version
+	res["extra"] = d.Extra
+	res["tld"] = d.TopLevelDomainName
+	res["sld"] = d.SecondLevelDomainName
+	res["thirdld"] = d.ThirdLevelDomainName
+	res["fourthld"] = d.FourthLevelDomainName
+
+	res["qname"] = d.Qname
+	res["qclass"] = d.Qclass
+	res["qtype"] = d.Qtype
+
+	res["message_size"] = int64(d.MessageSize)
+	res["txid"] = int32(d.Txid)
+	res["rcode"] = d.Rcode
+
+	res["aa"] = d.AA
+	res["tc"] = d.TC
+	res["rd"] = d.RD
+	res["ra"] = d.RA
+	res["ad"] = d.AD
+	res["cd"] = d.CD
+
 	return res
 }
