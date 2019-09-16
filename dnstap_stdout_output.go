@@ -25,6 +25,7 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/common/log"
 )
 
 type DnstapStdoutOutput struct {
@@ -55,7 +56,7 @@ func (o *DnstapStdoutOutput) write(frame []byte) error {
 	if err != nil {
 		return err
 	}
-	switch o.config.Type {
+	switch o.config.GetType() {
 	case "json":
 		buf, err := json.Marshal(data)
 		if err != nil {
@@ -68,6 +69,8 @@ func (o *DnstapStdoutOutput) write(frame []byte) error {
 			return err
 		}
 		fmt.Println(buf.String())
+	default:
+		log.Fatalf("unsupported Type %s", o.config.GetType())
 	}
 	return nil
 }

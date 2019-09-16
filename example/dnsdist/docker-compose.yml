@@ -1,0 +1,28 @@
+version: "3"
+services:
+  dnsdist:
+    image: mimuret/dnsdist
+    tty: true
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - "./volumes/run:/var/run/dnsdist"
+      - "./data/dnsdist/:/etc/dnsdist/" 
+    networks:
+      - dtap_dnsdist
+  dtap:
+    image: mimuret/dtap:latest
+    ports:
+      - 9520:9520
+    volumes:
+      - "./volumes/run:/unbound/var/run"
+    command: /usr/bin/dtap -c /etc/dtap/dtap.conf -d debug
+    environment:
+      DTAP_INPUT_UNIX_SOCKET: /unbound/var/run/dnstap.sock
+      DTAP_OUTPUT_STDOUT_TYPE: json
+    networks:
+      - dtap_dnsdist
+
+networks:
+  dtap_dnsdist:

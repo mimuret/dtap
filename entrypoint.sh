@@ -74,6 +74,19 @@ EOS
     IPHashSaltPath = "${DTAP_HASH_SALT}"
 EOS
   fi
+  if [ "${DTAP_OUTPUT_STDOUT_TYPE}" != "" ] ; then
+    cat <<- EOS >> /etc/dtap/dtap.conf
+[[OutputStdout]]
+  Type = "${DTAP_OUTPUT_STDOUT_TYPE}"
+  Template = "${DTAP_OUTPUT_STDOUT_TEMPLATE}"
+  [OutputStdout.flat]
+    IPv4Mask = ${DTAP_IPV4_MASK}
+    IPv6Mask = ${DTAP_IPV6_MASK}
+    EnableECS = ${DTAP_ENABLE_ECS}
+    EnableHashIP = ${DTAP_ENABLE_HASH_IP}
+    IPHashSaltPath = "${DTAP_HASH_SALT}"
+EOS
+  fi
 fi
 
 cat /etc/dtap/dtap.conf
