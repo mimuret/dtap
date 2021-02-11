@@ -39,7 +39,7 @@ func NewDnstapFstrmSocketOutput(handler SocketOutput, params *DnstapOutputParams
 func (o *DnstapFstrmSocketOutput) open() error {
 	var err error
 	if o.enc, err = o.handler.newConnect(); err != nil {
-		return fmt.Errorf("failed to connect socket: %w")
+		return fmt.Errorf("failed to connect socket: %w", err)
 	}
 	o.opened = make(chan bool)
 	go func() {

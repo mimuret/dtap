@@ -49,7 +49,7 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf) {
 				i.readError <- nil
 				return
 			}
-			i.readError <- fmt.Errorf("failed to accept socket", err)
+			i.readError <- fmt.Errorf("failed to accept socket: %w", err)
 			return
 		}
 		input, err := NewDnstapFstrmInput(conn, true)
