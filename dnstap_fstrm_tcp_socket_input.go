@@ -17,15 +17,14 @@
 package dtap
 
 import (
+	"fmt"
 	"net"
-
-	"github.com/pkg/errors"
 )
 
 func NewDnstapFstrmTCPSocketInput(config *InputTCPSocketConfig) (*DnstapFstrmSocketInput, error) {
 	l, err := net.Listen("tcp", config.GetNet())
 	if err != nil {
-		return nil, errors.Wrapf(err, "can't listen %s", config.GetNet())
+		return nil, fmt.Errorf("failed to listen %s err: %w", config.GetNet(), err)
 	}
 	return NewDnstapFstrmSocketInput(l)
 }

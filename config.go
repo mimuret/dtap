@@ -224,10 +224,10 @@ func NewConfigFromReader(r io.Reader) (*Config, error) {
 	v.SetConfigType("toml")
 	v.SetDefault("InputMsgBuffer", 10000)
 	if err := v.ReadConfig(r); err != nil {
-		return nil, errors.Wrap(err, "can't read config")
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 	if err := v.Unmarshal(c); err != nil {
-		return nil, errors.Wrap(err, "can't parse config")
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 	return c, nil
 }
@@ -592,7 +592,7 @@ func (o *OutputStdoutConfig) Validate() error {
 		}
 		t, err := template.New("stdout").Parse(o.TemplateStr)
 		if err != nil {
-			valerr.Add(errors.Wrap(err, "Template parse error"))
+			valerr.Add(fmt.Errorf("Template parse error: %w", err))
 		}
 		o.template = t
 	default:

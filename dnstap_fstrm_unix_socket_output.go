@@ -17,9 +17,8 @@
 package dtap
 
 import (
+	"fmt"
 	"net"
-
-	"github.com/pkg/errors"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
@@ -39,13 +38,11 @@ func NewDnstapFstrmUnixSockOutput(config *OutputUnixSocketConfig, params *Dnstap
 func (o *DnstapFstrmUnixSockOutput) newConnect() (*framestream.Encoder, error) {
 	w, err := net.Dial("unix", o.config.GetPath())
 	if err != nil {
-
-		return nil, errors.Wrapf(err, "can't connect unix socket, path: %s", o.config.GetPath())
+		return nil, fmt.Errorf("failed to connect unix socket, path: %s: %w", o.config.GetPath(), err)
 	}
 	enc, err := framestream.NewEncoder(w, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: true})
 	if err != nil {
-
-		return nil, errors.Wrapf(err, "can't create fstrm encorder, path: %s", o.config.GetPath())
+		return nil, fmt.Errorf("failed to create fstrm encorder, path: %s: %w", o.config.GetPath(), err)
 	}
 	return enc, nil
 }

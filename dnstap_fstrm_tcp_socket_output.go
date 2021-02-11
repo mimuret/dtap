@@ -17,11 +17,11 @@
 package dtap
 
 import (
+	"fmt"
 	"net"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/pkg/errors"
 )
 
 type DnstapFstrmTCPSocketOutput struct {
@@ -37,12 +37,11 @@ func (o *DnstapFstrmTCPSocketOutput) newConnect() (*framestream.Encoder, error) 
 	w, err := net.Dial("tcp", o.config.GetAddress())
 	if err != nil {
 
-		return nil, errors.Wrapf(err, "can't connect tcp socket, address: %s", o.config.GetAddress())
+		return nil, fmt.Errorf("failed to connect tcp socket, address: %s err: %w", o.config.GetAddress(), err)
 	}
 	enc, err := framestream.NewEncoder(w, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: true})
 	if err != nil {
-
-		return nil, errors.Wrapf(err, "can't create fstrm encorder, address: %s", o.config.GetAddress())
+		return nil, fmt.Errorf("failed to create fstrm encorder, address: %s err: %w", o.config.GetAddress(), err)
 	}
 	return enc, nil
 }

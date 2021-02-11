@@ -25,7 +25,6 @@ import (
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
-	"github.com/pkg/errors"
 )
 
 type DnstapFlatT struct {
@@ -127,7 +126,7 @@ func FlatDnstap(dt *dnstap.Dnstap, opt DnstapFlatOption) (*DnstapFlatT, error) {
 	data.Extra = string(dt.GetExtra())
 	dnsMsg := dns.Msg{}
 	if err := dnsMsg.Unpack(dnsMessage); err != nil {
-		return nil, errors.Wrapf(err, "can't parse dns message() failed: %s\n", err)
+		return nil, fmt.Errorf("failed to parse dns message() err: %w", err)
 	}
 
 	if len(dnsMsg.Question) > 0 {

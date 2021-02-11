@@ -20,11 +20,11 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/ulikunitz/xz"
 )
 
@@ -55,13 +55,13 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 	var r io.ReadCloser
 	f, err := os.Open(config.GetPath())
 	if err != nil {
-		return nil, errors.Wrapf(err, "watch failed, path: %s", config.GetPath())
+		return nil, fmt.Errorf("failed to watci file, path: %s err: %w", config.GetPath(), err)
 	}
 
 	if strings.HasSuffix(config.GetPath(), "gz") {
 		r, err = gzip.NewReader(f)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create gzip reader, path: %s", config.GetPath())
+			return nil, fmt.Errorf("failed to create gzip reader, path: %s err: %w", config.GetPath(), err)
 		}
 	} else if strings.HasSuffix(config.GetPath(), "bz2") {
 		cmp := bzip2.NewReader(f)
@@ -70,14 +70,14 @@ func NewDnstapFstrmFileInput(config *InputFileConfig) (*DnstapFstrmFileInput, er
 		cmp, err := xz.NewReader(f)
 		r = NewDnstapFstrmFileReadCloser(cmp, f)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create xz reader, path: %s", config.GetPath())
+			return nil, fmt.Errorf("failed to create xz reader, path: %s err: %w", config.GetPath(), err)
 		}
 	} else {
 		r = f
 	}
 	input, err := NewDnstapFstrmInput(r, false)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create fstrm input, path: %s", config.GetPath())
+		return nil, fmt.Errorf("failed to create fstrm input, path: %s err: %w", config.GetPath(), err)
 	}
 
 	i := &DnstapFstrmFileInput{

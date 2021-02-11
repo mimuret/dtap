@@ -18,10 +18,10 @@ package dtap
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -49,12 +49,12 @@ func (i *DnstapFstrmSocketInput) runRead(ctx context.Context, rbuf *RBuf) {
 				i.readError <- nil
 				return
 			}
-			i.readError <- errors.Wrapf(err, "can't accept socket")
+			i.readError <- fmt.Errorf("failed to accept socket", err)
 			return
 		}
 		input, err := NewDnstapFstrmInput(conn, true)
 		if err != nil {
-			log.Debugf("can't create NewDnstapFstrmInput: %s", err)
+			log.Debugf("failed to create NewDnstapFstrmInput: %s", err)
 			continue
 		}
 		childCtx, _ := context.WithCancel(readCtx)

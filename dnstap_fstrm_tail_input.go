@@ -18,11 +18,11 @@ package dtap
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/fsnotify/fsnotify"
@@ -50,7 +50,7 @@ func (i *DnstapFstrmTailInput) runSearchPath(ctx context.Context) error {
 	for {
 		matches, err := filepath.Glob(i.config.GetPath())
 		if err != nil {
-			return errors.Wrapf(err, "search file error, path: %s", i.config.GetPath())
+			return fmt.Errorf("search file error, path: %s err: %w", i.config.GetPath(), err)
 		} else {
 			for _, filename := range matches {
 				if _, ok := i.readers[filename]; ok != false {
@@ -76,11 +76,11 @@ func (i *DnstapFstrmTailInput) runReadFile(ctx context.Context, filename string,
 	modify := make(chan bool)
 	f, err := os.Open(filename)
 	if err != nil {
-		return errors.Wrapf(err, "can't open file, path: %s", filename)
+		return fmt.Errorf("failed to open file, path: %s err: %w", filename, err)
 	}
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return errors.Wrapf(err, "can't create file watcher")
+		return fmt.Errorf("failed to create file watcher: %w", err)
 	}
 	defer watcher.Close()
 	watcher.Add(filename)

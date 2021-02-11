@@ -17,31 +17,33 @@
 package dtap
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/user"
 	"strconv"
-
-	"github.com/pkg/errors"
 )
 
 func NewDnstapFstrmUnixSocketInput(config *InputUnixSocketConfig) (*DnstapFstrmSocketInput, error) {
 	os.Remove(config.GetPath())
 	l, err := net.Listen("unix", config.GetPath())
 	if err != nil {
-		return nil, errors.Wrapf(err, "can't listen %s", config.GetPath())
+		return nil, fmt.Errorf("failed to listen %s: %w", config.GetPath(), err)
 	}
 	if config.GetUser() != "" {
 		if u, err := user.Lookup(config.GetUser()); err != nil {
-			return nil, errors.Wrapf(err, "can't get chown user %s", config.GetUser())
+			return nil, fmt.Errorf("failed to get chown user %s: %w", config.GetUser(), err)
 		} else {
 			uid, err := strconv.Atoi(u.Uid)
 			if err != nil {
-				return nil, errors.Wrapf(err, "can't chown this system")
+				return nil, fmt.Errorf("failed to get uid: %w", err)
 			}
 			gid, err := strconv.Atoi(u.Gid)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get gid: %w", err)
+			}
 			if err := os.Chown(config.GetPath(), uid, gid); err != nil {
-				return nil, errors.Wrapf(err, "can't chown user %s (%s:%s)", config.GetUser(), u.Uid, u.Gid)
+				return nil, fmt.Errorf("failed to change owner %s (%s:%s): %w", config.GetUser(), u.Uid, u.Gid, err)
 			}
 		}
 	}

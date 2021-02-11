@@ -19,6 +19,7 @@ package dtap
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/dangkaka/go-kafka-avro"
@@ -29,7 +30,6 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mimuret/dtap/statik"
-	"github.com/pkg/errors"
 )
 
 var schemaStr string
@@ -85,14 +85,14 @@ func (o *DnstapKafkaOutput) open() error {
 	var err error
 	o.producer, err = sarama.NewSyncProducer(o.config.Hosts, o.kafkaConfig)
 	if err != nil {
-		return errors.Wrapf(err, "can't create kafka producer")
+		return fmt.Errorf("failed to create kafka producer: %w", err)
 	}
 	if o.config.GetOutputType() == "avro" {
 		if o.valueSchemaID, err = o.getSchemaID(o.config.GetTopic()+"-value", o.valueCodec); err != nil {
-			return errors.Wrapf(err, "can't get schema id")
+			return fmt.Errorf("failed to get schema id: %w", err)
 		}
 		if o.keySchemaID, err = o.getSchemaID(o.config.GetTopic()+"-key", o.keyCodec); err != nil {
-			return errors.Wrapf(err, "can't get schema id")
+			return fmt.Errorf("failed to get schema id: %w", err)
 		}
 	}
 	return nil

@@ -17,10 +17,10 @@
 package dtap
 
 import (
+	"fmt"
 	"time"
 
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/pkg/errors"
 )
 
 type DnstapFstrmSocketOutput struct {
@@ -39,7 +39,7 @@ func NewDnstapFstrmSocketOutput(handler SocketOutput, params *DnstapOutputParams
 func (o *DnstapFstrmSocketOutput) open() error {
 	var err error
 	if o.enc, err = o.handler.newConnect(); err != nil {
-		return errors.Wrapf(err, "can't connect socket")
+		return fmt.Errorf("failed to connect socket: %w")
 	}
 	o.opened = make(chan bool)
 	go func() {

@@ -18,9 +18,8 @@ package dtap
 
 import (
 	"context"
+	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 
@@ -40,7 +39,7 @@ func NewDnstapFstrmInput(rc io.ReadCloser, bi bool) (*DnstapFstrmInput, error) {
 		Bidirectional: bi,
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "can't create framestream Decoder")
+		return nil, fmt.Errorf("failed to create framestream Decoder: %w", err)
 	}
 	return &DnstapFstrmInput{
 		rc:        rc,
@@ -56,7 +55,7 @@ func (i *DnstapFstrmInput) read(rbuf *RBuf) {
 				i.readError <- nil
 				return
 			}
-			i.readError <- errors.Wrap(err, "decode error")
+			i.readError <- fmt.Errorf("decode error: %w", err)
 			return
 		}
 		newbuf := make([]byte, len(buf))

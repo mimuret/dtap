@@ -19,6 +19,7 @@ package dtap
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/go-nats"
-	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
 )
 
@@ -62,7 +62,7 @@ func (o *DnstapNatsOutput) open() error {
 		o.con, err = nats.Connect(o.config.GetHost())
 	}
 	if err != nil {
-		return errors.Wrapf(err, "can't create nats producer")
+		return fmt.Errorf("failed to create nats producer: %w", err)
 	}
 	o.closeCh = make(chan struct{})
 	ctx, cancelFunc := context.WithCancel(context.Background())

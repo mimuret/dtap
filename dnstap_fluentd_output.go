@@ -17,9 +17,10 @@
 package dtap
 
 import (
+	"fmt"
+
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/pkg/errors"
 
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"github.com/golang/protobuf/proto"
@@ -52,7 +53,7 @@ func (o *DnstapFluentdOutput) open() error {
 	var err error
 	o.client, err = fluent.New(o.fluetConfig)
 	if err != nil {
-		return errors.Wrapf(err, "can't create fluent logger")
+		return fmt.Errorf("failed to create fluent logger: %w", err)
 	}
 
 	return nil
@@ -68,7 +69,7 @@ func (o *DnstapFluentdOutput) write(frame []byte) error {
 		return err
 	}
 	if err := o.client.Post(o.tag, *data); err != nil {
-		return errors.Wrapf(err, "failed to post fluent message, tag: %s", o.tag)
+		return fmt.Errorf("failed to post fluent message, tag: %s %w", o.tag, err)
 	}
 	return nil
 }

@@ -17,6 +17,7 @@
 package dtap
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -24,7 +25,6 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	strftime "github.com/jehiah/go-strftime"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -49,13 +49,13 @@ func (o *DnstapFstrmFileOutput) open() error {
 
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
-		return errors.Wrapf(err, "can't create file %s", filename)
+		return fmt.Errorf("failed to create file %s err: %w", filename, err)
 	}
 	o.writer = f
 
 	o.enc, err = framestream.NewEncoder(o.writer, &framestream.EncoderOptions{ContentType: dnstap.FSContentType, Bidirectional: false})
 	if err != nil {
-		return errors.Wrapf(err, "can't create framestream encorder %s", filename)
+		return fmt.Errorf("failed to create framestream encorder %s err: %w", filename, err)
 	}
 	o.currentFilename = filename
 	o.opened = make(chan bool)
