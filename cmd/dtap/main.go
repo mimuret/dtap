@@ -177,7 +177,10 @@ func main() {
 		o := dtap.NewDnstapNatsOutput(oc, params)
 		output = append(output, o)
 		if oc.Flat.GetIPHashSaltPath() != "" {
-			go oc.Flat.WatchSalt(context.Background())
+			ready := make(chan struct{})
+			go oc.Flat.WatchSalt(context.Background(), ready)
+			log.Info("wait for ready to watch salt files")
+			<-ready
 		}
 	}
 

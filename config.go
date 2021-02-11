@@ -677,7 +677,7 @@ func (o *FlatConfig) LoadSalt() {
 	}
 }
 
-func (o *FlatConfig) WatchSalt(ctx context.Context) {
+func (o *FlatConfig) WatchSalt(ctx context.Context, ready chan struct{}) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -687,6 +687,7 @@ func (o *FlatConfig) WatchSalt(ctx context.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	close(ready)
 L:
 	for {
 		select {

@@ -81,14 +81,22 @@ User="unbound"
 		EnableHashIP = true
 		IPHashSaltPath = "/tmp/salt.test"
 `
-	f, _ := os.Create("/tmp/salt.test")
+	f, err := os.Create("/tmp/salt.test")
+	if err != nil {
+		t.Fatal("failed to create salt")
+	}
+	defer os.Remove("/tmp/salt.test")
 	f.Write([]byte{10, 20, 30, 40})
 	f.Close()
 	b := bytes.NewBufferString(cfg)
 	c, err := dtap.NewConfigFromReader(b)
 	assert.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.TODO())
-	go c.OutputNats[0].Flat.WatchSalt(ctx)
+	defer cancel()
+
+	ready := make(chan struct{})
+	go c.OutputNats[0].Flat.WatchSalt(ctx, ready)
+	<-ready
 
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableEcs(), true)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPv4Mask(), net.CIDRMask(22, 32))
@@ -96,9 +104,11 @@ User="unbound"
 	assert.Equal(t, c.OutputNats[0].Flat.GetEnableHashIP(), true)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPHashSalt(), []byte{10, 20, 30, 40})
 	f, _ = os.Create("/tmp/salt.test")
+	if err != nil {
+		t.Fatal("failed to create salt")
+	}
 	f.Write([]byte{20, 30, 40, 50})
 	f.Close()
 	time.Sleep(10 * time.Second)
 	assert.Equal(t, c.OutputNats[0].Flat.GetIPHashSalt(), []byte{20, 30, 40, 50})
-	cancel()
 }
