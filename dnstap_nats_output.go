@@ -39,6 +39,7 @@ type DnstapNatsOutput struct {
 	data            []*DnstapFlatT
 	flatOption      DnstapFlatOption
 	flushCancelFunc context.CancelFunc
+	flushErr        error
 	closeCh         chan struct{}
 }
 
@@ -67,11 +68,15 @@ func (o *DnstapNatsOutput) open() error {
 	o.closeCh = make(chan struct{})
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	o.flushCancelFunc = cancelFunc
+	o.flushErr = nil
 	go o.flush(ctx)
 	return nil
 }
 
 func (o *DnstapNatsOutput) write(frame []byte) error {
+	if o.flushErr != nil {
+		return o.flushErr
+	}
 	dt := dnstap.Dnstap{}
 	if err := proto.Unmarshal(frame, &dt); err != nil {
 		return err
@@ -113,7 +118,7 @@ func (o *DnstapNatsOutput) publish() {
 	o.data = []*DnstapFlatT{}
 	o.mux.Unlock()
 	if err := o.con.Publish(o.config.GetSubject(), buf); err != nil {
-		log.Warnf("publish error: %v", err)
+		o.flushErr = fmt.Errorf("publish error: %w", err)
 	}
 }
 
