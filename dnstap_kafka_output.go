@@ -19,8 +19,9 @@ package dtap
 import (
 	_ "embed"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
+
+	json "github.com/goccy/go-json"
 
 	"github.com/dangkaka/go-kafka-avro"
 	"github.com/linkedin/goavro"

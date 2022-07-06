@@ -14,6 +14,7 @@ require (
 	github.com/farsightsec/golang-framestream v0.3.0
 	github.com/fluent/fluent-logger-golang v1.4.0
 	github.com/fsnotify/fsnotify v1.4.7
+	github.com/goccy/go-json v0.9.8 // indirect
 	github.com/golang/protobuf v1.4.0
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869
 	github.com/kr/pretty v0.1.0 // indirect

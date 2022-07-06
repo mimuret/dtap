@@ -19,8 +19,9 @@ package dtap
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+
+	json "github.com/goccy/go-json"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"

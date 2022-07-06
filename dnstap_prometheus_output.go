@@ -166,7 +166,6 @@ func (o *DnstapPrometheusOutput) write(frame []byte) error {
 			m[field] = v.String()
 		}
 	}
-
 	for _, counter := range o.Metrics {
 		labelValues := make([]string, 0, len(counter.LabelKeys))
 		for _, l := range counter.LabelKeys {
