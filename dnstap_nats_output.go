@@ -18,16 +18,16 @@ package dtap
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
+	json "github.com/goccy/go-json"
 	"github.com/golang/protobuf/proto"
-	nats "github.com/nats-io/go-nats"
-	"github.com/prometheus/common/log"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
 )
 
 type DnstapNatsOutput struct {
