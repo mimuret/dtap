@@ -22,17 +22,19 @@ import (
 	"fmt"
 
 	json "github.com/goccy/go-json"
-
-	"github.com/dangkaka/go-kafka-avro"
-	"github.com/linkedin/goavro"
+	"github.com/riferrei/srclient"
 
 	"github.com/Shopify/sarama"
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/golang/protobuf/proto"
+	"github.com/linkedin/goavro"
 )
 
 //go:embed assets/flat.avsc
-var schemaStr string
+var valueSchemaStr string
+
+//go:embed assets/key.avsc
+var keySchemaStr string
 
 type KafkaClient interface {
 	Add(string, string, []byte, []byte) error
@@ -42,11 +44,10 @@ type DnstapKafkaOutput struct {
 	config        *OutputKafkaConfig
 	kafkaConfig   *sarama.Config
 	producer      sarama.SyncProducer
-	registry      *kafka.CachedSchemaRegistryClient
-	valueCodec    *goavro.Codec
 	valueSchemaID []byte
-	keyCodec      *goavro.Codec
+	valueCodec    *goavro.Codec
 	keySchemaID   []byte
+	keyCodec      *goavro.Codec
 }
 
 func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams) (*DnstapOutput, error) {
@@ -55,12 +56,12 @@ func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams)
 	kafkaConfig.Producer.Return.Errors = true
 	kafkaConfig.Producer.Retry.Max = int(config.GetRetry())
 
-	keyCodec, err := goavro.NewCodec(`{"type": "string"}`)
+	keyCodec, err := goavro.NewCodec(keySchemaStr)
 	if err != nil {
 		return nil, err
 	}
 
-	valueCodec, err := goavro.NewCodec(schemaStr)
+	valueCodec, err := goavro.NewCodec(valueSchemaStr)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +72,7 @@ func NewDnstapKafkaOutput(config *OutputKafkaConfig, params *DnstapOutputParams)
 		keyCodec:    keyCodec,
 		valueCodec:  valueCodec,
 	}
+
 	return NewDnstapOutput(params), nil
 }
 
@@ -81,23 +83,38 @@ func (o *DnstapKafkaOutput) open() error {
 		return fmt.Errorf("failed to create kafka producer: %w", err)
 	}
 	if o.config.GetOutputType() == "avro" {
-		if o.valueSchemaID, err = o.getSchemaID(o.config.GetTopic()+"-value", o.valueCodec); err != nil {
+		if o.valueSchemaID, err = o.getSchemaID(o.config.GetTopic()+"-value", valueSchemaStr); err != nil {
 			return fmt.Errorf("failed to get schema id: %w", err)
 		}
-		if o.keySchemaID, err = o.getSchemaID(o.config.GetTopic()+"-key", o.keyCodec); err != nil {
+		if o.keySchemaID, err = o.getSchemaID(o.config.GetTopic()+"-key", keySchemaStr); err != nil {
 			return fmt.Errorf("failed to get schema id: %w", err)
 		}
 	}
 	return nil
 }
-func (o *DnstapKafkaOutput) getSchemaID(subject string, codec *goavro.Codec) ([]byte, error) {
-	registry := kafka.NewCachedSchemaRegistryClient(o.config.GetSchemaRegistries())
-	schemaID, err := registry.CreateSubject(subject, codec)
+func (o *DnstapKafkaOutput) getSchemaID(subject string, schemaStr string) ([]byte, error) {
+	var (
+		err    error
+		schema *srclient.Schema
+	)
+	for _, host := range o.config.GetSchemaRegistries() {
+		client := srclient.CreateSchemaRegistryClient(host)
+		schema, err = client.GetLatestSchema(subject)
+		if err != nil {
+			continue
+		}
+		if schema == nil {
+			schema, err = client.CreateSchema(subject, schemaStr, srclient.Avro)
+			if err != nil {
+				panic(fmt.Sprintf("Error creating the schema %s", err))
+			}
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
 	val := make([]byte, 4)
-	binary.BigEndian.PutUint32(val, uint32(schemaID))
+	binary.BigEndian.PutUint32(val, uint32(schema.ID()))
 	return val, nil
 }
 
