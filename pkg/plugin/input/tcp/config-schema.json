@@ -1,0 +1,22 @@
+{
+  "$id": "/pkg/plugin/input/tcp/config-schema.json",
+  "title": "tcp input plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "Port"
+  ],
+  "properties": {
+    "Name": {
+      "const": "tcp"
+    },
+    "Address": {
+      "type": "string"
+    },
+    "Port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  }
+}

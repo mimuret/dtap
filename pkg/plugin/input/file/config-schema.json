@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "/pkg/plugin/input/file/config-schema.json",
+  "title": "file input plugin",
+  "description": "The `file` is the input plugin that input DNSTAP message from file.",
+  "type": "object",
+  "required": [
+    "Name",
+    "Path"
+  ],
+  "properties": {
+    "Name": {
+      "const": "file"
+    },
+    "Path": {
+      "description": "The `Path` is the file path of DNSTAP message file.",
+      "type": "string"
+    }
+  }
+}

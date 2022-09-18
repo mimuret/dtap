@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "/schemas/schema.json",
+  "title": "DTAP version 2 Config schema",
+  "description": "The DTAP version 2 config schema",
+  "type": "object",
+  "required": [
+    "Inputs",
+    "OutputGroups"
+  ],
+  "properties": {
+    "InputFilterWorkerNum": {
+      "$ref": "#/$defs/InputFilterWorkerNum"
+    },
+    "LogLevel": {
+      "$ref": "#/$defs/LogLevel"
+    },
+    "MetricsListen": {
+      "$ref": "#/$defs/MetricsListen"
+    },
+    "InputBufferConfig": {
+      "$ref": "#/$defs/BufferConfig"
+    },
+    "Inputs": {
+      "$ref": "#/$defs/Inputs"
+    },
+    "Filters": {
+      "$ref": "#/$defs/Filters"
+    },
+    "OutputGroups": {
+      "$ref": "#/$defs/OutputGroups"
+    }
+  },
+  "$defs": {
+    "InputFilterWorkerNum": {
+      "title": "InputFilterWorkerNum",
+      "description": "The number of input filter goroutine workers",
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "LogLevel": {
+      "title": "LogLevel",
+      "description": "Log level",
+      "type": "string",
+      "default": "info",
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "error",
+        "dpanic",
+        "panic",
+        "fatal"
+      ]
+    },
+    "MetricsListen": {
+      "title": "MetricsListen",
+      "description": "Metrics listener address host:port format",
+      "type": "string",
+      "default": ":9520"
+    },
+    "BufferConfig": {
+      "title": "BufferConfig",
+      "description": "Buffer config",
+      "type": "object",
+      "properties": {
+        "Size": {
+          "description": "Buffer Size",
+          "type": "integer",
+          "minimum": 1,
+          "default": 10000
+        }
+      }
+    },
+    "Inputs": {
+      "title": "InputPlugins",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "/schemas/input_plugins.json"
+      }
+    },
+    "Filters": {
+      "title": "FiltersPlugins",
+      "type": "array",
+      "items": {
+        "$ref": "/schemas/filter_plugins.json"
+      }
+    },
+    "OutputGroups": {
+      "title": "OutputGroups",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/OutputGroup"
+      }
+    },
+    "OutputGroup": {
+      "title": "OutputGroup",
+      "type": "object",
+      "required": [
+        "Outputs"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "BufferConfig": {
+          "$ref": "#/$defs/BufferConfig"
+        },
+        "Filters": {
+          "$ref": "#/$defs/Filters"
+        },
+        "Outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "/schemas/output_plugins.json"
+          }
+        }
+      }
+    }
+  }
+}

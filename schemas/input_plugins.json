@@ -1,0 +1,1 @@
+{"title":"Plugins","$id":"/schemas/input_plugins.json","oneOf":[{"$ref":"/pkg/plugin/input/file/config-schema.json"},{"$ref":"/pkg/plugin/input/tcp/config-schema.json"},{"$ref":"/pkg/plugin/input/unix/config-schema.json"}]}

@@ -1,0 +1,29 @@
+InputFilterWorkerNum: 10
+LogLevel: "trace"
+MetricsListen: ":19520"
+InputBufferConfig:
+  Name: "input_common"
+  Size: 100
+Input:
+  - Name: "dummy"
+    Path: "/var/run/unbound/dnstap.sock"
+    User: "unbound"
+Filters:
+  - Name: "matcher"
+    Rule:
+      op: "AND"
+      Matchers:
+        - Type: "DNS"
+          Name: "qname"
+          Arg: "www.example.jp"
+OutputGroups:
+  - Filters:
+      - Name: "matcher"
+        Rule:
+          op: "AND"
+          Matchers:
+            - Type: "DNS"
+              Name: "qtype"
+              Arg: "A"
+    Outputs:
+      - Name: "nop"

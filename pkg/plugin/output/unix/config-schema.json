@@ -1,0 +1,18 @@
+{
+  "$id": "/pkg/plugin/output/unix/config-schema.json",
+  "title": "unix output plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "Path"
+  ],
+  "properties": {
+    "Name": {
+      "const": "unix"
+    },
+    "Path": {
+      "description": "The `Path` is the UNIX socket path to create a socket file.",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "matcher",
+  "rule": {
+    "Op": "OR",
+    "Matchers": [
+      {
+        "Type": "DNSTAP",
+        "Name": "Static",
+        "Arg": false
+      },
+      {
+        "Type": "DNS",
+        "Name": "Static",
+        "Arg": false
+      }
+    ],
+    "SubConfigs": [
+      {
+        "Op": "or",
+        "Matchers": [
+          {
+            "Type": "dns",
+            "Name": "static",
+            "Arg": false
+          },
+          {
+            "Type": "dns",
+            "Name": "static",
+            "Arg": true
+          }
+        ]
+      }
+    ]
+  }
+}

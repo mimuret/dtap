@@ -1,0 +1,27 @@
+{
+  "$id": "/pkg/plugin/filter/label/config-schema.json",
+  "title": "label filter plugin",
+  "description": "The `label` is the filter plugin that adds labels.",
+  "type": "object",
+  "required": [
+    "Name",
+    "Type",
+    "Value"
+  ],
+  "properties": {
+    "Name": {
+      "const": "label"
+    },
+    "Type": {
+      "type": "string",
+      "enum": [
+        "DNSTAP",
+        "DNS",
+        "STATIC"
+      ]
+    },
+    "Value": {
+      "type": "string"
+    }
+  }
+}

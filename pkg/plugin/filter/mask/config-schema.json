@@ -1,0 +1,30 @@
+{
+  "$id": "/pkg/plugin/filter/mask/config-schema.json",
+  "title": "mask filter plugin",
+  "description": "The `mask` is the filter plugin that masks the query address and the response address.",
+  "type": "object",
+  "required": [
+    "Name",
+    "MaskLen4",
+    "MaskLen6"
+  ],
+  "properties": {
+    "Name": {
+      "const": "mask"
+    },
+    "MaskLen4": {
+      "description": "The `MaskLen4` is the mask prefix length for a IPv4 address.",
+      "type": "integer",
+      "default": 22,
+      "minimum": 0,
+      "maximum": 32
+    },
+    "MaskLen6": {
+      "description": "The `MaskLen6` is the mask prefix length for a IPv6 address.",
+      "type": "integer",
+      "default": 40,
+      "minimum": 0,
+      "maximum": 128
+    }
+  }
+}

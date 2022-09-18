@@ -1,0 +1,80 @@
+/*
+ * Copyright (c) 2022 Manabu Sonoda
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package types
+
+import (
+	"net"
+	"strconv"
+	"strings"
+
+	"github.com/pkg/errors"
+)
+
+type Net struct {
+	IP           net.IP
+	PrefixLength int
+}
+
+func (n *Net) String() string {
+	if n == nil || n.IP == nil {
+		return "<nil>"
+	}
+	return n.IP.String() + "/" + strconv.Itoa(n.PrefixLength)
+}
+
+func (n Net) MarshalJSON() ([]byte, error) {
+	if n.IP == nil {
+		return []byte(`"<nil>"`), nil
+	}
+	return []byte(`"` + n.String() + `"`), nil
+}
+
+func (n *Net) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == `"<nil>"` {
+		n.IP = nil
+		n.PrefixLength = 0
+		return nil
+	}
+	strlen := len(str)
+	if strlen < 3 || str[0] != '"' || str[strlen-1] != '"' {
+		return errors.Errorf("can't parse Net: %v", str)
+	}
+	bs := strings.Split(string(b[1:strlen-1]), "/")
+
+	n.IP = net.ParseIP(bs[0])
+	if n.IP == nil {
+		return errors.Errorf("can't parse Net: %v", bs[0])
+	}
+	if len(bs) > 1 {
+		plen, err := strconv.ParseUint(bs[1], 10, 8)
+		n.PrefixLength = int(plen)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse Prefixlength `%s`", bs[1])
+		}
+		if n.PrefixLength < 0 ||
+			!isIPv6(n.IP) && n.PrefixLength > 32 ||
+			isIPv6(n.IP) && n.PrefixLength > 128 {
+			return errors.Errorf("invalid value Prefixlength `%s`", bs[1])
+		}
+	}
+	return nil
+}
+
+func isIPv6(n net.IP) bool {
+	return strings.Contains(n.String(), ":")
+}

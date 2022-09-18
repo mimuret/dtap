@@ -1,0 +1,39 @@
+{
+  "$id": "/pkg/plugin/output/fluent/config-schema.json",
+  "title": "fluent output plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "FluentConfig",
+    "Tag"
+  ],
+  "properties": {
+    "Name": {
+      "const": "fluent"
+    },
+    "FluentConfig": {
+      "$ref": "#/$defs/FluentConfig"
+    },
+    "Tag": {
+      "description": "Tag is the fluent message tag.",
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "FluentConfig": {
+      "title": "fluent output setting",
+      "description": "github.com/fluent/fluent-logger-golang Config",
+      "type": "object",
+      "properties": {
+        "FluentPort": {
+          "description": "FluentPort is the port to connect.",
+          "type": "string"
+        },
+        "FluentHost": {
+          "description": "FluentHost is the host to connect.",
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

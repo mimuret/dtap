@@ -1,2 +1,7 @@
 .vscode
-example/*/volumes
+./example/*/volumes
+./dtap
+
+node_modules
+cover.html
+cover.out

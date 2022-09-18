@@ -1,0 +1,107 @@
+{
+  "$id": "/pkg/plugin/output/metrics/config-schema.json",
+  "title": "metrics output plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "Rules"
+  ],
+  "properties": {
+    "Name": {
+      "const": "metrics"
+    },
+    "Rules": {
+      "description": "The `Rules` are metrics rules.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/MetricsRule"
+      }
+    }
+  },
+  "$defs": {
+    "DnstapLabel": {
+      "title": "dnstap labels",
+      "type": "object",
+      "required": [
+        "Name",
+        "Attribute"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Attribute": {
+          "type": "string"
+        }
+      }
+    },
+    "DnsMsgLabel": {
+      "title": "dns message labels",
+      "type": "object",
+      "required": [
+        "Name",
+        "Attribute"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Attribute": {
+          "type": "string"
+        }
+      }
+    },
+    "MetricsRule": {
+      "title": "MetricsRule",
+      "description": "The `MetricsRule` is metrics rule.",
+      "type": "object",
+      "properties": {
+        "Filters": {
+          
+        },
+        "DnstapLabels": {
+          "description": "The `DnstapLabels` are metrics label settings for the DNSTAP field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DnstapLabel"
+          }
+        },
+        "DnsMsgLabels": {
+          "description": "The `DnsMsgLabels` are metrics label settings for the DNS message field.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DnsMsgLabel"
+          }
+        },
+        "CounterOps": {
+          "description": "The `CounterOps` is the prometheus metrics config.",
+          "type": "object",
+          "required": [
+            "Name"
+          ],
+          "properties": {
+            "Namespace": {
+              "type": "string"
+            },
+            "Subsystem": {
+              "type": "string"
+            },
+            "Name": {
+              "type": "string"
+            },
+            "Help": {
+              "type": "string"
+            },
+            "ConstLabels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

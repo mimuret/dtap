@@ -1,9 +1,0 @@
-[[InputUnix]]
-type = "sock"
-path = "/var/run/unbound/dnstap.sock"
-user = "unbound"
-
-[[OutputFluent]]
-host = "fluent.example.jp"
-port = 24224
-tag = "dnstap-message"

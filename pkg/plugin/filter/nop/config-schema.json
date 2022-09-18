@@ -1,0 +1,14 @@
+{
+  "$id": "/pkg/plugin/filter/nop/config-schema.json",
+  "title": "nop filter plugin",
+  "description": "The `nop` is the filter plugin that is nothing to do. It uses for testing.",
+  "type": "object",
+  "required": [
+    "Name"
+  ],
+  "properties": {
+    "Name": {
+      "const": "nop"
+    }
+  }
+}

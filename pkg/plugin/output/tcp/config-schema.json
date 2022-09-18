@@ -1,0 +1,25 @@
+{
+  "$id": "/pkg/plugin/output/tcp/config-schema.json",
+  "title": "tcp output plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "Host",
+    "Port"
+  ],
+  "properties": {
+    "Name": {
+      "const": "tcp"
+    },
+    "Host": {
+      "description": "The `Host` is the hostname or ip address to connect",
+      "type": "string"
+    },
+    "Port": {
+      "description": "The `Port` is the port number to connect.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  }
+}

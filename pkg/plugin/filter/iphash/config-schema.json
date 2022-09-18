@@ -1,0 +1,19 @@
+{
+  "$id": "/pkg/plugin/filter/iphash/config-schema.json",
+  "title": "iphash filter plugin",
+  "description": "The `iphash` is the filter plugin that adds hashed address to the label. ",
+  "type": "object",
+  "required": [
+    "Name",
+    "Salt"
+  ],
+  "properties": {
+    "Name": {
+      "const": "iphash"
+    },
+    "Salt": {
+      "description": "The `string` is the hash salt.",
+      "type": "string"
+    }
+  }
+}

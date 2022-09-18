@@ -1,0 +1,18 @@
+{
+  "Name": "matcher",
+  "Rule": {
+    "Op": "nor",
+    "Matchers": [
+      {
+        "Type": "dnstap",
+        "Name": "static",
+        "Arg": false
+      },
+      {
+        "Type": "dns",
+        "Name": "static",
+        "Arg": false
+      }
+    ]
+  }
+}

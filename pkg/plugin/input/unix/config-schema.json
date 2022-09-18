@@ -1,0 +1,20 @@
+{
+  "$id": "/pkg/plugin/input/unix/config-schema.json",
+  "title": "unix input plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "Path"
+  ],
+  "properties": {
+    "Name": {
+      "const": "unix"
+    },
+    "Path": {
+      "type": "string"
+    },
+    "User": {
+      "type": "string"
+    }
+  }
+}

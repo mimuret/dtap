@@ -1,0 +1,19 @@
+{
+  "$id": "/pkg/plugin/filter/static/config-schema.json",
+  "title": "static filter plugin",
+  "description": "The `static` is the filter plugin that filters DNSTAP message by `Deny` flag. It uses for testing.",
+  "type": "object",
+  "required": [
+    "Name"
+  ],
+  "properties": {
+    "Name": {
+      "const": "static"
+    },
+    "Deny": {
+      "description": "The `Deny` is the filter flag. If it's true, DNSTAP message is filtered.",
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

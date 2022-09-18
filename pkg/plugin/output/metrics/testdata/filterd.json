@@ -1,0 +1,50 @@
+{
+  "Name": "metrics",
+  "Rules": [
+    {
+      "Filters" : [
+        {
+          "Name": "static",
+          "Deny": false
+        }
+      ],
+      "CounterOps": {
+        "Namespace": "dtap",
+        "Subsystem": "metrics",
+        "Name": "test1"
+      }
+    },
+    {
+      "Filters" : [
+        {
+          "Name": "static",
+          "Deny": true
+        }
+      ],
+      "CounterOps": {
+        "Namespace": "dtap",
+        "Subsystem": "metrics",
+        "Name": "test2"
+      }
+    },
+    {
+      "DnstapLabels": [
+        {
+          "Name": "response_address",
+          "Attribute": "ResponseAddress"
+        }
+      ],
+      "DnsMsgLabels": [
+        {
+          "Name": "rcode",
+          "Attribute": "Rcode"
+        }
+      ],
+      "CounterOps": {
+        "Namespace": "dtap",
+        "Subsystem": "metrics",
+        "Name": "test3"
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "Name": "metrics",
+  "Rules": [
+    {
+      "Filters" : [
+        {
+          "Name": "static",
+          "Deny": false
+        }
+      ],
+      "DnstapLabels": [
+        {
+          "Name": "response_address",
+          "Attribute": "ResponseAddress"
+        }
+      ],
+      "DnsMsgLabels": [
+        {
+          "Name": "rcode",
+          "Attribute": "Rcode"
+        }
+      ],
+      "CounterOps": {
+        "Namespace": "dtap",
+        "Subsystem": "metrics",
+        "Name": "rcode_response_addr_total"
+      }
+    }
+  ]
+}
