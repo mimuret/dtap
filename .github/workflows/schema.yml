@@ -20,5 +20,5 @@ jobs:
       with:
         node-version: 16.x
         cache: 'npm'
-    - run: yarn add ajv-cli
+    - run: yarn global add ajv-cli
     - run: make schema
