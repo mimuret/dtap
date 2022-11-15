@@ -1,7 +1,5 @@
-.vscode
-./example/*/volumes
-./dtap
-
-node_modules
-cover.html
-cover.out
+/.vscode
+/example/*/volumes
+/dtap
+/cover.html
+/cover.out

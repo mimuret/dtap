@@ -42,7 +42,7 @@ var _ = Describe("pub", func() {
 		)
 		BeforeEach(func() {
 			th = &TestPublisherHandler{}
-			op = pub.NewJsonV1Publisher(1024*1024, th)
+			op = pub.NewJsonV1Publisher(1024*1024, 1, th)
 		})
 		When("NewJsonV1Publisher", func() {
 			It("returns JsonV1Publisher", func() {

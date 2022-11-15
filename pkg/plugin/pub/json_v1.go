@@ -20,19 +20,27 @@ type JsonV1Publisher struct {
 	handler PublisherHandler
 	maxSize int
 
+	interval *intervalSec
+
 	writeSize  int
 	writeState writeState
 	writeCount int
 }
 
-func NewJsonV1Publisher(maxSize int, handler PublisherHandler) Publisher {
+func NewJsonV1Publisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
 	buf := make([]byte, 0, maxSize)
 	return &JsonV1Publisher{
-		buf:     bytes.NewBuffer(buf),
-		handler: handler,
-		maxSize: maxSize,
+		buf:      bytes.NewBuffer(buf),
+		handler:  handler,
+		maxSize:  maxSize,
+		interval: newIntervalSec(intervalSec),
 	}
 }
+
+func (f *JsonV1Publisher) Start() {
+	f.interval.Start(f)
+}
+
 func (f *JsonV1Publisher) reset() {
 	f.buf.Reset()
 	f.writeState = writeStateInit
@@ -56,15 +64,10 @@ func (f *JsonV1Publisher) write(dm *types.DnstapMessage) error {
 		return errors.Wrap(err, "failed to convert json")
 	}
 	if f.writeSize+len(data)+2 > f.maxSize {
-		if err := f.buf.WriteByte(']'); err != nil {
-			return errors.Wrap(err, "failed to close message")
-		}
-		f.writeSize += 1
 		err := f.Publish()
 		if err != nil {
 			return errors.Wrap(err, "failed to publish message")
 		}
-		f.reset()
 	}
 
 	pre := byte(',')
@@ -83,15 +86,24 @@ func (f *JsonV1Publisher) write(dm *types.DnstapMessage) error {
 }
 
 func (f *JsonV1Publisher) Publish() error {
-	if f.buf.Len() == 0 {
+	if f.writeCount == 0 {
 		return nil
 	}
+	if err := f.buf.WriteByte(']'); err != nil {
+		return errors.Wrap(err, "failed to close message")
+	}
+	f.writeSize += 1
 	data := f.buf.Bytes()
 	err := f.handler.Publish(data[:f.writeSize])
-	return errors.Wrap(err, "publish error")
+	if err != nil {
+		return errors.Wrap(err, "publish error")
+	}
+	f.reset()
+	return nil
 }
 
 func (f *JsonV1Publisher) Close() error {
+	f.interval.Close()
 	return f.Publish()
 }
 

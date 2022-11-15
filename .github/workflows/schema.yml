@@ -1,4 +1,4 @@
-name: Go
+name: "config schema check"
 
 on:
   push:
@@ -18,7 +18,6 @@ jobs:
     - name: Set up node
       uses: actions/setup-node@v3
       with:
-        node-version: 16.x
-        cache: 'npm'
-    - run: yarn add ajv-cli
+        node-version: 16
+    - run: yarn global add ajv-cli
     - run: make schema

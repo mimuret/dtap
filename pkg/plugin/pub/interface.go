@@ -12,6 +12,7 @@ type ConsumerHandler interface {
 
 type Publisher interface {
 	Write(*types.DnstapMessage) error
+	Start()
 	Close() error
 	Publish() error
 }

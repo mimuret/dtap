@@ -13,7 +13,7 @@ build:
 	go build
 
 docker_build:
-	docker build -t mimuret/dtap:latest .
+	docker build -t mimuret/dtapv2:latest .
 
 cover:
 	go mod tidy

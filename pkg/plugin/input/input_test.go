@@ -67,14 +67,6 @@ var _ = Describe("InputServer", func() {
 				Expect(srvErr).To(Succeed())
 			})
 		})
-		When("close listener", func() {
-			BeforeEach(func() {
-				ln.Close()
-			})
-			It("returns ErrClosed", func() {
-				Eventually(func() error { return srvErr }).Should(MatchError(net.ErrClosed))
-			})
-		})
 		AfterEach(func() {
 			ln.Close()
 		})

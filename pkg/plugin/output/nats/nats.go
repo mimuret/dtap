@@ -41,7 +41,9 @@ func init() {
 
 func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	s := &Nats{
-		MaxSize: DefaultMaxPayloadSize,
+		MaxSize:     DefaultMaxPayloadSize,
+		Format:      pub.DefaultFormat,
+		IntervalSec: 1,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
@@ -55,10 +57,14 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.Token == "" && s.User != "" && s.Password == "" {
 		return nil, errors.Errorf("missing parameter Password")
 	}
-	s.publisher = pub.NewPublisher(s.Format, s.MaxSize, s)
+	if s.IntervalSec == 0 {
+		s.IntervalSec = 1
+	}
+	s.publisher = pub.NewPublisher(s.Format, s.MaxSize, s.IntervalSec, s)
 	if s.publisher == nil {
 		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
 	}
+	s.publisher.Start()
 	s.DnstapOutput = output.NewDnstapOutput(s)
 	return s, nil
 }
@@ -85,9 +91,10 @@ type Nats struct {
 
 	conn *nats.Conn
 
-	MaxSize   int
-	Format    pub.Format
-	publisher pub.Publisher
+	MaxSize     int
+	IntervalSec uint
+	Format      pub.Format
+	publisher   pub.Publisher
 }
 
 func (f *Nats) Open() error {
