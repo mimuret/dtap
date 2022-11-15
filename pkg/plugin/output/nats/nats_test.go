@@ -60,7 +60,7 @@ var _ = Describe("output/nats", func() {
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Host"))
+				Expect(err.Error()).To(MatchRegexp("missing parameter Hosts"))
 			})
 		})
 		When("Subject is an empty", func() {
@@ -137,9 +137,10 @@ var _ = Describe("output/nats", func() {
 			err error
 			sv  *server.Server
 
-			nc  *natsio.Conn
-			sub *natsio.Subscription
-			ch  chan *natsio.Msg
+			nc   *natsio.Conn
+			sub  *natsio.Subscription
+			ch   chan *natsio.Msg
+			data []byte
 		)
 		BeforeEach(func() {
 			ch = make(chan *natsio.Msg)
@@ -165,7 +166,7 @@ var _ = Describe("output/nats", func() {
 			sub, err = nc.ChanQueueSubscribe("dnstap", "", ch)
 			Expect(err).To(Succeed())
 
-			op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Host": "127.0.0.1:14222", "Subject": "dnstap", "Format": "json/v1"}`))
+			op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
 			Expect(err).To(Succeed())
 			p = op.(*nats.Nats)
 		})
@@ -205,7 +206,7 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is json/v1", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Host": "127.0.0.1:14222", "Subject": "dnstap", "Format": "json/v1"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})
@@ -218,7 +219,7 @@ var _ = Describe("output/nats", func() {
 					When("write messages ", func() {
 						BeforeEach(func() {
 							p.Format = pub.FormatV1JSON
-							data, err := dm.ConvertV1JSON()
+							data, err = dm.ConvertV1JSON()
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize - 2) / (len(data) + 1)
 							for i := 0; i < maxMsg; i++ {
@@ -234,7 +235,7 @@ var _ = Describe("output/nats", func() {
 					When("1 publish", func() {
 						BeforeEach(func() {
 							p.Format = pub.FormatV1JSON
-							data, err := dm.ConvertV1JSON()
+							data, err = dm.ConvertV1JSON()
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-2)/(len(data)+1) + 1
 							for i := 0; i < maxMsg; i++ {
@@ -251,7 +252,7 @@ var _ = Describe("output/nats", func() {
 					When("2 publish", func() {
 						BeforeEach(func() {
 							p.Format = pub.FormatV1JSON
-							data, err := dm.ConvertV1JSON()
+							data, err = dm.ConvertV1JSON()
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-2)/(len(data)+1)*2 + 2
 							for i := 0; i < maxMsg; i++ {
@@ -268,7 +269,7 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Host": "127.0.0.1:14222", "Subject": "dnstap", "Format": "dnstap"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "dnstap"}`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})
