@@ -42,6 +42,7 @@ func init() {
 func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	s := &Nats{
 		MaxSize: DefaultMaxPayloadSize,
+		Format:  pub.DefaultFormat,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")

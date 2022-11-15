@@ -2,6 +2,8 @@ package pub
 
 import "strings"
 
+const DefaultFormat = "JSON/V1"
+
 type Format string
 
 var (
