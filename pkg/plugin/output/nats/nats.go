@@ -61,10 +61,10 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 		s.IntervalSec = 1
 	}
 	s.publisher = pub.NewPublisher(s.Format, s.MaxSize, s.IntervalSec, s)
-	s.publisher.Start()
 	if s.publisher == nil {
 		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
 	}
+	s.publisher.Start()
 	s.DnstapOutput = output.NewDnstapOutput(s)
 	return s, nil
 }
