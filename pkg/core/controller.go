@@ -148,6 +148,7 @@ func (c *Controller) Run(ctx context.Context) error {
 	for i, inputPlugin := range c.inputPlugins {
 		iwg.Add(1)
 		go func(i int, ip types.InputPlugin) {
+			logger.GetLogger().Info("start input plugin", zap.String("name", ip.GetName()), zap.Int("no", i))
 			err := ip.Start(iCtx, c.inputBuffer)
 			logger.GetLogger().Info("finish input plugin", zap.String("name", ip.GetName()), zap.Int("no", i), zap.Error(err))
 			if err != nil {
@@ -163,14 +164,15 @@ func (c *Controller) Run(ctx context.Context) error {
 	for _, og := range c.outputGroups {
 		for i, outputPlugin := range og.outputs {
 			owg.Add(1)
-			go func(i int, op types.OutputPlugin) {
+			go func(i int, og OutputGroup, op types.OutputPlugin) {
+				logger.GetLogger().Info("start output plugin", zap.String("og", og.name), zap.String("name", op.GetName()), zap.Int("no", i))
 				err := op.Start(oCtx, og.buffer)
 				logger.GetLogger().Info("finish output plugin", zap.String("og", og.name), zap.String("name", op.GetName()), zap.Int("no", i), zap.Error(err))
 				if err != nil {
 					errCh <- err
 				}
 				owg.Done()
-			}(i, outputPlugin)
+			}(i, og, outputPlugin)
 		}
 	}
 	defer func() {
