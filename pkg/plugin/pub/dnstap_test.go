@@ -32,7 +32,7 @@ var _ = Describe("pub", func() {
 		)
 		BeforeEach(func() {
 			th = &TestPublisherHandler{}
-			op = pub.NewDnstapPublisher(1024*1024, th)
+			op = pub.NewDnstapPublisher(1024*1024, 1, th)
 		})
 		When("NewDnstapPublisher", func() {
 			It("returns DnstapPublisher", func() {
