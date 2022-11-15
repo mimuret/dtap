@@ -74,7 +74,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Format is empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"]}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Format": ""}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
