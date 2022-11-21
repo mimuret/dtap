@@ -17,6 +17,7 @@ package unix_test
 
 import (
 	"math"
+	"os"
 
 	"github.com/goccy/go-json"
 
@@ -136,6 +137,8 @@ var _ = Describe("input/unix", func() {
 			})
 			AfterEach(func() {
 				p.Close()
+				_, err = os.Stat(path)
+				Expect(os.IsNotExist(err)).To(BeTrue())
 			})
 			It("succeed", func() {
 				Expect(err).To(Succeed())
