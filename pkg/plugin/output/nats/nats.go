@@ -64,7 +64,6 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.publisher == nil {
 		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
 	}
-	s.publisher.Start()
 	s.DnstapOutput = output.NewDnstapOutput(s)
 	return s, nil
 }
@@ -109,7 +108,11 @@ func (f *Nats) Open() error {
 		cfg.Password = f.Password
 	}
 	f.conn, err = cfg.Connect()
-	return errors.Wrap(err, "failed to create nats producer")
+	if err != nil {
+		return errors.Wrap(err, "failed to create nats producer")
+	}
+	f.publisher.Start()
+	return nil
 }
 
 func (f *Nats) Write(dm *types.DnstapMessage) error {
