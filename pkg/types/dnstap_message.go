@@ -53,7 +53,7 @@ func getDnsMsg(dt *dnstap.Dnstap) (*dns.Msg, error) {
 	}
 	dnsMsg := &dns.Msg{}
 	if err := dnsMsg.Unpack(dnsRaw); err != nil {
-		return nil, errors.New("failed to unpack dns message")
+		return nil, errors.Wrap(err, "failed to unpack dns message")
 	}
 	return dnsMsg, nil
 }
@@ -87,6 +87,33 @@ func NewDnstapMessageFromDnstap(dt *dnstap.Dnstap) (*DnstapMessage, error) {
 		return nil, err
 	}
 	return &DnstapMessage{raw: raw, dnstap: dt, msg: dnsMsg, Labels: make(map[string]string)}, nil
+}
+
+func NewDnstapMessageFromDtapFrame(f *DtapFrame) (*DnstapMessage, error) {
+	if f == nil {
+		return nil, errors.New("parameter is nil")
+	}
+	dt := f.GetDnstap()
+	if dt == nil {
+		return nil, errors.New("Dnstap is nil")
+	}
+	dm, err := NewDnstapMessageFromDnstap(dt)
+	if err != nil {
+		return nil, err
+	}
+	dm.Labels = f.Labels
+	return dm, nil
+}
+
+func NewDnstapMessageFromDtapFrameRaw(raw []byte) (*DnstapMessage, error) {
+	if raw == nil {
+		return nil, errors.New("parameter is nil")
+	}
+	df := &DtapFrame{}
+	if err := proto.Unmarshal(raw, df); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal DtapFrame")
+	}
+	return NewDnstapMessageFromDtapFrame(df)
 }
 
 func (d *DnstapMessage) UpdateFromDnstap(dt *dnstap.Dnstap) error {
@@ -134,6 +161,13 @@ func (d *DnstapMessage) GetMessage() *dns.Msg {
 
 func (d *DnstapMessage) GetRaw() []byte {
 	return d.raw
+}
+
+func (d *DnstapMessage) ToDtapFrame() *DtapFrame {
+	return &DtapFrame{
+		Dnstap: d.GetDnstap(),
+		Labels: d.Labels,
+	}
 }
 
 type DnstapMessageGetFunc func(*DnstapMessage) string

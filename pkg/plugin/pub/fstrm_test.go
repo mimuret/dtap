@@ -24,7 +24,7 @@ import (
 )
 
 var _ = Describe("pub", func() {
-	Context("DnstapPublisher", func() {
+	Context("FstrmPublisher", func() {
 		var (
 			th  *TestPublisherHandler
 			op  pub.Publisher
@@ -32,10 +32,10 @@ var _ = Describe("pub", func() {
 		)
 		BeforeEach(func() {
 			th = &TestPublisherHandler{}
-			op = pub.NewDnstapPublisher(1024*1024, 1, th)
+			op = pub.NewFstrmDNSTAPPublisher(1024*1024, 1, th)
 		})
-		When("NewDnstapPublisher", func() {
-			It("returns DnstapPublisher", func() {
+		When("NewFstrmDNSTAPPublisher", func() {
+			It("returns FstrmPublisher", func() {
 				Expect(op).NotTo(BeNil())
 			})
 		})

@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package dtap;
+
+import "dnstap.proto";
+
+option go_package = "github.com/mimuret/dtap/types";
+
+// for DTAP output plguins
+message DtapFrame {
+  required dnstap.Dnstap Dnstap = 1;
+  map<string, string> Labels = 2;
+}

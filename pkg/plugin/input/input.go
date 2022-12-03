@@ -8,9 +8,22 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/logger"
+	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
+)
+
+const FormatDNSTAP Format = "DNSTAP"
+const FormatDtapFrame Format = "DtapFrame"
+
+var (
+	TotalDecordError = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dtap_input_error_frame_total",
+		Help: "The total number of input error frames",
+	})
 )
 
 type connectionManager struct {
@@ -39,23 +52,46 @@ func (c *connectionManager) close() {
 	}
 }
 
+type FstrmUnmarshaler func([]byte) (*types.DnstapMessage, error)
+
 type InputServer struct {
 	DecoderOptions    *framestream.DecoderOptions
 	logger            *zap.Logger
 	connectionManager *connectionManager
+	unmarshaler       FstrmUnmarshaler
 }
 
-func NewInputServer(options *framestream.DecoderOptions) *InputServer {
+func NewDnstapInputServer(options *framestream.DecoderOptions) *InputServer {
 	if options == nil {
 		options = &framestream.DecoderOptions{
-			ContentType:   dnstap.FSContentType,
 			Bidirectional: true,
 		}
+	}
+	if options.ContentType == nil {
+		options.ContentType = dnstap.FSContentType
 	}
 	return &InputServer{
 		DecoderOptions:    options,
 		logger:            logger.GetLogger(),
 		connectionManager: newConnectionManager(),
+		unmarshaler:       types.NewDnstapMessage,
+	}
+}
+
+func NewDtapFrameInputServer(options *framestream.DecoderOptions) *InputServer {
+	if options == nil {
+		options = &framestream.DecoderOptions{
+			Bidirectional: true,
+		}
+	}
+	if options.ContentType == nil {
+		options.ContentType = pub.DtapFrameFSContentType
+	}
+	return &InputServer{
+		DecoderOptions:    options,
+		logger:            logger.GetLogger(),
+		connectionManager: newConnectionManager(),
+		unmarshaler:       types.NewDnstapMessageFromDtapFrameRaw,
 	}
 }
 
@@ -77,7 +113,8 @@ func (i *InputServer) Serve(ln net.Listener, buf types.Writer) error {
 		wg.Add(1)
 		go func(conn net.Conn) {
 			if err := i.Read(conn, buf); err != nil {
-				i.logger.Error("input error", zap.Error(err))
+				TotalDecordError.Inc()
+				i.logger.Warn("input error", zap.Error(err))
 			}
 			i.connectionManager.remove(conn)
 			wg.Done()
@@ -102,11 +139,16 @@ LOOP:
 			}
 			return errors.Wrap(err, "failed to decode DNSTAP message")
 		}
-		dm, err := types.NewDnstapMessage(bs)
+		dm, err := i.unmarshaler(bs)
 		if err != nil {
 			return errors.Wrap(err, "failed to create dnstap message")
 		}
 		buf.Write(dm)
 	}
 	return nil
+}
+
+func init() {
+	RegisterFormat(FormatDNSTAP, NewDnstapInputServer)
+	RegisterFormat(FormatDtapFrame, NewDtapFrameInputServer)
 }
