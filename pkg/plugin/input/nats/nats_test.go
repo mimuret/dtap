@@ -150,12 +150,9 @@ var _ = Describe("input/nats", func() {
 			err error
 			sv  *server.Server
 
-			nc  *natsio.Conn
-			sub *natsio.Subscription
-			ch  chan *natsio.Msg
+			nc *natsio.Conn
 		)
 		BeforeEach(func() {
-			ch = make(chan *natsio.Msg)
 			sv, err = server.NewServer(&server.Options{
 				Host:       "127.0.0.1",
 				Port:       14222,
@@ -173,20 +170,14 @@ var _ = Describe("input/nats", func() {
 			go sv.Start()
 			Expect(sv.ReadyForConnections(time.Second)).To(BeTrue())
 
-			nc, err = natsio.Connect("127.0.0.1:14222")
-			Expect(err).To(Succeed())
-			sub, err = nc.ChanQueueSubscribe("dnstap", "", ch)
-			Expect(err).To(Succeed())
-
 			inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "DNSTAP"}`))
 			Expect(err).To(Succeed())
 			p = inp.(*nats.Nats)
 		})
 		AfterEach(func() {
-			err := sub.Unsubscribe()
-			Expect(err).To(Succeed())
 			nc.Close()
 			sv.Shutdown()
+			sv.WaitForShutdown()
 		})
 		Context("Open", func() {
 			When("failed to connect", func() {

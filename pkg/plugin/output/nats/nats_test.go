@@ -175,6 +175,7 @@ var _ = Describe("output/nats", func() {
 			Expect(err).To(Succeed())
 			nc.Close()
 			sv.Shutdown()
+			sv.WaitForShutdown()
 		})
 		Context("Open", func() {
 			When("failed to connect", func() {
