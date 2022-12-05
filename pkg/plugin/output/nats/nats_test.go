@@ -165,10 +165,6 @@ var _ = Describe("output/nats", func() {
 			Expect(err).To(Succeed())
 			sub, err = nc.ChanQueueSubscribe("dnstap", "", ch)
 			Expect(err).To(Succeed())
-
-			op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
-			Expect(err).To(Succeed())
-			p = op.(*nats.Nats)
 		})
 		AfterEach(func() {
 			err := sub.Unsubscribe()
@@ -178,10 +174,16 @@ var _ = Describe("output/nats", func() {
 			sv.WaitForShutdown()
 		})
 		Context("Open", func() {
+			var (
+				err error
+			)
 			When("failed to connect", func() {
 				BeforeEach(func() {
-					p.Hosts = []string{"127.0.0.1:5222"}
+					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:15222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					Expect(err).To(Succeed())
+					p = op.(*nats.Nats)
 					err = p.Open()
+					Expect(err).To(HaveOccurred())
 				})
 				It("returns error", func() {
 					Expect(err).To(HaveOccurred())
@@ -190,6 +192,9 @@ var _ = Describe("output/nats", func() {
 			})
 			When("valid", func() {
 				BeforeEach(func() {
+					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					Expect(err).To(Succeed())
+					p = op.(*nats.Nats)
 					err = p.Open()
 				})
 				It("Succeed", func() {
@@ -199,8 +204,14 @@ var _ = Describe("output/nats", func() {
 		})
 		Context("Write", func() {
 			var (
-				dm *types.DnstapMessage
+				dm  *types.DnstapMessage
+				err error
 			)
+			BeforeEach(func() {
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+				Expect(err).To(Succeed())
+				p = op.(*nats.Nats)
+			})
 			When("valid message", func() {
 				BeforeEach(func() {
 					dm = testtool.CreateValidDnstapMessage()
