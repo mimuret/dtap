@@ -155,7 +155,7 @@ var _ = Describe("input/nats", func() {
 		BeforeEach(func() {
 			sv, err = server.NewServer(&server.Options{
 				Host:       "127.0.0.1",
-				Port:       14222,
+				Port:       14223,
 				HTTPPort:   -1,
 				Cluster:    server.ClusterOpts{Port: -1, Name: "abc"},
 				NoLog:      true,
@@ -168,11 +168,7 @@ var _ = Describe("input/nats", func() {
 			Expect(err).To(Succeed())
 			Expect(sv).NotTo(BeNil())
 			go sv.Start()
-			Expect(sv.ReadyForConnections(time.Second)).To(BeTrue())
-
-			inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "DNSTAP"}`))
-			Expect(err).To(Succeed())
-			p = inp.(*nats.Nats)
+			Expect(sv.ReadyForConnections(time.Second * 5)).To(BeTrue())
 		})
 		AfterEach(func() {
 			nc.Close()
@@ -182,7 +178,9 @@ var _ = Describe("input/nats", func() {
 		Context("Open", func() {
 			When("failed to connect", func() {
 				BeforeEach(func() {
-					p.Hosts = []string{"127.0.0.1:5223"}
+					inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:5223"], "Subject": "dnstap", "Format": "DNSTAP"}`))
+					Expect(err).To(Succeed())
+					p = inp.(*nats.Nats)
 					_, err = p.Open()
 				})
 				It("returns error", func() {
@@ -192,6 +190,9 @@ var _ = Describe("input/nats", func() {
 			})
 			When("valid", func() {
 				BeforeEach(func() {
+					inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14223"], "Subject": "dnstap", "Format": "DNSTAP"}`))
+					Expect(err).To(Succeed())
+					p = inp.(*nats.Nats)
 					_, err = p.Open()
 				})
 				It("Succeed", func() {
@@ -216,7 +217,7 @@ var _ = Describe("input/nats", func() {
 			When("valid message", func() {
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "DNSTAP"}`))
+						inp, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14223"], "Subject": "dnstap", "Format": "DNSTAP"}`))
 						Expect(err).To(Succeed())
 						p = inp.(*nats.Nats)
 					})

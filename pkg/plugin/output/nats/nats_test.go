@@ -159,7 +159,7 @@ var _ = Describe("output/nats", func() {
 			Expect(err).To(Succeed())
 			Expect(sv).NotTo(BeNil())
 			go sv.Start()
-			Expect(sv.ReadyForConnections(time.Second)).To(BeTrue())
+			Expect(sv.ReadyForConnections(time.Second * 5)).To(BeTrue())
 
 			nc, err = natsio.Connect("127.0.0.1:14222")
 			Expect(err).To(Succeed())

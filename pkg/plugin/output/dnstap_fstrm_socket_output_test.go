@@ -41,7 +41,7 @@ func (s *socketOutput) NewConnect() (io.Writer, error) {
 	if s.ErrNewConnect != nil {
 		return nil, s.ErrNewConnect
 	}
-	return net.Dial("tcp", "127.0.0.1:10053")
+	return net.Dial("tcp", "127.0.0.1:10153")
 }
 
 func (s *socketOutput) Close() {
@@ -61,7 +61,7 @@ var _ = Describe("DnstapFstrmSocketOutput", func() {
 		)
 		BeforeEach(func() {
 			resQueue = make(chan []byte, 100)
-			server, err = net.Listen("tcp", "127.0.0.1:10053")
+			server, err = net.Listen("tcp", "127.0.0.1:10153")
 			Expect(err).To(Succeed())
 			iServer = dnstap.NewFrameStreamSockInput(server)
 
