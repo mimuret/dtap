@@ -42,9 +42,8 @@ func init() {
 
 func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	s := &Nats{
-		Format:    input.FormatDtapFrame,
-		QueueLen:  64,
-		QueueName: "dtap_in_nats",
+		Format:   input.FormatDtapFrame,
+		QueueLen: 64,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
