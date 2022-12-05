@@ -36,12 +36,19 @@ func init() {
 }
 
 func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
-	p := &File{}
+	p := &File{
+		Format: input.FormatDNSTAP,
+	}
 	if err := json.Unmarshal(bs, p); err != nil {
 		return nil, errors.Wrapf(err, "failed to decode config")
 	}
 	if p.Path == "" {
 		return nil, errors.New("missing parameter Path")
+	}
+	if input.NewInputServer(p.Format, &framestream.DecoderOptions{
+		Bidirectional: false,
+	}) == nil {
+		return nil, errors.Errorf("invalid format")
 	}
 	p.fs = afero.NewOsFs()
 	return p, nil
@@ -54,11 +61,12 @@ type File struct {
 
 	fs afero.Fs
 
-	Path string
+	Path   string
+	Format input.Format
 }
 
 func (p *File) Start(_ context.Context, w types.Writer) error {
-	is := input.NewInputServer(&framestream.DecoderOptions{
+	is := input.NewInputServer(p.Format, &framestream.DecoderOptions{
 		ContentType:   dnstap.FSContentType,
 		Bidirectional: false,
 	})

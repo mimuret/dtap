@@ -68,8 +68,6 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	return s, nil
 }
 
-type NatsFormat string
-
 var _ output.OutputHandler = &Nats{}
 var _ types.OutputPlugin = &Nats{}
 var _ pub.PublisherHandler = &Nats{}

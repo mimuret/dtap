@@ -47,7 +47,7 @@ var _ = Describe("InputServer", func() {
 			buf    types.Writer
 		)
 		BeforeEach(func() {
-			srv = input.NewInputServer(nil)
+			srv = input.NewInputServer(input.FormatDNSTAP, nil)
 			srvErr = nil
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
 			ln, srvErr = nettest.NewLocalListener("unix")
@@ -80,7 +80,7 @@ var _ = Describe("InputServer", func() {
 			buf     types.Buffer
 		)
 		BeforeEach(func() {
-			srv = input.NewInputServer(nil)
+			srv = input.NewInputServer(input.FormatDNSTAP, nil)
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
 			connOut, connIn = net.Pipe()
 			srvErr = nil

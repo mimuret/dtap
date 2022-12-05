@@ -34,7 +34,9 @@ func init() {
 }
 
 func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
-	p := &TCPSocket{}
+	p := &TCPSocket{
+		Format: input.FormatDNSTAP,
+	}
 
 	if err := json.Unmarshal(bs, p); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
@@ -42,7 +44,9 @@ func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.Port == 0 {
 		return nil, errors.Errorf("missing parameter Port")
 	}
-
+	if input.NewInputServer(p.Format, nil) == nil {
+		return nil, errors.Errorf("invalid format")
+	}
 	return p, nil
 }
 
@@ -53,6 +57,7 @@ type TCPSocket struct {
 
 	Address string
 	Port    uint16
+	Format  input.Format
 
 	ln net.Listener
 }
@@ -79,5 +84,5 @@ func (p *TCPSocket) Start(ctx context.Context, w types.Writer) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(nil).Serve(p.ln, w)
+	return input.NewInputServer(p.Format, nil).Serve(p.ln, w)
 }

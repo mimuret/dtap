@@ -37,7 +37,9 @@ func init() {
 
 func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	var err error
-	p := &UnixSocket{}
+	p := &UnixSocket{
+		Format: input.FormatDNSTAP,
+	}
 
 	if err = json.Unmarshal(bs, p); err != nil {
 		return nil, errors.Wrapf(err, "failed to decode config")
@@ -61,6 +63,9 @@ func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 		p.uid = &uid
 		p.gid = &gid
 	}
+	if input.NewInputServer(p.Format, nil) == nil {
+		return nil, errors.Errorf("invalid format")
+	}
 	return p, nil
 }
 
@@ -69,8 +74,9 @@ var _ types.InputPlugin = &UnixSocket{}
 type UnixSocket struct {
 	plugin.PluginCommon
 
-	Path string
-	User string
+	Path   string
+	User   string
+	Format input.Format
 
 	ln  net.Listener
 	uid *int
@@ -104,5 +110,5 @@ func (p *UnixSocket) Start(ctx context.Context, w types.Writer) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(nil).Serve(p.ln, w)
+	return input.NewInputServer(p.Format, nil).Serve(p.ln, w)
 }

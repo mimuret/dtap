@@ -8,33 +8,42 @@ import (
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 const FormatDNSTAP Format = "DNSTAP"
+const FormatDtapFrame Format = "DTAPFrame"
+
+// FSContentType is the FrameStream content type for dnstap protobuf data.
+var DtapFrameFSContentType = []byte("protobuf:dtap.DtapFrame")
 
 const (
 	DnstapFstrmControlHeaderSize = 42
 	DnstapFstrmMsgHeaderSize     = 4
 )
 
-var _ Publisher = &DnstapPublisher{}
+var _ Publisher = &FstrmPublisher{}
 
-type DnstapPublisher struct {
+type FstrmPublisherMarshaler func(*types.DnstapMessage) ([]byte, error)
+
+type FstrmPublisher struct {
 	sync.Mutex
-	buf     *bytes.Buffer
-	handler PublisherHandler
-	maxSize int
+	buf         *bytes.Buffer
+	handler     PublisherHandler
+	maxSize     int
+	contentType []byte
 
 	interval   *intervalSec
+	marshaler  FstrmPublisherMarshaler
 	writer     *framestream.Writer
 	writeSize  int
 	writeState writeState
 	writeCount int
 }
 
-func NewDnstapPublisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
+func NewFstrmPublisher(maxSize int, intervalSec uint, handler PublisherHandler) *FstrmPublisher {
 	buf := make([]byte, 0, maxSize)
-	return &DnstapPublisher{
+	return &FstrmPublisher{
 		buf:      bytes.NewBuffer(buf),
 		handler:  handler,
 		maxSize:  maxSize,
@@ -42,18 +51,36 @@ func NewDnstapPublisher(maxSize int, intervalSec uint, handler PublisherHandler)
 	}
 }
 
-func (f *DnstapPublisher) Start() {
+func NewFstrmDNSTAPPublisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
+	publisher := NewFstrmPublisher(maxSize, intervalSec, handler)
+	publisher.marshaler = func(dm *types.DnstapMessage) ([]byte, error) {
+		return dm.GetRaw(), nil
+	}
+	publisher.contentType = dnstap.FSContentType
+	return publisher
+}
+
+func NewFstrmDtapFramePublisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
+	publisher := NewFstrmPublisher(maxSize, intervalSec, handler)
+	publisher.marshaler = func(dm *types.DnstapMessage) ([]byte, error) {
+		return proto.Marshal(dm.ToDtapFrame())
+	}
+	publisher.contentType = DtapFrameFSContentType
+	return publisher
+}
+
+func (f *FstrmPublisher) Start() {
 	f.interval.Start(f)
 }
 
-func (f *DnstapPublisher) reset() {
+func (f *FstrmPublisher) reset() {
 	f.buf.Reset()
 	f.writeState = writeStateInit
 	f.writeSize = 0
 	f.writeCount = 0
 }
 
-func (f *DnstapPublisher) Write(dm *types.DnstapMessage) error {
+func (f *FstrmPublisher) Write(dm *types.DnstapMessage) error {
 	f.Lock()
 	defer f.Unlock()
 	if err := f.write(dm); err != nil {
@@ -63,11 +90,14 @@ func (f *DnstapPublisher) Write(dm *types.DnstapMessage) error {
 	return nil
 }
 
-func (f *DnstapPublisher) write(dm *types.DnstapMessage) error {
+func (f *FstrmPublisher) write(dm *types.DnstapMessage) error {
 	var err error
-	data := dm.GetRaw()
+	data, err := f.marshaler(dm)
+	if err != nil {
+		return nil
+	}
 	if f.writeSize+4+len(data)+DnstapFstrmControlHeaderSize > f.maxSize {
-		if err := f.Publish(); err != nil {
+		if err := f.publish(); err != nil {
 			return errors.Wrap(err, "failed to publish message")
 		}
 	}
@@ -89,7 +119,16 @@ func (f *DnstapPublisher) write(dm *types.DnstapMessage) error {
 	return errors.Wrap(err, "failed to write message")
 }
 
-func (f *DnstapPublisher) Publish() error {
+func (f *FstrmPublisher) Publish() error {
+	f.Lock()
+	defer f.Unlock()
+	return f.publish()
+}
+
+func (f *FstrmPublisher) publish() error {
+	if f.writeState != writeStateActive {
+		return nil
+	}
 	if err := f.writer.Flush(); err != nil {
 		return errors.Wrap(err, "failed to flush fstrm")
 	}
@@ -109,11 +148,13 @@ func (f *DnstapPublisher) Publish() error {
 	return nil
 }
 
-func (f *DnstapPublisher) Close() error {
+func (f *FstrmPublisher) Close() error {
 	f.interval.Close()
+	<-f.interval.closeCh
 	return f.Publish()
 }
 
 func init() {
-	RegisterPublisher(FormatDNSTAP, NewDnstapPublisher)
+	RegisterPublisher(FormatDNSTAP, NewFstrmDNSTAPPublisher)
+	RegisterPublisher(FormatDtapFrame, NewFstrmDtapFramePublisher)
 }
