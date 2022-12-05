@@ -24,5 +24,5 @@ import (
 
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "nats package test suite")
+	RunSpecs(t, "output/nats package test suite")
 }

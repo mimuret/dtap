@@ -16,7 +16,6 @@
 package nats_test
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -183,8 +182,6 @@ var _ = Describe("output/nats", func() {
 				BeforeEach(func() {
 					p.Hosts = []string{"127.0.0.1:5222"}
 					err = p.Open()
-					fmt.Println(err)
-					fmt.Println(p)
 				})
 				It("returns error", func() {
 					Expect(err).To(HaveOccurred())
