@@ -187,7 +187,7 @@ var _ = Describe("input/nats", func() {
 				})
 				It("returns error", func() {
 					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(MatchRegexp("failed to create nats producer"))
+					Expect(err.Error()).To(MatchRegexp("failed to create nats subscriber"))
 				})
 			})
 			When("valid", func() {

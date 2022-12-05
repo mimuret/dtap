@@ -113,7 +113,7 @@ func (f *Nats) Open() (*nats.Conn, error) {
 	}
 	conn, err := cfg.Connect()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create nats producer")
+		return nil, errors.Wrap(err, "failed to create nats subscriber")
 	}
 	return conn, nil
 }
