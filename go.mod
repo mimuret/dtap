@@ -10,8 +10,8 @@ require (
 	github.com/fluent/fluent-logger-golang v1.8.0
 	github.com/goccy/go-json v0.8.0
 	github.com/linkedin/goavro v2.1.0+incompatible
-	github.com/miekg/dns v1.1.48
-	github.com/mimuret/dnsutils v1.2.0
+	github.com/miekg/dns v1.1.50
+	github.com/mimuret/dnsutils v1.5.0
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
 	github.com/onsi/ginkgo v1.16.5
@@ -24,7 +24,7 @@ require (
 	github.com/spf13/cobra v1.1.3
 	go.uber.org/zap v1.23.0
 	golang.org/x/exp v0.0.0-20220827204233-334a2380cb91
-	golang.org/x/net v0.0.0-20220811182439-13a9a731de15
+	golang.org/x/net v0.0.0-20221004154528-8021a29435af
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
