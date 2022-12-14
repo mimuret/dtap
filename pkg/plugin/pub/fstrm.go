@@ -103,7 +103,7 @@ func (f *FstrmPublisher) write(dm *types.DnstapMessage) error {
 	}
 	if f.writeState == writeStateInit {
 		f.writer, err = framestream.NewWriter(f.buf, &framestream.WriterOptions{
-			ContentTypes:  [][]byte{dnstap.FSContentType},
+			ContentTypes:  [][]byte{f.contentType},
 			Bidirectional: false,
 		})
 		if err != nil {
