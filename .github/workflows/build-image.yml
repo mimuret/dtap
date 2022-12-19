@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - id: get_tag
-      run: echo name=TAG_NAME::${GITHUB_REF/refs\/tags\//} >> $GITHUB_OUTPUT
+      run: echo TAG_NAME=${GITHUB_REF##*/} >> $GITHUB_OUTPUT
     -
       name: Set up QEMU
       uses: docker/setup-qemu-action@v2
