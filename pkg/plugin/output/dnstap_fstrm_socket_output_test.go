@@ -36,6 +36,7 @@ type socketOutput struct {
 	Conn          net.Conn
 }
 
+func (s *socketOutput) SetOutputContext(*types.OutputContext) {}
 func (s *socketOutput) NewConnect() (io.Writer, error) {
 	s.RunNewConnect++
 	if s.ErrNewConnect != nil {

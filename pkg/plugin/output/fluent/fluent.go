@@ -52,6 +52,11 @@ type Fluent struct {
 
 	// fluent
 	client *fluent.Fluent
+	oc     *types.OutputContext
+}
+
+func (f *Fluent) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (o *Fluent) Open() error {

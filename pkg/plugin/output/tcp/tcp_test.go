@@ -20,6 +20,7 @@ import (
 	"net"
 
 	"github.com/goccy/go-json"
+	"golang.org/x/net/nettest"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/tcp"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -79,11 +80,14 @@ var _ = Describe("output/tcp", func() {
 			conn io.Writer
 		)
 		BeforeEach(func() {
-			ln, err = net.Listen("tcp", "127.0.0.1:10053")
+			ln, err = nettest.NewLocalListener("tcp")
 			Expect(err).To(Succeed())
+			addr, ok := ln.Addr().(*net.TCPAddr)
+			Expect(ok).To(BeTrue())
 			op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp", "Host": "127.0.0.1","Port": 10053}`))
 			Expect(err).To(Succeed())
 			p = op.(*tcp.TCP)
+			p.Port = uint16(addr.Port)
 		})
 		AfterEach(func() {
 			ln.Close()

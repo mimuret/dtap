@@ -59,6 +59,12 @@ type TCP struct {
 	Port uint16
 
 	w net.Conn
+
+	oc *types.OutputContext
+}
+
+func (f *TCP) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (t *TCP) NewConnect() (io.Writer, error) {

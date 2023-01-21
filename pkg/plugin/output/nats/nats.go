@@ -92,6 +92,12 @@ type Nats struct {
 	IntervalSec uint
 	Format      pub.Format
 	publisher   pub.Publisher
+
+	oc *types.OutputContext
+}
+
+func (f *Nats) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (f *Nats) Open() error {

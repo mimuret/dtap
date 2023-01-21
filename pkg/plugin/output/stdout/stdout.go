@@ -73,7 +73,12 @@ type Stdout struct {
 	Type     OutputFormat
 	Template string
 
-	t *template.Template
+	t  *template.Template
+	oc *types.OutputContext
+}
+
+func (f *Stdout) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (o *Stdout) Open() error {

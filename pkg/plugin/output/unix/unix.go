@@ -54,7 +54,12 @@ type Unix struct {
 
 	Path string
 
-	w net.Conn
+	oc *types.OutputContext
+	w  net.Conn
+}
+
+func (f *Unix) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (f *Unix) NewConnect() (io.Writer, error) {

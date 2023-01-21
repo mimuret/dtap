@@ -74,7 +74,12 @@ type Output struct {
 	Format   OutputFormat
 	Template string
 
-	t *template.Template
+	t  *template.Template
+	oc *types.OutputContext
+}
+
+func (f *Output) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (o *Output) Open() error {

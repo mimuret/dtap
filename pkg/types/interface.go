@@ -18,6 +18,8 @@ package types
 
 import (
 	"context"
+
+	"go.uber.org/zap"
 )
 
 type Buffer interface {
@@ -40,9 +42,15 @@ type Plugin interface {
 	GetName() string
 }
 
+type InputContext struct {
+	No     int
+	Logger *zap.Logger
+	Writer Writer
+}
+
 type InputPlugin interface {
 	Plugin
-	Start(context.Context, Writer) error
+	Start(context.Context, *InputContext) error
 }
 
 type FilterPlugin interface {
@@ -50,7 +58,14 @@ type FilterPlugin interface {
 	Filter(*DnstapMessage) *DnstapMessage
 }
 
+type OutputContext struct {
+	OutputGroup string
+	No          int
+	Logger      *zap.Logger
+	Reader      Reader
+}
+
 type OutputPlugin interface {
 	Plugin
-	Start(context.Context, Reader) error
+	Start(context.Context, *OutputContext) error
 }

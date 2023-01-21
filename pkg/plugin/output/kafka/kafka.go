@@ -87,6 +87,11 @@ type Kafka struct {
 	valueSchemaID []byte
 	keyCodec      *goavro.Codec
 	keySchemaID   []byte
+	oc            *types.OutputContext
+}
+
+func (f *Kafka) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 type OutputType string

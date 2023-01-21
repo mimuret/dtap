@@ -44,7 +44,7 @@ func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.Port == 0 {
 		return nil, errors.Errorf("missing parameter Port")
 	}
-	if input.NewInputServer(p.Format, nil) == nil {
+	if input.NewInputServer(p.Format, nil, nil) == nil {
 		return nil, errors.Errorf("invalid format")
 	}
 	return p, nil
@@ -76,7 +76,7 @@ func (p *TCPSocket) Close() error {
 	return p.ln.Close()
 }
 
-func (p *TCPSocket) Start(ctx context.Context, w types.Writer) error {
+func (p *TCPSocket) Start(ctx context.Context, ic *types.InputContext) error {
 	if err := p.Listen(); err != nil {
 		return err
 	}
@@ -84,5 +84,5 @@ func (p *TCPSocket) Start(ctx context.Context, w types.Writer) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(p.Format, nil).Serve(p.ln, w)
+	return input.NewInputServer(p.Format, nil, ic).Serve(p.ln, ic.Writer)
 }
