@@ -21,8 +21,11 @@ import (
 
 	"github.com/mimuret/dtap/v2/pkg/logger"
 	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+const MaxRetryDuration = time.Minute * 1
 
 type OutputHandler interface {
 	Open() error
@@ -34,9 +37,10 @@ type DnstapOutput struct {
 	handler        OutputHandler
 	logger         *zap.Logger
 	retryOpenCount uint
+	maxRetry       uint
 }
 
-func NewDnstapOutput(handler OutputHandler) *DnstapOutput {
+func NewDnstapOutput(handler OutputHandler, maxRetry uint) *DnstapOutput {
 	if handler == nil {
 		panic("handler is nil")
 	}
@@ -44,11 +48,16 @@ func NewDnstapOutput(handler OutputHandler) *DnstapOutput {
 		handler:        handler,
 		logger:         logger.GetLogger(),
 		retryOpenCount: 0,
+		maxRetry:       0,
 	}
 }
 
 func (o *DnstapOutput) Start(ctx context.Context, r types.Reader) error {
 	o.logger.Debug("start output run")
+	if err := o.handler.Open(); err != nil {
+		return errors.Wrap(err, "failed to open first time")
+	}
+	o.handler.Close()
 L:
 	for {
 		select {
@@ -57,6 +66,9 @@ L:
 			break L
 		default:
 			if err := o.Run(ctx, r); err != nil {
+				if o.maxRetry != 0 && o.maxRetry <= o.retryOpenCount {
+					return errors.Wrap(err, "failed to open output resource")
+				}
 				o.logger.Debug("output running error", zap.Error(err))
 			}
 		}
@@ -68,8 +80,8 @@ L:
 func (o *DnstapOutput) Run(ctx context.Context, r types.Reader) error {
 	if err := o.handler.Open(); err != nil {
 		retryDuration := time.Second * time.Duration(1+o.retryOpenCount*o.retryOpenCount)
-		if retryDuration > time.Minute*3 {
-			retryDuration = time.Minute * 3
+		if retryDuration > MaxRetryDuration {
+			retryDuration = MaxRetryDuration
 		}
 		time.Sleep(retryDuration)
 		o.retryOpenCount++

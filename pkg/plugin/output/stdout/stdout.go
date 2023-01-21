@@ -52,7 +52,7 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	default:
 		return nil, errors.New("Type is an invalid value")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s)
+	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 	return s, nil
 }
 

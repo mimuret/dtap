@@ -41,7 +41,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.Path == "" {
 		return nil, errors.New("missing parameter Path")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil))
+	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil), s.MaxRetry)
 	return s, nil
 }
 

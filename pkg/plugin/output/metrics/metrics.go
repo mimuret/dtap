@@ -140,7 +140,7 @@ type Metrics struct {
 }
 
 func (f *Metrics) Start(ctx context.Context, r types.Reader) error {
-	return output.NewDnstapOutput(f).Start(ctx, r)
+	return output.NewDnstapOutput(f, 0).Start(ctx, r)
 }
 
 func (f *Metrics) Open() error {

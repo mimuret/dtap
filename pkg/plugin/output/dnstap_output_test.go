@@ -72,7 +72,7 @@ var _ = Describe("DnstapOutput", func() {
 			ctx, cancelFunc = context.WithCancel(context.Background())
 			wg = &sync.WaitGroup{}
 			h = &handler{}
-			out = output.NewDnstapOutput(h)
+			out = output.NewDnstapOutput(h, 0)
 			msg = testtool.CreateValidDnstapMessage()
 		})
 		Context("incoming message", func() {

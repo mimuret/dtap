@@ -26,9 +26,9 @@ import (
 
 	// input
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/file"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/nats"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/nats"
 
 	// output
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/file"
