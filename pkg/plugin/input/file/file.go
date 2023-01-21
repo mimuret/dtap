@@ -47,7 +47,7 @@ func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
 	}
 	if input.NewInputServer(p.Format, &framestream.DecoderOptions{
 		Bidirectional: false,
-	}) == nil {
+	}, nil) == nil {
 		return nil, errors.Errorf("invalid format")
 	}
 	p.fs = afero.NewOsFs()
@@ -65,16 +65,16 @@ type File struct {
 	Format input.Format
 }
 
-func (p *File) Start(_ context.Context, w types.Writer) error {
+func (p *File) Start(_ context.Context, ic *types.InputContext) error {
 	is := input.NewInputServer(p.Format, &framestream.DecoderOptions{
 		ContentType:   dnstap.FSContentType,
 		Bidirectional: false,
-	})
+	}, ic)
 	r, err := p.fs.Open(p.Path)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
-	if err := is.Read(r, w); err != nil {
+	if err := is.Read(r, ic.Writer); err != nil {
 		return fmt.Errorf("failed to push message: %w", err)
 	}
 	return nil

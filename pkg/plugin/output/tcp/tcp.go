@@ -45,7 +45,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.Port == 0 {
 		return nil, errors.Errorf("missing parameter Port")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil))
+	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil), s.MaxRetry)
 	return s, nil
 }
 
@@ -59,6 +59,12 @@ type TCP struct {
 	Port uint16
 
 	w net.Conn
+
+	oc *types.OutputContext
+}
+
+func (f *TCP) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (t *TCP) NewConnect() (io.Writer, error) {

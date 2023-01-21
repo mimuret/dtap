@@ -39,13 +39,13 @@ type NOP struct {
 	plugin.PluginCommon
 }
 
-func (f *NOP) Start(ctx context.Context, r types.Reader) error {
+func (f *NOP) Start(ctx context.Context, oc *types.OutputContext) error {
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			break LOOP
-		case <-r.Read():
+		case <-oc.Reader.Read():
 		}
 	}
 	return nil

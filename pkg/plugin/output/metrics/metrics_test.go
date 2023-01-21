@@ -24,15 +24,15 @@ import (
 
 	"github.com/goccy/go-json"
 
-	dto "github.com/prometheus/client_model/go"
-
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
 	"github.com/mimuret/dnsutils/getter"
 	"github.com/mimuret/dnsutils/testtool"
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
+	dtaptesttool "github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/metrics"
@@ -177,7 +177,7 @@ var _ = Describe("output/metrics", func() {
 				o = op.(*metrics.Metrics)
 				buf.Write(dm)
 				go func() {
-					err := op.Start(ctx, buf)
+					err := op.Start(ctx, dtaptesttool.NewTestOutputContext(buf))
 					Expect(err).To(Succeed())
 				}()
 			})

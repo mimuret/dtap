@@ -36,7 +36,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s)
+	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 	return s, nil
 }
 
@@ -52,6 +52,11 @@ type Fluent struct {
 
 	// fluent
 	client *fluent.Fluent
+	oc     *types.OutputContext
+}
+
+func (f *Fluent) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (o *Fluent) Open() error {

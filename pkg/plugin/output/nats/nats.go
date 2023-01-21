@@ -64,7 +64,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.publisher == nil {
 		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s)
+	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 	return s, nil
 }
 
@@ -92,6 +92,12 @@ type Nats struct {
 	IntervalSec uint
 	Format      pub.Format
 	publisher   pub.Publisher
+
+	oc *types.OutputContext
+}
+
+func (f *Nats) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (f *Nats) Open() error {

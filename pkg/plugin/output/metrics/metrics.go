@@ -137,10 +137,15 @@ func (c *MetricsRule) GetLabels(dm *types.DnstapMessage) []string {
 type Metrics struct {
 	plugin.PluginCommon
 	Rules []*MetricsRule
+	oc    *types.OutputContext
 }
 
-func (f *Metrics) Start(ctx context.Context, r types.Reader) error {
-	return output.NewDnstapOutput(f).Start(ctx, r)
+func (f *Metrics) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
+}
+
+func (f *Metrics) Start(ctx context.Context, oc *types.OutputContext) error {
+	return output.NewDnstapOutput(f, 0).Start(ctx, oc)
 }
 
 func (f *Metrics) Open() error {

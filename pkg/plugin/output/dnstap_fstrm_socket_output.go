@@ -28,6 +28,7 @@ import (
 )
 
 type SocketOutput interface {
+	SetOutputContext(*types.OutputContext)
 	NewConnect() (io.Writer, error)
 	Close()
 }
@@ -37,6 +38,7 @@ var _ OutputHandler = &DnstapFstrmSocketOutput{}
 type DnstapFstrmSocketOutput struct {
 	handler      SocketOutput
 	flushTimeout time.Duration
+	oc           *types.OutputContext
 
 	enc     *framestream.Encoder
 	encOpt  *framestream.EncoderOptions
@@ -58,6 +60,11 @@ func NewDnstapFstrmSocketOutput(handler SocketOutput, flushTimeout time.Duration
 		flushTimeout: flushTimeout,
 		wg:           &sync.WaitGroup{},
 	}
+}
+
+func (o *DnstapFstrmSocketOutput) SetOutputContext(oc *types.OutputContext) {
+	o.oc = oc
+	o.handler.SetOutputContext(oc)
 }
 
 func (o *DnstapFstrmSocketOutput) Open() error {

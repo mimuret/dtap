@@ -26,7 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/mimuret/dtap/v2/pkg/logger"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/types"
 
@@ -59,8 +58,12 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	}
 	if input.NewInputServer(s.Format, &framestream.DecoderOptions{
 		Bidirectional: false,
-	}) == nil {
+	}, nil) == nil {
 		return nil, errors.Errorf("invalid format")
+	}
+	// for test
+	s.ic = &types.InputContext{
+		Logger: zap.NewExample(),
 	}
 	return s, nil
 }
@@ -72,6 +75,8 @@ type Nats struct {
 	sync.Mutex
 
 	*output.DnstapOutput
+
+	ic *types.InputContext
 
 	// config
 	Hosts     []string
@@ -86,14 +91,15 @@ type Nats struct {
 	Format input.Format
 }
 
-func (f *Nats) Start(ctx context.Context, w types.Writer) error {
+func (f *Nats) Start(ctx context.Context, ic *types.InputContext) error {
+	f.ic = ic
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			break LOOP
 		default:
-			if err := f.Subscribe(ctx, w); err != nil {
+			if err := f.Subscribe(ctx, ic.Writer); err != nil {
 				return err
 			}
 		}
@@ -121,7 +127,7 @@ func (f *Nats) Open() (*nats.Conn, error) {
 func (f *Nats) Subscribe(ctx context.Context, w types.Writer) error {
 	is := input.NewInputServer(f.Format, &framestream.DecoderOptions{
 		Bidirectional: false,
-	})
+	}, f.ic)
 	nc, err := f.Open()
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect nats server")
@@ -138,7 +144,7 @@ func (f *Nats) Subscribe(ctx context.Context, w types.Writer) error {
 		_ = sub.Unsubscribe()
 	}()
 
-	logger.GetLogger().Info("start subscribe", zap.String("subject", f.Subject), zap.String("queue name", f.QueueName), zap.Int("queue len", f.QueueLen))
+	f.ic.Logger.Info("start subscribe", zap.String("subject", f.Subject), zap.String("queue name", f.QueueName), zap.Int("queue len", f.QueueLen))
 LOOP:
 	for {
 		select {

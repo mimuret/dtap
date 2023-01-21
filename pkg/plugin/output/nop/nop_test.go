@@ -22,6 +22,7 @@ import (
 
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
+	"github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -58,8 +59,9 @@ var _ = Describe("output/nop", func() {
 			op, err = nop.Setup(json.RawMessage(`{"Name": "nop"}`))
 			Expect(err).To(Succeed())
 			ctx, cancelFunc = context.WithCancel(context.Background())
+
 			go func() {
-				err := op.Start(ctx, buf)
+				err := op.Start(ctx, testtool.NewTestOutputContext(buf))
 				Expect(err).To(Succeed())
 			}()
 		})

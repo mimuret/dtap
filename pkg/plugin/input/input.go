@@ -7,7 +7,6 @@ import (
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/mimuret/dtap/v2/pkg/logger"
 	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
@@ -56,12 +55,12 @@ type FstrmUnmarshaler func([]byte) (*types.DnstapMessage, error)
 
 type InputServer struct {
 	DecoderOptions    *framestream.DecoderOptions
-	logger            *zap.Logger
 	connectionManager *connectionManager
 	unmarshaler       FstrmUnmarshaler
+	ic                *types.InputContext
 }
 
-func NewDnstapInputServer(options *framestream.DecoderOptions) *InputServer {
+func NewDnstapInputServer(options *framestream.DecoderOptions, ic *types.InputContext) *InputServer {
 	if options == nil {
 		options = &framestream.DecoderOptions{
 			Bidirectional: true,
@@ -72,13 +71,13 @@ func NewDnstapInputServer(options *framestream.DecoderOptions) *InputServer {
 	}
 	return &InputServer{
 		DecoderOptions:    options,
-		logger:            logger.GetLogger(),
+		ic:                ic,
 		connectionManager: newConnectionManager(),
 		unmarshaler:       types.NewDnstapMessage,
 	}
 }
 
-func NewDtapFrameInputServer(options *framestream.DecoderOptions) *InputServer {
+func NewDtapFrameInputServer(options *framestream.DecoderOptions, ic *types.InputContext) *InputServer {
 	if options == nil {
 		options = &framestream.DecoderOptions{
 			Bidirectional: true,
@@ -89,7 +88,7 @@ func NewDtapFrameInputServer(options *framestream.DecoderOptions) *InputServer {
 	}
 	return &InputServer{
 		DecoderOptions:    options,
-		logger:            logger.GetLogger(),
+		ic:                ic,
 		connectionManager: newConnectionManager(),
 		unmarshaler:       types.NewDnstapMessageFromDtapFrameRaw,
 	}
@@ -114,7 +113,7 @@ func (i *InputServer) Serve(ln net.Listener, buf types.Writer) error {
 		go func(conn net.Conn) {
 			if err := i.Read(conn, buf); err != nil {
 				TotalDecordError.Inc()
-				i.logger.Warn("input error", zap.Error(err))
+				i.ic.Logger.Debug("input error", zap.Error(err))
 			}
 			i.connectionManager.remove(conn)
 			wg.Done()

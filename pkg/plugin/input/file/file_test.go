@@ -23,6 +23,7 @@ import (
 
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/file"
+	"github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -80,6 +81,7 @@ var _ = Describe("input/file", func() {
 	Context("Start", func() {
 		var (
 			p   types.InputPlugin
+			ic  *types.InputContext
 			fp  *file.File
 			err error
 			fs  afero.Fs
@@ -88,6 +90,7 @@ var _ = Describe("input/file", func() {
 		)
 		BeforeEach(func() {
 			buf = buffer.NewRingBuffer(10, nil, nil)
+			ic = testtool.NewTestInputContext(buf)
 			fs = afero.NewMemMapFs()
 			p, err = file.SetupFile(validConfig)
 			Expect(err).To(Succeed())
@@ -96,7 +99,7 @@ var _ = Describe("input/file", func() {
 		})
 		When("file not exist", func() {
 			BeforeEach(func() {
-				err = fp.Start(context.TODO(), buf)
+				err = fp.Start(context.TODO(), ic)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -110,7 +113,7 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(dummyData)
 				Expect(err).To(Succeed())
 				f.Close()
-				err = fp.Start(context.TODO(), buf)
+				err = fp.Start(context.TODO(), ic)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -124,7 +127,7 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(validData)
 				Expect(err).To(Succeed())
 				f.Close()
-				err = fp.Start(context.TODO(), buf)
+				err = fp.Start(context.TODO(), ic)
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())

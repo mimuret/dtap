@@ -66,7 +66,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s)
+	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 
 	return s, nil
 }
@@ -87,6 +87,11 @@ type Kafka struct {
 	valueSchemaID []byte
 	keyCodec      *goavro.Codec
 	keySchemaID   []byte
+	oc            *types.OutputContext
+}
+
+func (f *Kafka) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 type OutputType string

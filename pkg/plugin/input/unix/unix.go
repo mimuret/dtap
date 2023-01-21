@@ -63,7 +63,7 @@ func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 		p.uid = &uid
 		p.gid = &gid
 	}
-	if input.NewInputServer(p.Format, nil) == nil {
+	if input.NewInputServer(p.Format, nil, nil) == nil {
 		return nil, errors.Errorf("invalid format")
 	}
 	return p, nil
@@ -102,7 +102,7 @@ func (p *UnixSocket) Close() error {
 	return p.ln.Close()
 }
 
-func (p *UnixSocket) Start(ctx context.Context, w types.Writer) error {
+func (p *UnixSocket) Start(ctx context.Context, ic *types.InputContext) error {
 	if err := p.Listen(); err != nil {
 		return err
 	}
@@ -110,5 +110,5 @@ func (p *UnixSocket) Start(ctx context.Context, w types.Writer) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(p.Format, nil).Serve(p.ln, w)
+	return input.NewInputServer(p.Format, nil, ic).Serve(p.ln, ic.Writer)
 }

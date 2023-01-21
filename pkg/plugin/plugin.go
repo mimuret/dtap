@@ -24,7 +24,8 @@ import (
 )
 
 type PluginCommon struct {
-	Name string `json:"Name"`
+	Name     string `json:"Name"`
+	MaxRetry uint   `json:"MaxRetry"`
 }
 
 func (p *PluginCommon) GetName() string {

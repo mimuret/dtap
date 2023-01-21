@@ -24,7 +24,6 @@ import (
 	"syscall"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
-	"github.com/mimuret/dtap/v2/pkg/logger"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
@@ -147,15 +146,20 @@ func (c *Controller) Run(ctx context.Context) error {
 	iCtx, iCancel := context.WithCancel(ctx)
 	for i, inputPlugin := range c.inputPlugins {
 		iwg.Add(1)
-		go func(i int, ip types.InputPlugin) {
-			logger.GetLogger().Info("start input plugin", zap.String("name", ip.GetName()), zap.Int("no", i))
-			err := ip.Start(iCtx, c.inputBuffer)
-			logger.GetLogger().Info("finish input plugin", zap.String("name", ip.GetName()), zap.Int("no", i), zap.Error(err))
+		ic := &types.InputContext{
+			No:     i,
+			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.Int("no", i)),
+			Writer: c.inputBuffer,
+		}
+		go func(ip types.InputPlugin, ic *types.InputContext) {
+			ic.Logger.Info("start input plugin")
+			err := ip.Start(iCtx, ic)
+			ic.Logger.Info("finish input plugin")
 			if err != nil {
 				errCh <- err
 			}
 			iwg.Done()
-		}(i, inputPlugin)
+		}(inputPlugin, ic)
 	}
 
 	// start outputPlugin
@@ -164,15 +168,21 @@ func (c *Controller) Run(ctx context.Context) error {
 	for _, og := range c.outputGroups {
 		for i, outputPlugin := range og.outputs {
 			owg.Add(1)
-			go func(i int, og OutputGroup, op types.OutputPlugin) {
-				logger.GetLogger().Info("start output plugin", zap.String("og", og.name), zap.String("name", op.GetName()), zap.Int("no", i))
-				err := op.Start(oCtx, og.buffer)
-				logger.GetLogger().Info("finish output plugin", zap.String("og", og.name), zap.String("name", op.GetName()), zap.Int("no", i), zap.Error(err))
+			oc := &types.OutputContext{
+				OutputGroup: og.name,
+				No:          i,
+				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.Int("no", i)),
+				Reader:      og.buffer,
+			}
+			go func(op types.OutputPlugin, oc *types.OutputContext) {
+				oc.Logger.Info("start output plugin")
+				err := op.Start(oCtx, oc)
+				oc.Logger.Info("finish output plugin")
 				if err != nil {
 					errCh <- err
 				}
 				owg.Done()
-			}(i, og, outputPlugin)
+			}(outputPlugin, oc)
 		}
 	}
 	defer func() {

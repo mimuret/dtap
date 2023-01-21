@@ -16,7 +16,10 @@
 package tcp_test
 
 import (
+	"net"
+
 	"github.com/goccy/go-json"
+	"golang.org/x/net/nettest"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -68,9 +71,16 @@ var _ = Describe("input/tcp", func() {
 			p   *tcp.TCPSocket
 		)
 		BeforeEach(func() {
+			ln, lerr := nettest.NewLocalListener("tcp")
+			Expect(lerr).To(Succeed())
+			addr, ok := ln.Addr().(*net.TCPAddr)
+			Expect(ok).To(BeTrue())
+			ln.Close()
+
 			ip, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp", "Port": 10053}`))
 			Expect(err).To(Succeed())
 			p = ip.(*tcp.TCPSocket)
+			p.Port = uint16(addr.Port)
 		})
 		When("failed to listen", func() {
 			BeforeEach(func() {

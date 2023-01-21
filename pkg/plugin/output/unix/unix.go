@@ -41,7 +41,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.Path == "" {
 		return nil, errors.New("missing parameter Path")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil))
+	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil), s.MaxRetry)
 	return s, nil
 }
 
@@ -54,7 +54,12 @@ type Unix struct {
 
 	Path string
 
-	w net.Conn
+	oc *types.OutputContext
+	w  net.Conn
+}
+
+func (f *Unix) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (f *Unix) NewConnect() (io.Writer, error) {

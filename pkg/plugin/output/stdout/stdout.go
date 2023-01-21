@@ -52,7 +52,7 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	default:
 		return nil, errors.New("Type is an invalid value")
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s)
+	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 	return s, nil
 }
 
@@ -73,7 +73,12 @@ type Stdout struct {
 	Type     OutputFormat
 	Template string
 
-	t *template.Template
+	t  *template.Template
+	oc *types.OutputContext
+}
+
+func (f *Stdout) SetOutputContext(oc *types.OutputContext) {
+	f.oc = oc
 }
 
 func (o *Stdout) Open() error {

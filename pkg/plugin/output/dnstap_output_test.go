@@ -44,6 +44,8 @@ type handler struct {
 	Msg      *types.DnstapMessage
 }
 
+func (h *handler) SetOutputContext(*types.OutputContext) {
+}
 func (h *handler) Open() error {
 	h.Opened = true
 	return h.ErrOpen
@@ -72,7 +74,7 @@ var _ = Describe("DnstapOutput", func() {
 			ctx, cancelFunc = context.WithCancel(context.Background())
 			wg = &sync.WaitGroup{}
 			h = &handler{}
-			out = output.NewDnstapOutput(h)
+			out = output.NewDnstapOutput(h, 0)
 			msg = testtool.CreateValidDnstapMessage()
 		})
 		Context("incoming message", func() {
@@ -80,7 +82,7 @@ var _ = Describe("DnstapOutput", func() {
 				buf.Write(msg)
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, buf)
+					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()
@@ -100,7 +102,7 @@ var _ = Describe("DnstapOutput", func() {
 			BeforeEach(func() {
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, buf)
+					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()
@@ -117,7 +119,7 @@ var _ = Describe("DnstapOutput", func() {
 				h.ErrOpen = errors.New("dummy")
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, buf)
+					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()
