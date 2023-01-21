@@ -80,7 +80,11 @@ func (o *DnstapOutput) Run(ctx context.Context, r types.Reader) error {
 		if retryDuration > MaxRetryDuration {
 			retryDuration = MaxRetryDuration
 		}
-		time.Sleep(retryDuration)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(retryDuration):
+		}
 		o.retryOpenCount++
 		return err
 	}
