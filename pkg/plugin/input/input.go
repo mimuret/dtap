@@ -113,7 +113,7 @@ func (i *InputServer) Serve(ln net.Listener, buf types.Writer) error {
 		go func(conn net.Conn) {
 			if err := i.Read(conn, buf); err != nil {
 				TotalDecordError.Inc()
-				i.ic.Logger.Warn("input error", zap.Error(err))
+				i.ic.Logger.Debug("input error", zap.Error(err))
 			}
 			i.connectionManager.remove(conn)
 			wg.Done()
