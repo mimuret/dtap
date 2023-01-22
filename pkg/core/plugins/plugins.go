@@ -34,6 +34,7 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/file"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/fluent"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/kafka"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/loki"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/metrics"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"

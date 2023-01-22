@@ -1,0 +1,23 @@
+{
+  "$id": "/pkg/plugin/output/loki/config-schema.json",
+  "title": "loki output plugin",
+  "type": "object",
+  "description": "see: https://grafana.com/docs/loki/latest/clients/promtail/configuration/#clients",
+  "required": [
+    "Name",
+    "URL"
+  ],
+  "properties": {
+    "Name": {
+      "const": "nats"
+    },
+    "URL": {
+      "description": "The `URL` is the promtail push API URL.",
+      "type": "string"
+    },
+    "MaxStream": {
+      "description": "The `MaxStream` is the number of promtail stream.",
+      "type": "integer"
+    }
+  }
+}
