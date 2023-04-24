@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as base
+FROM golang:1.20-alpine as base
 WORKDIR /build
 RUN apk --update --no-cache add git gcc musl-dev
 COPY go.mod .
