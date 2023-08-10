@@ -18,8 +18,10 @@ func init() {
 
 func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 	fp := &Mask{
-		MaskLen4: 22,
-		MaskLen6: 40,
+		MaskLen4:               22,
+		MaskLen6:               40,
+		QueryAddressEnabled:    true,
+		ResponseAddressEnabled: true,
 	}
 	if err := json.Unmarshal(raw, fp); err != nil {
 		return nil, err
@@ -40,10 +42,12 @@ var _ types.FilterPlugin = &Mask{}
 
 type Mask struct {
 	plugin.PluginCommon
-	MaskLen4 uint8
-	MaskLen6 uint8
-	mask4    net.IPMask
-	mask6    net.IPMask
+	MaskLen4               uint8
+	MaskLen6               uint8
+	QueryAddressEnabled    bool
+	ResponseAddressEnabled bool
+	mask4                  net.IPMask
+	mask6                  net.IPMask
 }
 
 func (f *Mask) Filter(t *types.DnstapMessage) *types.DnstapMessage {
@@ -52,17 +56,17 @@ func (f *Mask) Filter(t *types.DnstapMessage) *types.DnstapMessage {
 		return t
 	}
 	if *dt.Message.SocketFamily == dnstap.SocketFamily_INET {
-		if dt.Message.QueryAddress != nil {
+		if f.QueryAddressEnabled && dt.Message.QueryAddress != nil {
 			dt.Message.QueryAddress = []byte(net.IP(dt.Message.QueryAddress).Mask(f.mask4).To4())
 		}
-		if dt.Message.ResponseAddress != nil {
+		if f.ResponseAddressEnabled && dt.Message.ResponseAddress != nil {
 			dt.Message.ResponseAddress = []byte(net.IP(dt.Message.ResponseAddress).Mask(f.mask4).To4())
 		}
 	} else if *dt.Message.SocketFamily == dnstap.SocketFamily_INET6 {
-		if dt.Message.QueryAddress != nil {
+		if f.QueryAddressEnabled && dt.Message.QueryAddress != nil {
 			dt.Message.QueryAddress = []byte(net.IP(dt.Message.QueryAddress).Mask(f.mask6).To16())
 		}
-		if dt.Message.ResponseAddress != nil {
+		if f.ResponseAddressEnabled && dt.Message.ResponseAddress != nil {
 			dt.Message.ResponseAddress = []byte(net.IP(dt.Message.ResponseAddress).Mask(f.mask6).To16())
 		}
 	}

@@ -18,7 +18,10 @@ func init() {
 }
 
 func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
-	fp := &IPHash{}
+	fp := &IPHash{
+		QueryAddressEnabled:    true,
+		ResponseAddressEnabled: true,
+	}
 	if err := json.Unmarshal(raw, fp); err != nil {
 		return nil, err
 	}
@@ -32,7 +35,9 @@ var _ types.FilterPlugin = &IPHash{}
 
 type IPHash struct {
 	plugin.PluginCommon
-	Salt string
+	Salt                   string
+	QueryAddressEnabled    bool
+	ResponseAddressEnabled bool
 }
 
 func (f *IPHash) Filter(t *types.DnstapMessage) *types.DnstapMessage {
@@ -40,14 +45,14 @@ func (f *IPHash) Filter(t *types.DnstapMessage) *types.DnstapMessage {
 	if dt.Message == nil {
 		return t
 	}
-	if dt.Message.QueryAddress != nil {
+	if f.QueryAddressEnabled && dt.Message.QueryAddress != nil {
 		bs := make([]byte, 0, len([]byte(f.Salt))+16)
 		copy(bs, []byte(f.Salt))
 		bs = append(bs, net.IP(dt.Message.QueryAddress).To16()...)
 		h := sha256.Sum256(bs)
 		t.Labels["QueryAddressHash"] = hex.EncodeToString(h[:])
 	}
-	if dt.Message.ResponseAddress != nil {
+	if f.ResponseAddressEnabled && dt.Message.ResponseAddress != nil {
 		bs := make([]byte, 0, len([]byte(f.Salt))+16)
 		copy(bs, []byte(f.Salt))
 		bs = append(bs, net.IP(dt.Message.ResponseAddress).To16()...)

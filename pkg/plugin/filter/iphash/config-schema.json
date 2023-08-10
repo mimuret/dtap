@@ -14,6 +14,16 @@
     "Salt": {
       "description": "The `string` is the hash salt.",
       "type": "string"
+    },
+    "QueryAddressEnabled": {
+      "description": "Enable hash creation from QueryAddress.",
+      "type": "boolean",
+      "default": true
+    },
+    "ResponseAddressEnabled": {
+      "description": "Enable hash creation from ResponseAddress.",
+      "type": "boolean",
+      "default": true
     }
   }
 }
