@@ -25,6 +25,16 @@
       "default": 40,
       "minimum": 0,
       "maximum": 128
+    },
+    "QueryAddressEnabled": {
+      "description": "Enable mask QueryAddress.",
+      "type": "boolean",
+      "default": true
+    },
+    "ResponseAddressEnabled": {
+      "description": "Enable mask ResponseAddress.",
+      "type": "boolean",
+      "default": true
     }
   }
 }

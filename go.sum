@@ -594,8 +594,8 @@ github.com/miekg/dns v1.1.31/go.mod h1:KNUDUusw/aVsxyTYZM1oqvCicbwhgbNgztCETuNZ7
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=
 github.com/miekg/dns v1.1.50 h1:DQUfb9uc6smULcREF09Uc+/Gd46YWqJd5DbpPE9xkcA=
 github.com/miekg/dns v1.1.50/go.mod h1:e3IlAVfNqAllflbibAZEWOXOQ+Ynzk/dDozDxY7XnME=
-github.com/mimuret/dnsutils v1.8.0 h1:slGqI03iOTGKVRjxWDm5a1NrhUAf/dpum9y8kpXG1vU=
-github.com/mimuret/dnsutils v1.8.0/go.mod h1:s8qiWRBS/Sdo4UJQMRl4o10YQZ5upfo8C4w/011Ri6Y=
+github.com/mimuret/dnsutils v1.10.0 h1:A3U65D5JwEYbj/PGo3idmVA25ZxjRzM8P8ns0K6tR5E=
+github.com/mimuret/dnsutils v1.10.0/go.mod h1:s8qiWRBS/Sdo4UJQMRl4o10YQZ5upfo8C4w/011Ri6Y=
 github.com/mimuret/intcast v0.2.0 h1:7Q+atsopP6jyMc0C1EmDRErIFMj4SkAbaquu4/EAgIs=
 github.com/mimuret/intcast v0.2.0/go.mod h1:koRrnZ0xyfw29iT2VLw7GukZqdx07iewxqdND1kEI8s=
 github.com/minio/highwayhash v1.0.2 h1:Aak5U0nElisjDCfPSG79Tgzkn2gl66NxOMspRrKnA/g=

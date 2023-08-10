@@ -13,7 +13,7 @@ require (
 	github.com/grafana/loki v1.6.2-0.20230120172107-15b382294ed1
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.50
-	github.com/mimuret/dnsutils v1.8.0
+	github.com/mimuret/dnsutils v1.10.0
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats.go v1.16.0
 	github.com/onsi/ginkgo v1.16.5
