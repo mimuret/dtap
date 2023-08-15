@@ -7,7 +7,7 @@
 ## install
 
 ```
-go install github.com/mimuret/dtap@v2
+go install github.com/mimuret/dtap/v2@latest
 ```
 
 ## Configuration
