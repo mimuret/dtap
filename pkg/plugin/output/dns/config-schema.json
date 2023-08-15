@@ -1,5 +1,5 @@
 {
-  "$id": "/pkg/plugin/output/file/config-schema.json",
+  "$id": "/pkg/plugin/output/dns/config-schema.json",
   "title": "DNS output plugin",
   "type": "object",
   "required": [
@@ -12,7 +12,10 @@
     "Host": {
       "type": "string",
       "description": "The host and port of the DNS server to send logs to.",
-      "example": "192.178.0.1:53"
+      "examples": [
+        "192.168.0.1:53",
+        "[2001:db8::1]:53"
+      ]
     },
     "Timeout": {
       "type": "string",
@@ -37,7 +40,7 @@
           "default": "POST"
         },
         "TLS": {
-          "type": "bool",
+          "type": "boolean",
           "description": "Whether to use TLS or not.",
           "default": true
         }
