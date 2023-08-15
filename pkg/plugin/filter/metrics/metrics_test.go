@@ -16,7 +16,6 @@
 package metrics_test
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"net"
@@ -28,14 +27,12 @@ import (
 	"github.com/miekg/dns"
 	"github.com/mimuret/dnsutils/getter"
 	"github.com/mimuret/dnsutils/testtool"
-	"github.com/mimuret/dtap/v2/pkg/buffer"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
-	dtaptesttool "github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin/output/metrics"
+	"github.com/mimuret/dtap/v2/pkg/plugin/filter/metrics"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -65,7 +62,7 @@ var _ = Describe("output/metrics", func() {
 	})
 	Context("Setup", func() {
 		var (
-			op  types.OutputPlugin
+			op  types.FilterPlugin
 			err error
 		)
 		When("type mismatch", func() {
@@ -107,21 +104,16 @@ var _ = Describe("output/metrics", func() {
 	})
 	Context("Metrics", func() {
 		var (
-			msg        *dns.Msg
-			msgRaw     []byte
-			dt         *dnstap.Dnstap
-			dm         *types.DnstapMessage
-			raw        []byte
-			op         types.OutputPlugin
-			o          *metrics.Metrics
-			err        error
-			buf        types.Buffer
-			ctx        context.Context
-			cancelFunc context.CancelFunc
+			msg    *dns.Msg
+			msgRaw []byte
+			dt     *dnstap.Dnstap
+			dm     *types.DnstapMessage
+			raw    []byte
+			op     types.FilterPlugin
+			o      *metrics.Metrics
+			err    error
 		)
 		BeforeEach(func() {
-			ctx, cancelFunc = context.WithCancel(context.Background())
-			buf = buffer.NewRingBuffer(100, nil, nil)
 			msg = &dns.Msg{
 				MsgHdr: dns.MsgHdr{
 					Id:            0,
@@ -175,14 +167,7 @@ var _ = Describe("output/metrics", func() {
 				op, err = metrics.Setup(json.RawMessage(filterdJson))
 				Expect(err).To(Succeed())
 				o = op.(*metrics.Metrics)
-				buf.Write(dm)
-				go func() {
-					err := op.Start(ctx, dtaptesttool.NewTestOutputContext(buf))
-					Expect(err).To(Succeed())
-				}()
-			})
-			AfterEach(func() {
-				cancelFunc()
+				op.Filter(dm)
 			})
 			It("not count", func() {
 				Eventually(func() int64 {
