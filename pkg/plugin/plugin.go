@@ -48,7 +48,7 @@ func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
 		}
 		ip, err := registry.CreateInputPlugin(cc.Name, raw)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create Input plugin[%d]", i)
+			return errors.Wrapf(err, "failed to create input plugin, no %d, name is `%s`", i, cc.Name)
 		}
 		res = append(res, ip)
 	}
@@ -72,7 +72,7 @@ func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
 		}
 		op, err := registry.CreateOutputPlugin(cc.Name, raw)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create Output plugin[%d]", i)
+			return errors.Wrapf(err, "failed to create output plugin, no %d, name is `%s`", i, cc.Name)
 		}
 		res = append(res, op)
 	}
@@ -96,7 +96,7 @@ func (c *FilterPlugins) UnmarshalJSON(bs []byte) error {
 		}
 		fp, err := registry.CreateFilterPlugin(cc.Name, raw)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create Filter plugin[%d]", i)
+			return errors.Wrapf(err, "failed to create filter plugin, no %d, name is `%s`", i, cc.Name)
 		}
 		res = append(res, fp)
 	}

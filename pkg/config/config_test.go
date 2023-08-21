@@ -18,10 +18,14 @@ package config_test
 
 import (
 	_ "embed"
+	"encoding/json"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
+	"github.com/mimuret/dtap/v2/pkg/plugin"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/matcher"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/file"
+	"github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
+	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/afero"
@@ -86,6 +90,53 @@ var _ = Describe("config", func() {
 			It("returns Config", func() {
 				Expect(err).To(Succeed())
 				Expect(cfg).NotTo(BeNil())
+				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","Path":"/var/tmp/hoge"}`))
+				Expect(err).To(Succeed())
+				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+					"Op": "AND",
+					"Matchers": [
+						{
+							"Type": "DNS",
+							"Name": "qname",
+							"Arg": "www.example.jp"
+						}
+					]
+				}}`))
+				Expect(err).To(Succeed())
+				filter2, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+					"Op": "AND",
+					"Matchers": [
+						{
+							"Type": "DNS",
+							"Name": "qtype",
+							"Arg": "A"
+						}
+					]
+				}}`))
+				Expect(err).To(Succeed())
+				c := &config.Config{
+					InputFilterWorkerNum: 10,
+					LogLevel:             "trace",
+					MetricsListen:        ":19520",
+					InputBufferConfig: &config.BufferConfig{
+						Name: "input_common",
+						Size: 100,
+					},
+					Inputs:  plugin.InputPlugins{ip},
+					Filters: plugin.FilterPlugins{filter1},
+					OutputGroups: []config.OutputGroupConfig{
+						{
+							Name: "output-group-0",
+							BufferConfig: &config.BufferConfig{
+								Name: "output-group-0",
+								Size: 10000,
+							},
+							Filters: plugin.FilterPlugins{filter2},
+							Outputs: plugin.OutputPlugins{&nop.NOP{}},
+						},
+					},
+				}
+				Expect(cfg).To(Equal(c))
 			})
 		})
 	})
