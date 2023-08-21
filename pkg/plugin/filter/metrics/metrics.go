@@ -16,14 +16,12 @@
 package metrics
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/goccy/go-json"
 
 	"github.com/mimuret/dnsutils/getter"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
@@ -31,10 +29,10 @@ import (
 )
 
 func init() {
-	_ = registry.RegisterOutputPlugin("metrics", Setup)
+	_ = registry.RegisterFilterPlugin("metrics", Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
+func Setup(bs json.RawMessage) (types.FilterPlugin, error) {
 	s := &Metrics{}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
@@ -53,7 +51,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	return s, nil
 }
 
-var _ types.OutputPlugin = &Metrics{}
+var _ types.FilterPlugin = &Metrics{}
 
 type DnstapLabel struct {
 	Name      string
@@ -137,30 +135,14 @@ func (c *MetricsRule) GetLabels(dm *types.DnstapMessage) []string {
 type Metrics struct {
 	plugin.PluginCommon
 	Rules []*MetricsRule
-	oc    *types.OutputContext
 }
 
-func (f *Metrics) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (f *Metrics) Start(ctx context.Context, oc *types.OutputContext) error {
-	return output.NewDnstapOutput(f, 0).Start(ctx, oc)
-}
-
-func (f *Metrics) Open() error {
-	return nil
-}
-
-func (f *Metrics) Write(dm *types.DnstapMessage) error {
+func (f *Metrics) Filter(dm *types.DnstapMessage) *types.DnstapMessage {
 	for _, rule := range f.Rules {
 		if rule.Filters.Filter(dm) == nil {
 			continue
 		}
 		rule.counter.WithLabelValues(rule.GetLabels(dm)...).Inc()
 	}
-	return nil
-}
-
-func (o *Metrics) Close() {
+	return dm
 }

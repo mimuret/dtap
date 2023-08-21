@@ -21,6 +21,7 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/label"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/mask"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/matcher"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/metrics"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/nop"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
 
@@ -31,11 +32,11 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
 
 	// output
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/dns"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/file"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/fluent"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/kafka"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/loki"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/metrics"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/stdout"

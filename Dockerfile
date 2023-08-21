@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine as base
+FROM golang:1.21-alpine as base
 WORKDIR /build
 RUN apk --update --no-cache add git gcc musl-dev
 COPY go.mod .
@@ -10,7 +10,7 @@ WORKDIR /build
 COPY . .
 RUN go build
 
-FROM alpine:3.16
+FROM alpine:3.18
 
 COPY entrypoint.sh /
 COPY --from=builder /build/dtap /usr/bin/dtap

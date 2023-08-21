@@ -1,6 +1,6 @@
 {
-  "$id": "/pkg/plugin/output/metrics/config-schema.json",
-  "title": "metrics output plugin",
+  "$id": "/pkg/plugin/filter/metrics/config-schema.json",
+  "title": "metrics filter plugin",
   "type": "object",
   "required": [
     "Name",
