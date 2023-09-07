@@ -24,6 +24,8 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/spf13/afero"
 
+	gerrors "errors"
+
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 )
@@ -33,12 +35,12 @@ const DefaultOutputBufferSize = 10000
 const DefaultInputFilterWorkerNum = 1
 
 type BufferConfig struct {
-	name string
+	Name string
 	Size uint
 }
 
 func (c *BufferConfig) GetName() string {
-	return c.name
+	return c.Name
 }
 
 func (c *BufferConfig) GetSize() uint {
@@ -68,7 +70,7 @@ func NewConfig() *Config {
 		MetricsListen: ":9520",
 		LogLevel:      "info",
 		InputBufferConfig: &BufferConfig{
-			name: "input",
+			Name: "input",
 			Size: DefaultInputBufferSize,
 		},
 		InputFilterWorkerNum: DefaultInputFilterWorkerNum,
@@ -103,15 +105,53 @@ func LoadConfig(fs afero.Fs, cfgFile string) (*Config, error) {
 			og.Name = fmt.Sprintf("output-group-%d", i)
 		}
 		if _, exist := OutputGroupName[og.Name]; exist {
-			return nil, fmt.Errorf("missing parameter OutputGroups[%d].Name `%s` is already exist", i, og.Name)
+			return nil, fmt.Errorf("invalid parameter OutputGroups[%d].Name `%s` is already exist", i, og.Name)
 		}
 		if og.BufferConfig == nil {
 			og.BufferConfig = &BufferConfig{
 				Size: DefaultInputBufferSize,
 			}
 		}
-		og.BufferConfig.name = og.Name
+		og.BufferConfig.Name = og.Name
 		OutputGroupName[og.Name] = struct{}{}
 	}
 	return c, nil
+}
+
+func (c *Config) UnmarshalJSON(bs []byte) error {
+	cfg := struct {
+		InputFilterWorkerNum uint
+		LogLevel             string
+		MetricsListen        string
+		InputBufferConfig    *BufferConfig
+		Inputs               json.RawMessage
+		Filters              json.RawMessage
+		OutputGroups         []json.RawMessage
+	}{}
+
+	if err := json.Unmarshal(bs, &cfg); err != nil {
+		return errors.Wrap(err, "invalid json Input")
+	}
+	c.InputFilterWorkerNum = cfg.InputFilterWorkerNum
+	c.LogLevel = cfg.LogLevel
+	c.MetricsListen = cfg.MetricsListen
+	c.InputBufferConfig = cfg.InputBufferConfig
+
+	var results error
+
+	if err := json.Unmarshal(cfg.Inputs, &c.Inputs); err != nil {
+		results = gerrors.Join(results, errors.Wrap(err, "failed to create input plugins"))
+	}
+	if err := json.Unmarshal(cfg.Filters, &c.Filters); err != nil {
+		results = gerrors.Join(results, errors.Wrap(err, "failed to create global filter plugins"))
+	}
+	for i, v := range cfg.OutputGroups {
+		var og OutputGroupConfig
+		if err := json.Unmarshal(v, &og); err != nil {
+			results = gerrors.Join(results, errors.Wrapf(err, "failed to create output groups no %d", i))
+		}
+		c.OutputGroups = append(c.OutputGroups, og)
+	}
+
+	return results
 }

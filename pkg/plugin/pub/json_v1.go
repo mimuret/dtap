@@ -20,7 +20,7 @@ type JsonV1Publisher struct {
 	handler PublisherHandler
 	maxSize int
 
-	interval *intervalSec
+	intervalFlusher *intervalFlusher
 
 	writeSize  int
 	writeState writeState
@@ -30,15 +30,15 @@ type JsonV1Publisher struct {
 func NewJsonV1Publisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
 	buf := make([]byte, 0, maxSize)
 	return &JsonV1Publisher{
-		buf:      bytes.NewBuffer(buf),
-		handler:  handler,
-		maxSize:  maxSize,
-		interval: newIntervalSec(intervalSec),
+		buf:             bytes.NewBuffer(buf),
+		handler:         handler,
+		maxSize:         maxSize,
+		intervalFlusher: newIntervalFlusher(intervalSec),
 	}
 }
 
 func (f *JsonV1Publisher) Start() {
-	f.interval.Start(f)
+	f.intervalFlusher.Start(f)
 }
 
 func (f *JsonV1Publisher) reset() {
@@ -103,7 +103,7 @@ func (f *JsonV1Publisher) Publish() error {
 }
 
 func (f *JsonV1Publisher) Close() error {
-	f.interval.Close()
+	f.intervalFlusher.Close()
 	return f.Publish()
 }
 

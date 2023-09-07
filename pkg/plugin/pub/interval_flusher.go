@@ -2,23 +2,24 @@ package pub
 
 import "time"
 
-type intervalSec struct {
+type intervalFlusher struct {
 	sec     uint
 	stopCh  chan struct{}
 	closeCh chan struct{}
 }
 
-func newIntervalSec(sec uint) *intervalSec {
-	return &intervalSec{
+func newIntervalFlusher(sec uint) *intervalFlusher {
+	return &intervalFlusher{
 		sec:     sec,
 		stopCh:  make(chan struct{}),
 		closeCh: make(chan struct{}),
 	}
 }
 
-func (i *intervalSec) Start(p Publisher) {
+func (i *intervalFlusher) Start(p Publisher) {
 	go func() {
 		ticker := time.NewTicker(time.Duration(i.sec) * time.Second)
+		defer ticker.Stop()
 	LOOP:
 		for {
 			select {
@@ -28,11 +29,11 @@ func (i *intervalSec) Start(p Publisher) {
 				break LOOP
 			}
 		}
+		close(i.closeCh)
 	}()
-	close(i.closeCh)
 }
 
-func (i *intervalSec) Close() {
+func (i *intervalFlusher) Close() {
 	close(i.stopCh)
 	<-i.closeCh
 }
