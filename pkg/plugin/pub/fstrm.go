@@ -33,21 +33,21 @@ type FstrmPublisher struct {
 	maxSize     int
 	contentType []byte
 
-	interval   *intervalSec
-	marshaler  FstrmPublisherMarshaler
-	writer     *framestream.Writer
-	writeSize  int
-	writeState writeState
-	writeCount int
+	intervalFlusher *intervalFlusher
+	marshaler       FstrmPublisherMarshaler
+	writer          *framestream.Writer
+	writeSize       int
+	writeState      writeState
+	writeCount      int
 }
 
 func NewFstrmPublisher(maxSize int, intervalSec uint, handler PublisherHandler) *FstrmPublisher {
 	buf := make([]byte, 0, maxSize)
 	return &FstrmPublisher{
-		buf:      bytes.NewBuffer(buf),
-		handler:  handler,
-		maxSize:  maxSize,
-		interval: newIntervalSec(intervalSec),
+		buf:             bytes.NewBuffer(buf),
+		handler:         handler,
+		maxSize:         maxSize,
+		intervalFlusher: newIntervalFlusher(intervalSec),
 	}
 }
 
@@ -70,7 +70,7 @@ func NewFstrmDtapFramePublisher(maxSize int, intervalSec uint, handler Publisher
 }
 
 func (f *FstrmPublisher) Start() {
-	f.interval.Start(f)
+	f.intervalFlusher.Start(f)
 }
 
 func (f *FstrmPublisher) reset() {
@@ -149,8 +149,7 @@ func (f *FstrmPublisher) publish() error {
 }
 
 func (f *FstrmPublisher) Close() error {
-	f.interval.Close()
-	<-f.interval.closeCh
+	f.intervalFlusher.Close()
 	return f.Publish()
 }
 
