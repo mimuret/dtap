@@ -65,20 +65,8 @@ type Config struct {
 	OutputGroups         []OutputGroupConfig
 }
 
-func NewConfig() *Config {
-	return &Config{
-		MetricsListen: ":9520",
-		LogLevel:      "info",
-		InputBufferConfig: &BufferConfig{
-			Name: "input",
-			Size: DefaultInputBufferSize,
-		},
-		InputFilterWorkerNum: DefaultInputFilterWorkerNum,
-	}
-}
-
 func LoadConfig(fs afero.Fs, cfgFile string) (*Config, error) {
-	c := NewConfig()
+	c := &Config{}
 	bs, err := afero.ReadFile(fs, cfgFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open config file")
@@ -127,7 +115,15 @@ func (c *Config) UnmarshalJSON(bs []byte) error {
 		Inputs               json.RawMessage
 		Filters              json.RawMessage
 		OutputGroups         []json.RawMessage
-	}{}
+	}{
+		MetricsListen: ":9520",
+		LogLevel:      "info",
+		InputBufferConfig: &BufferConfig{
+			Name: "input",
+			Size: DefaultInputBufferSize,
+		},
+		InputFilterWorkerNum: DefaultInputFilterWorkerNum,
+	}
 
 	if err := json.Unmarshal(bs, &cfg); err != nil {
 		return errors.Wrap(err, "invalid json Input")
@@ -142,8 +138,10 @@ func (c *Config) UnmarshalJSON(bs []byte) error {
 	if err := json.Unmarshal(cfg.Inputs, &c.Inputs); err != nil {
 		results = gerrors.Join(results, errors.Wrap(err, "failed to create input plugins"))
 	}
-	if err := json.Unmarshal(cfg.Filters, &c.Filters); err != nil {
-		results = gerrors.Join(results, errors.Wrap(err, "failed to create global filter plugins"))
+	if cfg.Filters != nil {
+		if err := json.Unmarshal(cfg.Filters, &c.Filters); err != nil {
+			results = gerrors.Join(results, errors.Wrap(err, "failed to create global filter plugins"))
+		}
 	}
 	for i, v := range cfg.OutputGroups {
 		var og OutputGroupConfig
