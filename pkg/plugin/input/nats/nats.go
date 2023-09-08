@@ -143,7 +143,8 @@ func (f *Nats) Subscribe(ctx context.Context, w types.Writer) error {
 	defer func() {
 		_ = sub.Unsubscribe()
 	}()
-
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
 	f.ic.Logger.Info("start subscribe", zap.String("subject", f.Subject), zap.String("queue name", f.QueueName), zap.Int("queue len", f.QueueLen))
 LOOP:
 	for {
@@ -151,10 +152,15 @@ LOOP:
 		case <-ctx.Done():
 			break LOOP
 		case msg := <-ch:
-			buf := bytes.NewBuffer(msg.Data)
-			if err := is.Read(buf, w); err != nil {
-				return err
-			}
+			wg.Add(1)
+			go func(bs []byte) {
+				buf := bytes.NewBuffer(bs)
+				if err := is.Read(buf, w); err != nil {
+					input.TotalDecordError.Inc()
+					f.ic.Logger.Debug("input error", zap.Error(err))
+				}
+				wg.Done()
+			}(msg.Data)
 		}
 	}
 	return nil

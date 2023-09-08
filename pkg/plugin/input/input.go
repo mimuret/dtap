@@ -124,7 +124,7 @@ func (i *InputServer) Serve(ln net.Listener, buf types.Writer) error {
 func (i *InputServer) Read(r io.Reader, buf types.Writer) error {
 	decoder, err := framestream.NewDecoder(r, i.DecoderOptions)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create fstrm decoder")
 	}
 LOOP:
 	for {
