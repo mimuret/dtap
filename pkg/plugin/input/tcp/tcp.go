@@ -52,12 +52,16 @@ func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
 
 var _ types.InputPlugin = &TCPSocket{}
 
+// The TCPSocket plugin get messages from the tcp socket.
 type TCPSocket struct {
 	plugin.PluginCommon
 
+	// Listen Address. If not given, I will listen to any.
 	Address string
-	Port    uint16
-	Format  input.Format
+	// Listen port. Must not be empty.
+	Port uint16
+	// Message format
+	Format input.Format
 
 	ln net.Listener
 }

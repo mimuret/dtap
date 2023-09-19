@@ -56,12 +56,15 @@ func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
 
 var _ types.InputPlugin = &File{}
 
+// The file plugin enters the DNSTAP message only once from the file.
 type File struct {
 	plugin.PluginCommon
 
 	fs afero.Fs
 
-	Path   string
+	// File Path
+	Path string
+	// File format
 	Format input.Format
 }
 

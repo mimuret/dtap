@@ -13,7 +13,6 @@ go install github.com/mimuret/dtap/v2@latest
 ## Configuration
 
 - [JSON schema](./schemas/schema.json)
-- TBD
 
 ## design
 

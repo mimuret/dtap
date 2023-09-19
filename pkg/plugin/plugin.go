@@ -24,14 +24,18 @@ import (
 )
 
 type PluginCommon struct {
-	Name     string `json:"Name"`
-	MaxRetry uint   `json:"MaxRetry"`
+	// Plugin type name
+	Name string `json:"Name"`
+	// Maximum number of retries. A value of 0 means infinite.
+	MaxRetry uint `json:"MaxRetry"`
 }
 
 func (p *PluginCommon) GetName() string {
 	return p.Name
 }
 
+// Input plugin slices
+// If multiple Plugins are specified, they are started in order, but input processing is performed in parallel.
 type InputPlugins []types.InputPlugin
 
 func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
@@ -56,6 +60,9 @@ func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+// Output plugin slices
+// If multiple plugins are specified, they are started in sequence and output processing is performed in parallel.
+// In other words, a message is processed only by one of the plugins.
 type OutputPlugins []types.OutputPlugin
 
 func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
@@ -80,6 +87,8 @@ func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+// If multiple plugins are specified, they are filtered in sequence;
+// a single message is processed in series, not in parallel.
 type FilterPlugins []types.FilterPlugin
 
 func (c *FilterPlugins) UnmarshalJSON(bs []byte) error {

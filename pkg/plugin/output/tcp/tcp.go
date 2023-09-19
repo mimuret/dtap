@@ -52,10 +52,13 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 var _ types.OutputPlugin = &TCP{}
 var _ output.SocketOutput = &TCP{}
 
+// The TCP plugin outputs messages to the tcp server.
 type TCP struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
+	// TCP server hostname. Must not be empty.
 	Host string
+	// TCP server port number. Must not be empty.
 	Port uint16
 
 	w net.Conn

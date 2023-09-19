@@ -75,8 +75,10 @@ type KafkaClient interface {
 	Add(string, string, []byte, []byte) error
 }
 
+// The kafka plugin outputs messages to the kafka server.
 type Kafka struct {
 	plugin.PluginCommon
+	// kafka config
 	KafkaConfig KafkaConfig
 	*output.DnstapOutput
 
@@ -102,6 +104,7 @@ var (
 	OutputTypeAvero    OutputType = "avero"
 )
 
+// kafka config
 type KafkaConfig struct {
 	Hosts            []string
 	SchemaRegistries []string

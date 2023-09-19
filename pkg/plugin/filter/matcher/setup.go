@@ -30,10 +30,7 @@ func init() {
 
 func setup(data json.RawMessage) (types.FilterPlugin, error) {
 	g := &Matcher{}
-	t := struct {
-		plugin.PluginCommon
-		Rule umatcher.Config `json:"Rule"`
-	}{}
+	t := MatcherConfig{}
 	if err := json.Unmarshal(data, &t); err != nil {
 		return nil, err
 	}
@@ -42,23 +39,30 @@ func setup(data json.RawMessage) (types.FilterPlugin, error) {
 		return nil, err
 	}
 	g.PluginCommon = t.PluginCommon
-	g.Set = set
+	g.set = set
 
 	return g, nil
 }
 
 var _ types.FilterPlugin = &Matcher{}
 
+// The Matcher plugin filters DNSTAP messages using the Matcher function.
+type MatcherConfig struct {
+	plugin.PluginCommon
+	// Rule is match settings
+	// see https://pkg.go.dev/github.com/mimuret/dnsutils/matcher#Config
+	Rule umatcher.Config `json:"Rule"`
+}
+
 type Matcher struct {
 	plugin.PluginCommon
-
-	Set *umatcher.MatcherSet `json:"-"`
+	set *umatcher.MatcherSet `json:"-"`
 }
 
 func (f *Matcher) Filter(dt *types.DnstapMessage) *types.DnstapMessage {
 	dnstap := dt.GetDnstap()
 	dnsmsg := dt.GetMessage()
-	if f.Set.Match(dnstap, dnsmsg) {
+	if f.set.Match(dnstap, dnsmsg) {
 		return dt
 	}
 	return nil

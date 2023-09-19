@@ -35,7 +35,9 @@ const DefaultOutputBufferSize = 10000
 const DefaultInputFilterWorkerNum = 1
 
 type BufferConfig struct {
+	// Buffer name
 	Name string
+	// Buffer size
 	Size uint
 }
 
@@ -47,22 +49,58 @@ func (c *BufferConfig) GetSize() uint {
 	return c.Size
 }
 
+// An output group consists of a buffer (queue) for the output group,
+// Filter settings specific to the output group, and output plug-in settings.
+// When a message passes through the global filter and is written to the
+// output group's buffer, the global workers runs a filter for the output group.
+// Only messages that pass through it are written to the output group's Buffer.
+// Each output plugin runs in its own goroutine, receiving and processing
+// messages from the output buffer (queue).
+// Since output plug-ins are executed in parallel, a message is not processed
+// by all output plug-ins, but by one of them. If you want all plug-ins to process
+// a message at the same time, for example, standard output and file output, please separate the output groups.
+// The current use case for setting up multiple output plugins is to increase
+// throughput by setting up multiple plugins with the same configuration, for example, for forwarding to remote.
 type OutputGroupConfig struct {
-	Name         string
+	// Output group name
+	Name string
+	// Output group shared queue config
 	BufferConfig *BufferConfig
-	Filters      plugin.FilterPlugins
-	Outputs      plugin.OutputPlugins
+	// Filter settings for groups.
+	// After filtering, it is added to the output buffer.
+	Filters plugin.FilterPlugins
+	// Output plugin settings.
+	// A message is processed only by one of the plugins.
+	Outputs plugin.OutputPlugins
 }
 
+// Configuration file structure.
+// The configuration file must be in yaml or json format.
+// The file extension must be 'yaml' or 'yml' or 'json'.
 type Config struct {
-	// number of workers that moves msg from input buffer to output buffer with msg filtering.
+	// Number of global workers that process messages.
+	// Global workers input messages from global buffers,
+	// filter messages with global filters, and copy messages
+	// with filter words to output group buffers.
+	// default value is 1
 	InputFilterWorkerNum uint
-	LogLevel             string
-	MetricsListen        string
-	InputBufferConfig    *BufferConfig
-	Inputs               plugin.InputPlugins
-	Filters              plugin.FilterPlugins
-	OutputGroups         []OutputGroupConfig
+	// Output log level.
+	// Select one of 'debug', 'info', 'warn', 'error', or 'fatal'.
+	// default value is 'info'
+	LogLevel string
+	// Listen IP and port to output metrics
+	MetricsListen string
+	// Input buffer settings
+	InputBufferConfig *BufferConfig
+	// Input plugin settings. Must not be empty.
+	Inputs plugin.InputPlugins
+	// The global filters are the filter that is processed for all messages.
+	// It can be empty.
+	Filters plugin.FilterPlugins
+	// Output group settings. Must not be empty.
+	// If multiple output groups are specified, messages that pass through
+	// the Global Filter are copied to all output groups.
+	OutputGroups []OutputGroupConfig
 }
 
 func LoadConfig(fs afero.Fs, cfgFile string) (*Config, error) {

@@ -72,6 +72,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 var _ output.OutputHandler = &Loki{}
 var _ types.OutputPlugin = &Loki{}
 
+// The loki plugin outputs messages to the loki server.
 type Loki struct {
 	plugin.PluginCommon
 	sync.Mutex

@@ -84,14 +84,19 @@ var (
 
 var _ types.OutputPlugin = &DNS{}
 
+// This is an experimental implementation.
+// The DNS plugin sends the same question as
+// the message to the DNS server.
 type DNS struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
 
-	// config
-	Host     string
+	// target DNS server
+	Host string
+	// Transport Protocol
 	Protocol DNSProtocol
-	Timeout  time.Duration
+	// Timeout setting (duration)
+	Timeout time.Duration
 
 	cl *dig.Dig
 	oc *types.OutputContext

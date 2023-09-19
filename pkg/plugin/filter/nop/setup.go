@@ -18,6 +18,7 @@ func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 
 var _ types.FilterPlugin = &Nop{}
 
+// No operation for debugs
 type Nop struct {
 	plugin.PluginCommon
 }

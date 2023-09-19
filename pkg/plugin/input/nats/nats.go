@@ -30,7 +30,6 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/types"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/input"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/nats-io/nats.go"
 )
@@ -70,24 +69,30 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 
 var _ types.InputPlugin = &Nats{}
 
+// The nats plugin retrieves messages from the nats server.
 type Nats struct {
 	plugin.PluginCommon
 	sync.Mutex
 
-	*output.DnstapOutput
-
 	ic *types.InputContext
 
-	// config
-	Hosts     []string
-	Subject   string
+	// Hosts is the URL of the nats servers. Must not be empty.
+	Hosts []string
+	// Nats subject. Must not be empty.
+	Subject string
+	// Nats queue name.
 	QueueName string
-	QueueLen  int
+	// QueueLen is nats subscriber queue length.
+	QueueLen int
 
-	User     string
+	// Nats user, If a token is given, it is not used.
+	User string
+	// Nats password, If a token is given, it is not used.
 	Password string
-	Token    string
+	// Nats token
+	Token string
 
+	// Nats message format
 	Format input.Format
 }
 

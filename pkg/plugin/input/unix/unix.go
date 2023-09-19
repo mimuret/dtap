@@ -71,11 +71,15 @@ func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 
 var _ types.InputPlugin = &UnixSocket{}
 
+// The UnixSocket plugin get messages from the unix socket.
 type UnixSocket struct {
 	plugin.PluginCommon
 
-	Path   string
-	User   string
+	// Socket path
+	Path string
+	// Socket owner
+	User string
+	// message format
 	Format input.Format
 
 	ln  net.Listener

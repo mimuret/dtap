@@ -72,26 +72,39 @@ var _ output.OutputHandler = &Nats{}
 var _ types.OutputPlugin = &Nats{}
 var _ pub.PublisherHandler = &Nats{}
 
+// The nats plugin outputs messages to the nats server.
+// DTAPFrame or DNSTAP messages are taken from the Output
+// Buffer and pushed together to the nats server.
+// The timing of the push is when the size of the nats
+// message is exceeded or when the number of seconds specified
+// by IntervalSec elapses.
 type Nats struct {
 	plugin.PluginCommon
 	sync.Mutex
 
 	*output.DnstapOutput
 
-	// config
-	Hosts   []string
+	// Hosts is the URL of the nats servers. Must not be empty.
+	Hosts []string
+	// Nats subject. Must not be empty.
 	Subject string
 
-	User     string
+	// Nats user, If a token is given, it is not used.
+	User string
+	// Nats password, If a token is given, it is not used.
 	Password string
-	Token    string
+	// Nats token
+	Token string
 
 	conn *nats.Conn
 
-	MaxSize     int
+	// Max nats message size. Default is 1KByte.
+	MaxSize int
+	// Interval to flush nats messages.
 	IntervalSec uint
-	Format      pub.Format
-	publisher   pub.Publisher
+	// Nats message format.
+	Format    pub.Format
+	publisher pub.Publisher
 
 	oc *types.OutputContext
 }

@@ -59,19 +59,19 @@ var _ = Describe("Static", func() {
 				staticDnsFalse, _ := matcher.NewMatchDNSMsgStatic(false)
 				staticDnsTrue, _ := matcher.NewMatchDNSMsgStatic(true)
 				Expect(err).To(Succeed())
-				Expect(fp).To(Equal(&pmatcher.Matcher{
+				Expect(fp).To(Equal(pmatcher.UpdateSet(&pmatcher.Matcher{
 					PluginCommon: plugin.PluginCommon{Name: "matcher"},
-					Set: &matcher.MatcherSet{
-						Op:             matcher.SetOpOR,
-						DnstapMatchers: []matcher.DnstapMatcher{staticDnstapFalse},
-						DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse},
-						SubSets: []*matcher.MatcherSet{
-							{
-								Op:             matcher.SetOpOR,
-								DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse, staticDnsTrue},
-							},
+				}, &matcher.MatcherSet{
+					Op:             matcher.SetOpOR,
+					DnstapMatchers: []matcher.DnstapMatcher{staticDnstapFalse},
+					DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse},
+					SubSets: []*matcher.MatcherSet{
+						{
+							Op:             matcher.SetOpOR,
+							DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse, staticDnsTrue},
 						},
-					}}))
+					},
+				})))
 			})
 		})
 	})
@@ -85,12 +85,11 @@ var _ = Describe("Static", func() {
 		BeforeEach(func() {
 			staticDnstapTrue, _ = matcher.NewMatchDnstapStatic(true)
 			staticDnsTrue, _ = matcher.NewMatchDNSMsgStatic(true)
-			fp = &pmatcher.Matcher{
-				Set: &matcher.MatcherSet{
-					Op:             matcher.SetOpAND,
-					DnstapMatchers: []matcher.DnstapMatcher{staticDnstapTrue},
-				},
-			}
+			fp = pmatcher.UpdateSet(&pmatcher.Matcher{}, &matcher.MatcherSet{
+				Op:             matcher.SetOpAND,
+				DnstapMatchers: []matcher.DnstapMatcher{staticDnstapTrue},
+			},
+			)
 		})
 		When("valid dns message", func() {
 			BeforeEach(func() {
@@ -114,7 +113,9 @@ var _ = Describe("Static", func() {
 			When("match rule", func() {
 				BeforeEach(func() {
 					m, _ := matcher.NewMatchDNSMsgQueryName("www.example.jp.")
-					fp.Set.DnsMsgMatchers = append(fp.Set.DnsMsgMatchers, staticDnsTrue, m)
+					fpSet := pmatcher.GetSet(fp)
+					fpSet.DnsMsgMatchers = append(fpSet.DnsMsgMatchers, staticDnsTrue, m)
+					pmatcher.UpdateSet(fp, fpSet)
 					dm2 = fp.Filter(dm1)
 				})
 				It("through", func() {
@@ -124,7 +125,9 @@ var _ = Describe("Static", func() {
 			When("not match rule", func() {
 				BeforeEach(func() {
 					m, _ := matcher.NewMatchDNSMsgQueryName("www.example.com")
-					fp.Set.DnsMsgMatchers = append(fp.Set.DnsMsgMatchers, staticDnsTrue, m)
+					fpSet := pmatcher.GetSet(fp)
+					fpSet.DnsMsgMatchers = append(fpSet.DnsMsgMatchers, staticDnsTrue, m)
+					pmatcher.UpdateSet(fp, fpSet)
 					dm2 = fp.Filter(dm1)
 				})
 				It("filterd", func() {
