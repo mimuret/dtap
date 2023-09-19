@@ -53,13 +53,22 @@ func Setup(bs json.RawMessage) (types.FilterPlugin, error) {
 
 var _ types.FilterPlugin = &Metrics{}
 
+// Specify if you want to get Prometheus
+// label values from DNSTAP messages.
 type DnstapLabel struct {
-	Name      string
+	// Label name
+	Name string
+	// getter func name
+	// You can see getter names https://pkg.go.dev/github.com/mimuret/dnsutils/getter#DnstapGetterName.
 	Attribute getter.DnstapGetterName
 }
 
+// Specify if you want to get Prometheus
+// label values from DNS messages.
 type DnsMsgLabel struct {
-	Name      string
+	// Label name
+	Name string
+	// You can see getter names https://pkg.go.dev/github.com/mimuret/dnsutils/getter#DnsMsgGetterName.
 	Attribute getter.DnsMsgGetterName
 }
 
@@ -68,11 +77,23 @@ type runLabel struct {
 	getFunc types.DnstapMessageGetFunc
 }
 
+// The Metrics plugin generates metrics.
+// The generated metrics are output at the
+// same time as the dtap metrics.
 type MetricsRule struct {
-	Filters      plugin.FilterPlugins
+	// Use the filter setting if there are messages
+	// you want to exclude before calculating the
+	// metrics.
+	Filters plugin.FilterPlugins
+	// Specify if you want to get Prometheus
+	// label values from DNSTAP messages.
 	DnstapLabels []DnstapLabel
+	// Specify if you want to get Prometheus
+	// label values from DNS messages.
 	DnsMsgLabels []DnsMsgLabel
-	CounterOps   prometheus.CounterOpts
+	// prometheus.CounterOpts
+	// Set metrics name, constLabel, etc.
+	CounterOps prometheus.CounterOpts
 
 	runLabel []runLabel
 	labels   []string

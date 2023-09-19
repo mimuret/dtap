@@ -47,8 +47,15 @@ const (
 )
 
 type AddLabel struct {
-	Name   string
-	Type   AddLabelType
+	// Label key name for adding or updating. It must not be empty.
+	Name string
+	// Type can be one of `DNSTAP`, `DNS`, or `STATIC`.
+	Type AddLabelType
+	// If `Type` is `DNSTAP`, the function name of DNSTAP of the getter function is set to value, and the value of DNSTAP message can be written in the label.
+	// You can see getter names https://pkg.go.dev/github.com/mimuret/dnsutils/getter#DnstapGetterName.
+	// If `Type` is `DNS`, the function name of the DNS message of the getter function is set to value, and the value of the DNS message can be written into the label.
+	// You can see getter names https://pkg.go.dev/github.com/mimuret/dnsutils/getter#DnsMsgGetterName.
+	// If the Type is `STATIC`, the string of the value is written directly into the label.
 	Value  string
 	getter types.DnstapMessageGetFunc
 }
@@ -86,7 +93,9 @@ func (l *AddLabel) Setup() error {
 	return nil
 }
 
+// Delete Label
 type DelLabel struct {
+	// Label key name for deleting. It must not be empty.
 	Name string
 }
 
@@ -97,9 +106,12 @@ func (l *DelLabel) Validate() error {
 	return nil
 }
 
+// The label plugin edits labels.
 type Label struct {
 	plugin.PluginCommon
+	// Adding and updating labels
 	Add []*AddLabel
+	// Deleting labels
 	Del []*DelLabel
 }
 

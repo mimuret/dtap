@@ -40,11 +40,16 @@ func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 
 var _ types.FilterPlugin = &Mask{}
 
+// Mask plug-ins mask IP addresses.
 type Mask struct {
 	plugin.PluginCommon
-	MaskLen4               uint8
-	MaskLen6               uint8
-	QueryAddressEnabled    bool
+	// PrefixLength value to mask ipv4 address. default is 22.
+	MaskLen4 uint8
+	// PrefixLength value to mask ipv6 address. default is 40.
+	MaskLen6 uint8
+	// If QueryAddressEnabled is true, mask QueryAddress. defaut is true
+	QueryAddressEnabled bool
+	// If ResponseAddressEnabled is true, mask ResponseAddress. defaut is true
 	ResponseAddressEnabled bool
 	mask4                  net.IPMask
 	mask6                  net.IPMask

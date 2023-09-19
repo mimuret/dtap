@@ -23,6 +23,7 @@ func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 
 var _ types.FilterPlugin = &Static{}
 
+// Static plugin for debug
 type Static struct {
 	plugin.PluginCommon
 	Deny bool `json:"Deny"`

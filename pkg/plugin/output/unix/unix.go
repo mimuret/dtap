@@ -48,10 +48,12 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 var _ types.OutputPlugin = &Unix{}
 var _ output.SocketOutput = &Unix{}
 
+// The unix plugin outputs messages to unix socket.
 type Unix struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
 
+	// unix socket path
 	Path string
 
 	oc *types.OutputContext

@@ -65,13 +65,20 @@ var (
 
 var _ types.OutputPlugin = &Output{}
 
+// This is an experimental implementation.
+// The file plug-in outputs the message to a file.
 type Output struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
 
-	// config
-	Logger   *lumberjack.Logger
-	Format   OutputFormat
+	// File output config
+	// see https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2#Logger
+	Logger *lumberjack.Logger
+
+	// File format
+	Format OutputFormat
+
+	// Line go template for format type 'go-template"
 	Template string
 
 	t  *template.Template

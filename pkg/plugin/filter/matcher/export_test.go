@@ -13,41 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package nop
+package matcher
 
 import (
-	"context"
-
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	umatcher "github.com/mimuret/dnsutils/matcher"
 )
 
-func init() {
-	_ = registry.RegisterOutputPlugin("nop", Setup)
+func UpdateSet(f *Matcher, set *umatcher.MatcherSet) *Matcher {
+	f.set = set
+	return f
 }
-
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	return &NOP{}, nil
-}
-
-var _ types.OutputPlugin = &NOP{}
-
-// NOP does nothing.
-type NOP struct {
-	plugin.PluginCommon
-}
-
-func (f *NOP) Start(ctx context.Context, oc *types.OutputContext) error {
-LOOP:
-	for {
-		select {
-		case <-ctx.Done():
-			break LOOP
-		case <-oc.Reader.Read():
-		}
-	}
-	return nil
+func GetSet(f *Matcher) *umatcher.MatcherSet {
+	return f.set
 }

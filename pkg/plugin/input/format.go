@@ -9,6 +9,10 @@ import (
 
 const DefaultFormat = "DNSTAP"
 
+// The file format can be either "DNSTAP" or "DTAPFrame".
+// "DNSTAP" is the normal DNSTAP format.
+// "DTAPFrame" is a DNSTAP format with a label added.
+// For details, https://github.com/mimuret/dtap/blob/v2/proto/dtap_frame.proto.
 type Format string
 
 var (

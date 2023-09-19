@@ -42,13 +42,16 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 
 var _ types.OutputPlugin = &Fluent{}
 
+// The fluent plugin outputs messages to the fluent server.
 type Fluent struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
 
-	// Coonfig
+	// fluent server config
+	// see https://pkg.go.dev/github.com/fluent/fluent-logger-golang/fluent#Config
 	FluentConfig fluent.Config
-	Tag          string
+	// fluent tag value
+	Tag string
 
 	// fluent
 	client *fluent.Fluent

@@ -33,10 +33,15 @@ func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 
 var _ types.FilterPlugin = &IPHash{}
 
+// The IPHash plugin creates QueryAddressHash and ResponseAddressHash labels from query and response addresses.
+
 type IPHash struct {
 	plugin.PluginCommon
-	Salt                   string
-	QueryAddressEnabled    bool
+	// salt for creating hash
+	Salt string
+	// If QueryAddressEnabled is true, create a QueryAddressHash label. Default is true.
+	QueryAddressEnabled bool
+	// If ResponseAddressEnabled is true, create a ResponseAddressHash label. Default is true.
 	ResponseAddressEnabled bool
 }
 

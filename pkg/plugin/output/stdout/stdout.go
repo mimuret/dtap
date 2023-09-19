@@ -65,12 +65,15 @@ var (
 
 var _ types.OutputPlugin = &Stdout{}
 
+// The stdout plugin ouput the message to stdout.
 type Stdout struct {
 	plugin.PluginCommon
 	*output.DnstapOutput
 
-	// config
-	Type     OutputFormat
+	// output format type
+	Type OutputFormat
+
+	// Line go template for format type 'go-template"
 	Template string
 
 	t  *template.Template
