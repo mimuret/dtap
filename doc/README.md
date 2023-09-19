@@ -3,7 +3,7 @@
 
 ## Configuration file
 
-- [see godoc](https://pkg.go.dev/github.com/mimuret/dtap/v2@v2.0.0-alpha.18/pkg/config#Config)
+- [see godoc](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/config#Config)
 
 
 ## filter_plugin
@@ -39,6 +39,5 @@
 - [dns](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/dns#DNS)
 - [fluent](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/fluent#Fluent)
 - [kafka](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/kafka#Kafka)
-- [loki](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/loki#Loki)
 - [loki](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/loki#Loki)
 - [nop](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/nop#NOP)
