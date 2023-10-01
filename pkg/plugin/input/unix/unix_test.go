@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/goccy/go-json"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -35,9 +36,12 @@ var _ = Describe("input/unix", func() {
 			err  error
 			p    types.InputPlugin
 		)
+		BeforeEach(func() {
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
+		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix"}`))
+				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix", "ID": "id1"}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -47,7 +51,7 @@ var _ = Describe("input/unix", func() {
 		})
 		When("Path is not string", func() {
 			BeforeEach(func() {
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix","Path": 0}`))
+				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix", "ID": "id2", "Path": 0}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -59,7 +63,7 @@ var _ = Describe("input/unix", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","Path":"` + path + `","User":"missing"}`))
+				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id3","Path":"` + path + `","User":"missing"}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -71,7 +75,7 @@ var _ = Describe("input/unix", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","Path":"` + path + `"}`))
+				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id4","Path":"` + path + `"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -84,7 +88,7 @@ var _ = Describe("input/unix", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","Path":"` + path + `","User":"root"}`))
+				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id5","Path":"` + path + `","User":"root"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -104,11 +108,13 @@ var _ = Describe("input/unix", func() {
 		BeforeEach(func() {
 			path, err = nettest.LocalPath()
 			Expect(err).To(Succeed())
-			ip, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","Path":"` + path + `"}`))
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
+			ip, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id6","Path":"` + path + `"}`))
 			p = ip.(*unix.UnixSocket)
 
 			path, err = nettest.LocalPath()
 			Expect(err).To(Succeed())
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 		})
 		When("failed to listen", func() {
 			BeforeEach(func() {

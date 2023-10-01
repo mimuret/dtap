@@ -21,14 +21,21 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/buffer"
+	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input"
 	"github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/nettest"
 	"google.golang.org/protobuf/proto"
 )
+
+type dummyPlugin struct {
+	plugin.PluginCommon
+	input.FormatMeta
+}
 
 type counter struct {
 	I int
@@ -45,15 +52,23 @@ var _ = Describe("InputServer", func() {
 			ln     net.Listener
 			srv    *input.InputServer
 			buf    types.Writer
+			dp     *dummyPlugin
 		)
 		BeforeEach(func() {
-			srv = input.NewInputServer(input.FormatDNSTAP, nil, testtool.NewTestInputContext(nil))
+			dp = &dummyPlugin{
+				PluginCommon: plugin.PluginCommon{
+					ID: "id1",
+				},
+				FormatMeta: input.FormatMeta{Format: input.FormatDNSTAP},
+			}
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
+			srv = input.NewInputServer(dp, nil)
 			srvErr = nil
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
 			ln, srvErr = nettest.NewLocalListener("unix")
 			Expect(srvErr).To(Succeed())
 			go func() {
-				srvErr = srv.Serve(ln, buf)
+				srvErr = srv.Serve(dp, ln, buf, testtool.NewTestInputContext(nil))
 			}()
 		})
 		When("write message", func() {
@@ -80,12 +95,18 @@ var _ = Describe("InputServer", func() {
 			buf     types.Buffer
 		)
 		BeforeEach(func() {
-			srv = input.NewInputServer(input.FormatDNSTAP, nil, testtool.NewTestInputContext(nil))
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
+			srv = input.NewInputServer(&dummyPlugin{
+				PluginCommon: plugin.PluginCommon{
+					ID: "id1",
+				},
+				FormatMeta: input.FormatMeta{Format: input.FormatDNSTAP},
+			}, nil)
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
 			connOut, connIn = net.Pipe()
 			srvErr = nil
 			go func() {
-				srvErr = srv.Read(connOut, buf)
+				srvErr = srv.Read(connOut, buf, testtool.NewTestInputContext(nil))
 			}()
 		})
 		AfterEach(func() {

@@ -39,7 +39,7 @@ func (p *PluginCommon) GetName() string {
 }
 
 func (p *PluginCommon) GetID() string {
-	return p.Name
+	return p.ID
 }
 
 var (

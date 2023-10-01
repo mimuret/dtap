@@ -38,7 +38,9 @@ func init() {
 func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	var err error
 	p := &UnixSocket{
-		Format: input.FormatDNSTAP,
+		FormatMeta: input.FormatMeta{
+			Format: input.FormatDNSTAP,
+		},
 	}
 
 	if err = json.Unmarshal(bs, p); err != nil {
@@ -63,7 +65,8 @@ func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 		p.uid = &uid
 		p.gid = &gid
 	}
-	if input.NewInputServer(p.Format, nil, nil) == nil {
+	p.is = input.NewInputServer(p, nil)
+	if p.is == nil {
 		return nil, errors.Errorf("invalid format")
 	}
 	return p, nil
@@ -71,20 +74,25 @@ func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
 
 var _ types.InputPlugin = &UnixSocket{}
 
+var _ input.PluginWithFormat = &UnixSocket{}
+
 // The UnixSocket plugin get messages from the unix socket.
 type UnixSocket struct {
 	plugin.PluginCommon
+
+	// message format
+	input.FormatMeta
 
 	// Socket path
 	Path string
 	// Socket owner
 	User string
-	// message format
-	Format input.Format
 
 	ln  net.Listener
 	uid *int
 	gid *int
+
+	is *input.InputServer
 }
 
 func (p *UnixSocket) Listen() error {
@@ -114,5 +122,5 @@ func (p *UnixSocket) Start(ctx context.Context, ic *types.InputContext) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(p.Format, nil, ic).Serve(p.ln, ic.Writer)
+	return p.is.Serve(p, p.ln, ic.Writer, ic)
 }

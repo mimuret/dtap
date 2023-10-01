@@ -28,6 +28,7 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/afero"
 )
 
@@ -67,6 +68,7 @@ var _ = Describe("config", func() {
 		})
 		When("file not exist", func() {
 			BeforeEach(func() {
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				cfg, err = config.LoadConfig(fs, "/not-exist.yaml")
 			})
 			It("returns err", func() {
@@ -76,6 +78,7 @@ var _ = Describe("config", func() {
 		})
 		When("file type is not yaml and json", func() {
 			BeforeEach(func() {
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				cfg, err = config.LoadConfig(fs, "/invalid.cfg")
 			})
 			It("returns err", func() {
@@ -85,11 +88,13 @@ var _ = Describe("config", func() {
 		})
 		When("valid YAML config", func() {
 			BeforeEach(func() {
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				cfg, err = config.LoadConfig(fs, "/valid-yaml.yaml")
 			})
 			It("returns Config", func() {
 				Expect(err).To(Succeed())
 				Expect(cfg).NotTo(BeNil())
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","ID":"input_file_1","Path":"/var/tmp/hoge"}`))
 				Expect(err).To(Succeed())
 				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","ID":"filter_matcher_1","Rule": {
@@ -136,7 +141,18 @@ var _ = Describe("config", func() {
 						},
 					},
 				}
-				Expect(cfg).To(Equal(c))
+				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
+				Expect(cfg.InputFilterWorkerNum).To(Equal(c.InputFilterWorkerNum))
+				Expect(cfg.LogLevel).To(Equal(c.LogLevel))
+				Expect(cfg.MetricsListen).To(Equal(c.MetricsListen))
+				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
+				Expect(len(cfg.Filters)).To(Equal(len(c.Filters)))
+				Expect(len(cfg.Inputs)).To(Equal(len(c.Inputs)))
+				Expect(len(cfg.OutputGroups)).To(Equal(len(c.OutputGroups)))
+				for i := range cfg.OutputGroups {
+					Expect(len(cfg.OutputGroups[i].Filters)).To(Equal(len(c.OutputGroups[i].Filters)))
+					Expect(len(cfg.OutputGroups[i].Outputs)).To(Equal(len(c.OutputGroups[i].Filters)))
+				}
 			})
 		})
 	})

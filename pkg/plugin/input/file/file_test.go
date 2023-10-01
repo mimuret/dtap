@@ -20,6 +20,7 @@ import (
 	_ "embed"
 
 	"github.com/goccy/go-json"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/file"
@@ -29,12 +30,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/spf13/afero"
 )
-
-//go:embed testfile/path-empty.json
-var pathEmptyConfig []byte
-
-//go:embed testfile/valid-config.json
-var validConfig []byte
 
 //go:embed testfile/dummy.data
 var dummyData []byte
@@ -50,7 +45,8 @@ var _ = Describe("input/file", func() {
 		)
 		When("invalid json", func() {
 			BeforeEach(func() {
-				p, err = file.SetupFile(json.RawMessage(`{"Name": 100}`))
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
+				p, err = file.SetupFile(json.RawMessage(`{"Name":100,"ID":"id1"}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -60,7 +56,8 @@ var _ = Describe("input/file", func() {
 		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
-				p, err = file.SetupFile(pathEmptyConfig)
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
+				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id2"}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -70,7 +67,8 @@ var _ = Describe("input/file", func() {
 		})
 		When("vaild config", func() {
 			BeforeEach(func() {
-				p, err = file.SetupFile(validConfig)
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
+				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id3","Path":"/var/tmp/dump.fstrm"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -92,7 +90,8 @@ var _ = Describe("input/file", func() {
 			buf = buffer.NewRingBuffer(10, nil, nil)
 			ic = testtool.NewTestInputContext(buf)
 			fs = afero.NewMemMapFs()
-			p, err = file.SetupFile(validConfig)
+			prometheus.DefaultRegisterer = prometheus.NewRegistry()
+			p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id4","Path":"/var/tmp/dump.fstrm"}`))
 			Expect(err).To(Succeed())
 			fp = p.(*file.File)
 			file.SetFS(fp, fs)
@@ -127,6 +126,7 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(validData)
 				Expect(err).To(Succeed())
 				f.Close()
+				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				err = fp.Start(context.TODO(), ic)
 			})
 			It("returns error", func() {

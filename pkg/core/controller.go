@@ -25,10 +25,10 @@ import (
 
 	"github.com/mimuret/dtap/v2/pkg/config"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
@@ -36,12 +36,16 @@ import (
 
 var (
 	TotalGlobalFilteredFrame = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "dtap_global_filtered_total",
-		Help: "The total number of global filtered frames",
+		Namespace: "dtap",
+		Subsystem: "global",
+		Name:      "filtered_total",
+		Help:      "The total number of global filtered frames",
 	})
 	TotalOGFilteredFrame = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "dtap_output_group_filtered_total",
-		Help: "The total number of output group filtered frames",
+		Namespace: "dtap",
+		Subsystem: "output",
+		Name:      "filtered_total",
+		Help:      "The total number of output group filtered frames",
 	}, []string{"og"})
 )
 
