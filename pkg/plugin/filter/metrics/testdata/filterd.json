@@ -1,10 +1,12 @@
 {
   "Name": "metrics",
+  "ID": "filter_match_1",
   "Rules": [
     {
       "Filters" : [
         {
           "Name": "static",
+          "ID": "filter_match_1_filter_static_1",
           "Deny": false
         }
       ],
@@ -18,6 +20,7 @@
       "Filters" : [
         {
           "Name": "static",
+          "ID": "filter_match_1_filter_static_2",
           "Deny": true
         }
       ],

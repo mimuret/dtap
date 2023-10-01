@@ -6,9 +6,11 @@ InputBufferConfig:
   Size: 100
 Inputs:
   - Name: "file"
+    ID: "input_file_1"
     Path: "/var/tmp/hoge"
 Filters:
   - Name: "matcher"
+    ID: "filter_matcher_1"
     Rule:
       Op: "AND"
       Matchers:
@@ -18,6 +20,7 @@ Filters:
 OutputGroups:
   - Filters:
       - Name: "matcher"
+        ID: "og1_filter_matcher_1"
         Rule:
           op: "AND"
           Matchers:
@@ -26,3 +29,4 @@ OutputGroups:
               Arg: "A"
     Outputs:
       - Name: "nop"
+        ID: "og1_nop_1"

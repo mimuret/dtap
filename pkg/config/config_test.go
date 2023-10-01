@@ -90,9 +90,9 @@ var _ = Describe("config", func() {
 			It("returns Config", func() {
 				Expect(err).To(Succeed())
 				Expect(cfg).NotTo(BeNil())
-				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","Path":"/var/tmp/hoge"}`))
+				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","ID":"input_file_1","Path":"/var/tmp/hoge"}`))
 				Expect(err).To(Succeed())
-				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","ID":"filter_matcher_1","Rule": {
 					"Op": "AND",
 					"Matchers": [
 						{
@@ -103,7 +103,7 @@ var _ = Describe("config", func() {
 					]
 				}}`))
 				Expect(err).To(Succeed())
-				filter2, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+				filter2, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","ID":"og1_filter_matcher_1","Rule": {
 					"Op": "AND",
 					"Matchers": [
 						{
