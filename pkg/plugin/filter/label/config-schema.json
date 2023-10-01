@@ -5,12 +5,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Type",
     "Value"
   ],
   "properties": {
     "Name": {
       "const": "label"
+    },
+    "ID": {
+      "type": "string"
     },
     "Type": {
       "type": "string",

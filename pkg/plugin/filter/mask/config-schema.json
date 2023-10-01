@@ -5,12 +5,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "MaskLen4",
     "MaskLen6"
   ],
   "properties": {
     "Name": {
       "const": "mask"
+    },
+    "ID": {
+      "type": "string"
     },
     "MaskLen4": {
       "description": "The `MaskLen4` is the mask prefix length for a IPv4 address.",

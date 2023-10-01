@@ -4,12 +4,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Hosts",
     "Subject"
   ],
   "properties": {
     "Name": {
       "const": "nats"
+    },
+    "ID": {
+      "type": "string"
     },
     "Hosts": {
       "description": "The `Hosts` are hosts:port to connect nats server.",

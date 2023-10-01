@@ -3,11 +3,16 @@
   "title": "DNS output plugin",
   "type": "object",
   "required": [
+    "Name",
+    "ID",
     "Host"
   ],
   "properties": {
     "Name": {
       "const": "dns"
+    },
+    "ID": {
+      "type": "string"
     },
     "Host": {
       "type": "string",

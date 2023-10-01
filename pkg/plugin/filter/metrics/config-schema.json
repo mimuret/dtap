@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Rules"
   ],
   "properties": {
     "Name": {
       "const": "metrics"
+    },
+    "ID": {
+      "type": "string"
     },
     "Rules": {
       "description": "The `Rules` are metrics rules.",

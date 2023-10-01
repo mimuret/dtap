@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "KafkaConfig"
   ],
   "properties": {
     "Name": {
       "const": "kafka"
+    },
+    "ID": {
+      "type": "string"
     },
     "KafkaConfig": {
       "$ref": "#/$defs/KafkaConfig"

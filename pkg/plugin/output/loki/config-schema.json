@@ -5,11 +5,15 @@
   "description": "see: https://grafana.com/docs/loki/latest/clients/promtail/configuration/#clients",
   "required": [
     "Name",
+    "ID",
     "URL"
   ],
   "properties": {
     "Name": {
       "const": "nats"
+    },
+    "ID": {
+      "type": "string"
     },
     "URL": {
       "description": "The `URL` is the promtail push API URL.",

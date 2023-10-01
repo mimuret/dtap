@@ -3,11 +3,15 @@
   "title": "nop output plugin",
   "type": "object",
   "required": [
-    "Name"
+    "Name",
+    "ID"
   ],
   "properties": {
     "Name": {
       "const": "nop"
+    },
+    "ID": {
+      "type": "string"
     }
   }
 }

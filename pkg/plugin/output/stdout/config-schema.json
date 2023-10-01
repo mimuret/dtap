@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Format"
   ],
   "properties": {
     "Name": {
       "const": "stdout"
+    },
+    "ID": {
+      "type": "string"
     },
     "Format": {
       "description": "The `Format` is the output format.",

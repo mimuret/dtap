@@ -6,11 +6,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Rule"
   ],
   "properties": {
     "Name": {
       "const": "matcher"
+    },
+    "ID": {
+      "type": "string"
     },
     "Rule": {
       "description": "The `Rule` is the rule set. see https://pkg.go.dev/github.com/mimuret/dnsutils/matcher#Config",

@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Port"
   ],
   "properties": {
     "Name": {
       "const": "tcp"
+    },
+    "ID": {
+      "type": "string"
     },
     "Address": {
       "type": "string"
