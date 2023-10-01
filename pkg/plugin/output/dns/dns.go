@@ -19,16 +19,21 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"runtime"
 	"time"
 
 	json "github.com/goccy/go-json"
 	"github.com/miekg/dns"
+	"github.com/mimuret/dnsutils"
 	"github.com/mimuret/dnsutils/dig"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 )
 
 func init() {
@@ -41,8 +46,9 @@ type ExchangeContextInterface interface {
 
 func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	s := &DNS{
-		Protocol: DNSProtocolUDP,
-		Timeout:  time.Second,
+		Protocol:  DNSProtocolUDP,
+		Timeout:   time.Second,
+		WorkerNum: 4,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
@@ -50,6 +56,10 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 
 	if _, _, err := net.SplitHostPort(s.Host); err != nil {
 		return nil, fmt.Errorf("invalid Host %s, %w", s.Host, err)
+	}
+
+	if s.WorkerNum == 0 {
+		s.WorkerNum = uint(runtime.NumCPU())
 	}
 
 	switch s.Protocol {
@@ -66,6 +76,24 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if err := op.Option(s.cl); err != nil {
 		return nil, fmt.Errorf("failed to set dig option: %w", err)
 	}
+	s.outCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_dns",
+		Name:        "queries_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.errCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_dns",
+		Name:        "request_errors_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.rcodeCoutner = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_dns",
+		Name:        "responses_by_rcode_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	}, []string{"rcodes"})
 
 	s.DnstapOutput = output.NewDnstapOutput(s, 0)
 	return s, nil
@@ -97,9 +125,16 @@ type DNS struct {
 	Protocol DNSProtocol
 	// Timeout setting (duration)
 	Timeout time.Duration
+	// SendOnly flag
+	WorkerNum uint
 
-	cl *dig.Dig
-	oc *types.OutputContext
+	sem *semaphore.Weighted
+	cl  *dig.Dig
+	oc  *types.OutputContext
+
+	outCounter   prometheus.Counter
+	errCounter   prometheus.Counter
+	rcodeCoutner *prometheus.CounterVec
 }
 
 func (o *DNS) SetOutputContext(oc *types.OutputContext) {
@@ -107,10 +142,20 @@ func (o *DNS) SetOutputContext(oc *types.OutputContext) {
 }
 
 func (o *DNS) Open() error {
+	o.sem = semaphore.NewWeighted(int64(o.WorkerNum))
 	return nil
 }
 
 func (o *DNS) Write(dm *types.DnstapMessage) error {
+	o.sem.Acquire(context.Background(), 1)
+	go func(dm *types.DnstapMessage) {
+		o.write(dm)
+		o.sem.Release(1)
+	}(dm)
+	return nil
+}
+
+func (o *DNS) write(dm *types.DnstapMessage) error {
 	msg := dm.GetMessage()
 	// skip response
 	if msg.Response {
@@ -118,9 +163,15 @@ func (o *DNS) Write(dm *types.DnstapMessage) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout)
 	defer cancel()
-	_, err := o.cl.ExchangeContext(ctx, msg)
-
-	return err
+	o.outCounter.Inc()
+	res, err := o.cl.ExchangeContext(ctx, msg)
+	if err != nil {
+		o.errCounter.Inc()
+		return err
+	}
+	rcodeStr := dnsutils.ConvertNumberToString(dns.RcodeToString, "RCODE", res.Rcode)
+	o.rcodeCoutner.WithLabelValues(rcodeStr).Inc()
+	return nil
 }
 
 func (o *DNS) Close() {
