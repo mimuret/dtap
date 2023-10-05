@@ -156,7 +156,6 @@ LOOP:
 			go func(bs []byte) {
 				buf := bytes.NewBuffer(bs)
 				if err := f.is.Read(buf, w, ic); err != nil {
-					input.TotalDecordError.Inc()
 					ic.Logger.Debug("input error", zap.Error(err))
 				}
 				wg.Done()

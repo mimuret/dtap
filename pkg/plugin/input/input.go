@@ -8,24 +8,15 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
 )
 
 const FormatDNSTAP = "DNSTAP"
 const FormatDtapFrame = "DtapFrame"
-
-var (
-	TotalDecordError = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: "dtap",
-		Subsystem: "input",
-		Name:      "error_frame_total",
-		Help:      "The total number of input error frames",
-	})
-)
 
 type connectionManager struct {
 	sync.Mutex
@@ -80,10 +71,11 @@ func newInputServer(p PluginWithFormat, options *framestream.DecoderOptions, unm
 		ConstLabels: prometheus.Labels{"ID": p.GetID()},
 	})
 	is.totalDecordErrorCount = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: "dtap",
-		Subsystem: "input_server",
-		Name:      "read_frame_errors_total",
-		Help:      "The total number of input error frames",
+		Namespace:   "dtap",
+		Subsystem:   "input_server",
+		Name:        "read_frame_errors_total",
+		Help:        "The total number of input error frames",
+		ConstLabels: prometheus.Labels{"ID": p.GetID()},
 	})
 	is.msgDecordErrCount = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",

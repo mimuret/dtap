@@ -21,9 +21,9 @@ import (
 	"sync"
 
 	json "github.com/goccy/go-json"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/types"

@@ -1,0 +1,9 @@
+Inputs:
+  - Name: "unix"
+    ID: "input_unix_0"
+    Path: "dnstap.sock"
+OutputGroups:
+  - Name: "og0"
+    Outputs:
+      - Name: "stdout"
+        ID: "og0_stdout_0"

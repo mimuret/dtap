@@ -25,28 +25,13 @@ import (
 
 	"github.com/mimuret/dtap/v2/pkg/config"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
-)
-
-var (
-	TotalGlobalFilteredFrame = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: "dtap",
-		Subsystem: "global",
-		Name:      "filtered_total",
-		Help:      "The total number of global filtered frames",
-	})
-	TotalOGFilteredFrame = promauto.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "dtap",
-		Subsystem: "output",
-		Name:      "filtered_total",
-		Help:      "The total number of output group filtered frames",
-	}, []string{"og"})
 )
 
 type OutputGroup struct {
@@ -54,6 +39,8 @@ type OutputGroup struct {
 	buffer  types.Buffer
 	filters plugin.FilterPlugins
 	outputs plugin.OutputPlugins
+
+	filterdCounter prometheus.Counter
 }
 
 type Controller struct {
@@ -65,6 +52,8 @@ type Controller struct {
 
 	filterPlugins plugin.FilterPlugins
 
+	filterdCounter prometheus.Counter
+
 	outputGroups []OutputGroup
 
 	onStartup  []func() error
@@ -75,6 +64,12 @@ func NewController(cfg *config.Config, logger *zap.Logger) *Controller {
 	return &Controller{
 		config: cfg,
 		logger: logger,
+		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: "dtap",
+			Subsystem: "global",
+			Name:      "filtered_total",
+			Help:      "The total number of global filtered frames",
+		}),
 	}
 }
 
@@ -85,7 +80,26 @@ func (c *Controller) SetupOutputGroup() error {
 		if len(ogc.Outputs) == 0 {
 			return fmt.Errorf("empty output plugin OutputGroup[%d]", i)
 		}
-		ob, err := NewOutputBufferFromBufferConfig(ogc.BufferConfig)
+		ob, err := NewBufferFromBufferConfig(ogc.BufferConfig,
+			promauto.NewCounter(
+				prometheus.CounterOpts{
+					Namespace:   "dtap",
+					Subsystem:   "output",
+					Name:        "recv_frame_total",
+					Help:        "The total number of output frames",
+					ConstLabels: prometheus.Labels{"og": ogc.Name},
+				},
+			),
+			promauto.NewCounter(
+				prometheus.CounterOpts{
+					Namespace:   "dtap",
+					Subsystem:   "output",
+					Name:        "lost_frame_total",
+					Help:        "The total number of lost output frames from buffer",
+					ConstLabels: prometheus.Labels{"og": ogc.Name},
+				},
+			),
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create output buffer")
 		}
@@ -94,6 +108,13 @@ func (c *Controller) SetupOutputGroup() error {
 			filters: ogc.Filters,
 			outputs: ogc.Outputs,
 			buffer:  ob,
+			filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
+				Namespace:   "dtap",
+				Subsystem:   "output",
+				Name:        "filtered_total",
+				Help:        "The total number of output group filtered frames",
+				ConstLabels: prometheus.Labels{"og": ogc.Name},
+			}),
 		})
 	}
 	c.outputGroups = outputGroups
@@ -103,7 +124,20 @@ func (c *Controller) SetupOutputGroup() error {
 // setup controller by config
 func (c *Controller) Setup() error {
 	// setup plugins
-	inputBuf, err := NewBufferFromBufferConfig(c.config.InputBufferConfig, TotalRecvInputFrame, TotalLostInputFrame)
+	inputBuf, err := NewBufferFromBufferConfig(c.config.InputBufferConfig,
+		promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: "dtap",
+			Subsystem: "input",
+			Name:      "recv_frames_total",
+			Help:      "The total number of input frames",
+		}),
+		promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: "dtap",
+			Subsystem: "input",
+			Name:      "lost_frames_total",
+			Help:      "The total number of lost input frames from buffer",
+		}),
+	)
 	if err != nil {
 		return errors.Wrap(err, "faield to create input buffer")
 	}
@@ -253,7 +287,7 @@ LOOP:
 				// input filter
 				dm = c.filterPlugins.Filter(dm)
 				if dm == nil {
-					TotalGlobalFilteredFrame.Inc()
+					c.filterdCounter.Inc()
 					return
 				}
 				for _, og := range c.outputGroups {
@@ -261,7 +295,7 @@ LOOP:
 					// output filter
 					ogdm = og.filters.Filter(ogdm)
 					if ogdm == nil {
-						TotalOGFilteredFrame.WithLabelValues(og.name).Inc()
+						og.filterdCounter.Inc()
 						continue
 					}
 					og.buffer.Write(ogdm)
