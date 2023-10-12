@@ -27,7 +27,6 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/nettest"
 	"google.golang.org/protobuf/proto"
 )
@@ -61,7 +60,6 @@ var _ = Describe("InputServer", func() {
 				},
 				FormatMeta: input.FormatMeta{Format: input.FormatDNSTAP},
 			}
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 			srv = input.NewInputServer(dp, nil)
 			srvErr = nil
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
@@ -95,7 +93,6 @@ var _ = Describe("InputServer", func() {
 			buf     types.Buffer
 		)
 		BeforeEach(func() {
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 			srv = input.NewInputServer(&dummyPlugin{
 				PluginCommon: plugin.PluginCommon{
 					ID: "id1",

@@ -20,7 +20,6 @@ import (
 	_ "embed"
 
 	"github.com/goccy/go-json"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/file"
@@ -45,7 +44,6 @@ var _ = Describe("input/file", func() {
 		)
 		When("invalid json", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = file.SetupFile(json.RawMessage(`{"Name":100,"ID":"id1"}`))
 			})
 			It("returns error", func() {
@@ -56,7 +54,6 @@ var _ = Describe("input/file", func() {
 		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id2"}`))
 			})
 			It("returns error", func() {
@@ -67,7 +64,6 @@ var _ = Describe("input/file", func() {
 		})
 		When("vaild config", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id3","Path":"/var/tmp/dump.fstrm"}`))
 			})
 			It("returns error", func() {
@@ -90,7 +86,6 @@ var _ = Describe("input/file", func() {
 			buf = buffer.NewRingBuffer(10, nil, nil)
 			ic = testtool.NewTestInputContext(buf)
 			fs = afero.NewMemMapFs()
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 			p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id4","Path":"/var/tmp/dump.fstrm"}`))
 			Expect(err).To(Succeed())
 			fp = p.(*file.File)
@@ -126,7 +121,6 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(validData)
 				Expect(err).To(Succeed())
 				f.Close()
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				err = fp.Start(context.TODO(), ic)
 			})
 			It("returns error", func() {

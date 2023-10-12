@@ -19,7 +19,6 @@ import (
 	"net"
 
 	"github.com/goccy/go-json"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/nettest"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
@@ -35,7 +34,6 @@ var _ = Describe("input/tcp", func() {
 			p   types.InputPlugin
 		)
 		BeforeEach(func() {
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 		})
 		When("Type missmatch", func() {
 			BeforeEach(func() {
@@ -81,7 +79,6 @@ var _ = Describe("input/tcp", func() {
 			Expect(ok).To(BeTrue())
 			ln.Close()
 
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 			ip, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id4","Port": 10053}`))
 			Expect(err).To(Succeed())
 			p = ip.(*tcp.TCPSocket)

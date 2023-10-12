@@ -16,8 +16,6 @@
 package plugin
 
 import (
-	"fmt"
-
 	json "github.com/goccy/go-json"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
@@ -42,19 +40,6 @@ func (p *PluginCommon) GetID() string {
 	return p.ID
 }
 
-var (
-	ErrAlreadyExist = fmt.Errorf("already exist plugin")
-	registerPlugins = map[string]types.Plugin{}
-)
-
-func registerID(id string, p types.Plugin) error {
-	if ap, exist := registerPlugins[id]; exist {
-		return fmt.Errorf("plugin with `ID` `%s` is a duplicate of Plugin with `Name` %s", ap.GetID(), ap.GetName())
-	}
-	registerPlugins[id] = p
-	return nil
-}
-
 // Input plugin slices
 // If multiple Plugins are specified, they are started in order, but input processing is performed in parallel.
 type InputPlugins []types.InputPlugin
@@ -76,9 +61,6 @@ func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
 		ip, err := registry.CreateInputPlugin(cc.Name, raw)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create input plugin, no %d, name is `%s`", i, cc.Name)
-		}
-		if err := registerID(cc.ID, ip); err != nil {
-			return err
 		}
 		res = append(res, ip)
 	}
@@ -110,9 +92,6 @@ func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to create output plugin, no %d, name is `%s`", i, cc.Name)
 		}
-		if err := registerID(cc.ID, op); err != nil {
-			return err
-		}
 		res = append(res, op)
 	}
 	*c = res
@@ -141,9 +120,6 @@ func (c *FilterPlugins) UnmarshalJSON(bs []byte) error {
 		fp, err := registry.CreateFilterPlugin(cc.Name, raw)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create filter plugin, no %d, name is `%s`", i, cc.Name)
-		}
-		if err := registerID(cc.ID, fp); err != nil {
-			return err
 		}
 		res = append(res, fp)
 	}

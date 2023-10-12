@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/buffer"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/nats"
@@ -53,7 +52,6 @@ var _ = Describe("input/nats", func() {
 		)
 		When("type mismatch", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id1","Hosts":0}`))
 			})
 			It("returns error", func() {
@@ -63,7 +61,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("vaild", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id2","Hosts":["127.0.0.1:4222"],"Subject":"dnstap","Format":"DNSTAP"}`))
 			})
 			It("returns error", func() {
@@ -73,7 +70,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("Host is an empty", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id3","Subject":"dnstap","Format":"DNSTAP"}`))
 			})
 			It("returns error", func() {
@@ -83,7 +79,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("Subject is an empty", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id4","Hosts":["127.0.0.1:4222"],"Format":"DNSTAP"}`))
 			})
 			It("returns error", func() {
@@ -93,7 +88,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("Format is empty", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id5","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Format": ""}`))
 			})
 			It("returns error", func() {
@@ -103,7 +97,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("Format is invalid", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id6","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Format":"hoge"}`))
 			})
 			It("returns error", func() {
@@ -113,7 +106,6 @@ var _ = Describe("input/nats", func() {
 		})
 		When("Token exist", func() {
 			BeforeEach(func() {
-				prometheus.DefaultRegisterer = prometheus.NewRegistry()
 				p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id7","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Subject":"dnstap","Format":"DNSTAP","Token":"token"}`))
 			})
 			It("succeed", func() {
@@ -124,7 +116,6 @@ var _ = Describe("input/nats", func() {
 			When("User exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						prometheus.DefaultRegisterer = prometheus.NewRegistry()
 						p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id8","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Subject":"dnstap","Format":"DNSTAP","User":"user","Password":"pass"}`))
 					})
 					It("succeed", func() {
@@ -133,7 +124,6 @@ var _ = Describe("input/nats", func() {
 				})
 				When("Password not exist", func() {
 					BeforeEach(func() {
-						prometheus.DefaultRegisterer = prometheus.NewRegistry()
 						p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id9","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Subject":"dnstap","Format":"DNSTAP","User":"user"}`))
 					})
 					It("returns error", func() {
@@ -145,7 +135,6 @@ var _ = Describe("input/nats", func() {
 			When("User not exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						prometheus.DefaultRegisterer = prometheus.NewRegistry()
 						p, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id10","Subject":"dnstap","Hosts":["127.0.0.1:4222"],"Subject":"dnstap","Format":"DNSTAP","Password":"pass"}`))
 					})
 					It("succeed", func() {
@@ -190,7 +179,6 @@ var _ = Describe("input/nats", func() {
 		Context("Open", func() {
 			When("failed to connect", func() {
 				BeforeEach(func() {
-					prometheus.DefaultRegisterer = prometheus.NewRegistry()
 					inp, err = nats.Setup(json.RawMessage(`{"Name":"nats","ID":"id20","Hosts":["127.0.0.1:5223"],"Subject":"dnstap","Format":"DNSTAP"}`))
 					Expect(err).To(Succeed())
 					p = inp.(*nats.Nats)
@@ -203,7 +191,6 @@ var _ = Describe("input/nats", func() {
 			})
 			When("valid", func() {
 				BeforeEach(func() {
-					prometheus.DefaultRegisterer = prometheus.NewRegistry()
 					inp, err = nats.Setup(json.RawMessage(`{"Name": "nats","ID":"id21","Hosts": ["127.0.0.1:14223"], "Subject": "dnstap", "Format": "DNSTAP"}`))
 					Expect(err).To(Succeed())
 					p = inp.(*nats.Nats)
@@ -231,7 +218,6 @@ var _ = Describe("input/nats", func() {
 			When("valid message", func() {
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						prometheus.DefaultRegisterer = prometheus.NewRegistry()
 						inp, err = nats.Setup(json.RawMessage(`{"Name": "nats","ID":"id22","Hosts": ["127.0.0.1:14223"], "Subject": "dnstap", "Format": "DNSTAP"}`))
 						Expect(err).To(Succeed())
 						p = inp.(*nats.Nats)

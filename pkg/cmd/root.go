@@ -17,13 +17,11 @@
 package cmd
 
 import (
-	"github.com/mimuret/dtap/v2/pkg/config"
 	"github.com/mimuret/dtap/v2/pkg/core"
 	_ "github.com/mimuret/dtap/v2/pkg/core/plugins"
-	"github.com/mimuret/dtap/v2/pkg/logger"
-	"github.com/spf13/afero"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 var cfgFile string
@@ -36,22 +34,13 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
+		registery := prometheus.NewRegistry()
+		promauto.Set(registery)
+		runner, err := core.NewRunner(cmd.Context(), cfgFile, registery)
 		if err != nil {
 			return err
 		}
-		l, err := logger.New(c.LogLevel)
-		if err != nil {
-			return err
-		}
-
-		ctl := core.NewController(c, l)
-		if err := ctl.Setup(); err != nil {
-			l.Fatal("failed to setup", zap.Error(err))
-		}
-		go ctl.PrometheusListen(cmd.Context())
-
-		return ctl.Run(cmd.Context())
+		return runner.Run(cmd.Context())
 	},
 }
 

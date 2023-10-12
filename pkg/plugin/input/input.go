@@ -8,10 +8,10 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
 )
 

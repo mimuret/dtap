@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
 	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
@@ -166,7 +165,6 @@ var _ = Describe("output/nats", func() {
 			Expect(err).To(Succeed())
 			sub, err = nc.ChanQueueSubscribe("dnstap", "", ch)
 			Expect(err).To(Succeed())
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 		})
 		AfterEach(func() {
 			err := sub.Unsubscribe()

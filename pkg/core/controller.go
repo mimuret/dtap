@@ -24,12 +24,14 @@ import (
 	"syscall"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
+	"github.com/mimuret/dtap/v2/pkg/logger"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/afero"
 	"go.uber.org/zap"
 	"golang.org/x/sync/semaphore"
 )
@@ -43,7 +45,7 @@ type OutputGroup struct {
 	filterdCounter prometheus.Counter
 }
 
-type Controller struct {
+type controller struct {
 	config *config.Config
 	logger *zap.Logger
 
@@ -53,17 +55,16 @@ type Controller struct {
 	filterPlugins plugin.FilterPlugins
 
 	filterdCounter prometheus.Counter
+	registery      *prometheus.Registry
 
 	outputGroups []OutputGroup
-
-	onStartup  []func() error
-	onShutdown []func() error
 }
 
-func NewController(cfg *config.Config, logger *zap.Logger) *Controller {
-	return &Controller{
-		config: cfg,
-		logger: logger,
+func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry) *controller {
+	return &controller{
+		config:    cfg,
+		logger:    logger,
+		registery: registery,
 		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "dtap",
 			Subsystem: "global",
@@ -74,7 +75,7 @@ func NewController(cfg *config.Config, logger *zap.Logger) *Controller {
 }
 
 // setup Output Plugin
-func (c *Controller) SetupOutputGroup() error {
+func (c *controller) setupOutputGroup() error {
 	var outputGroups []OutputGroup
 	for i, ogc := range c.config.OutputGroups {
 		if len(ogc.Outputs) == 0 {
@@ -122,7 +123,7 @@ func (c *Controller) SetupOutputGroup() error {
 }
 
 // setup controller by config
-func (c *Controller) Setup() error {
+func (c *controller) setup() error {
 	// setup plugins
 	inputBuf, err := NewBufferFromBufferConfig(c.config.InputBufferConfig,
 		promauto.NewCounter(prometheus.CounterOpts{
@@ -144,7 +145,7 @@ func (c *Controller) Setup() error {
 	c.inputBuffer = inputBuf
 	c.inputPlugins = c.config.Inputs
 	c.filterPlugins = c.config.Filters
-	if err := c.SetupOutputGroup(); err != nil {
+	if err := c.setupOutputGroup(); err != nil {
 		return errors.Wrap(err, "failed to create output plugin")
 	}
 	if len(c.inputPlugins) == 0 {
@@ -156,27 +157,40 @@ func (c *Controller) Setup() error {
 	return nil
 }
 
-// add startup function for plugin startup process
-func (c *Controller) OnStartup(f func() error) {
-	c.onStartup = append(c.onStartup, f)
-}
-
-// add shutdown function for plugin shutdown process
-func (c *Controller) OnShutdown(f func() error) {
-	c.onShutdown = append(c.onShutdown, f)
-}
-
-func (c *Controller) PrometheusListen(ctx context.Context) {
-	http.Handle("/metrics", promhttp.Handler())
+func (c *controller) prometheusListen(ctx context.Context) {
+	mux := &http.ServeMux{}
+	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(
+		c.registery, promhttp.HandlerFor(c.registery, promhttp.HandlerOpts{}),
+	))
+	srv := &http.Server{
+		Addr:    c.config.MetricsListen,
+		Handler: mux,
+	}
+	var errCh = make(chan error)
 	c.logger.Info("Listening on", zap.String("address", c.config.MetricsListen))
-	err := http.ListenAndServe(c.config.MetricsListen, nil)
-	if err != nil {
-		c.logger.Fatal("failed to listen metrics port", zap.Error(err))
+	go func() {
+		errCh <- srv.ListenAndServe()
+	}()
+	for {
+		select {
+		case err := <-errCh:
+			switch err {
+			case http.ErrServerClosed:
+				return
+			case context.Canceled:
+				return
+			default:
+				c.logger.Fatal("failed to listen metrics port", zap.Error(err))
+			}
+		case <-ctx.Done():
+			srv.Shutdown(ctx)
+		}
 	}
 }
 
 // main running function
-func (c *Controller) Run(ctx context.Context) error {
+func (c *controller) Run(ctx context.Context) error {
+	go c.prometheusListen(ctx)
 	errCh := make(chan error, 128)
 
 	// start inputPlugin
@@ -238,23 +252,6 @@ func (c *Controller) Run(ctx context.Context) error {
 		c.logger.Info("Shutdown process is completed.")
 	}()
 
-	// execute startup function
-	for _, f := range c.onStartup {
-		if err := f(); err != nil {
-			c.logger.Error("failed to onStartup", zap.Error(err))
-			return err
-		}
-	}
-
-	defer func() {
-		// finish func
-		for _, f := range c.onShutdown {
-			if err := f(); err != nil {
-				c.logger.Error("failed to onShutdown", zap.Error(err))
-			}
-		}
-	}()
-
 	// start main loop
 	c.logger.Info("semaphore", zap.Uint("num-worker", c.config.InputFilterWorkerNum))
 	iFilterSemaphore := semaphore.NewWeighted(int64(c.config.InputFilterWorkerNum))
@@ -304,4 +301,21 @@ LOOP:
 		}
 	}
 	return nil
+}
+
+// main running function
+func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry) (*controller, error) {
+	c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
+	if err != nil {
+		return nil, err
+	}
+	l, err := logger.New(c.LogLevel)
+	if err != nil {
+		return nil, err
+	}
+	ctl := newController(c, l, registery)
+	if err := ctl.setup(); err != nil {
+		return nil, fmt.Errorf("failed to setup: %w", err)
+	}
+	return ctl, nil
 }

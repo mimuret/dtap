@@ -29,10 +29,10 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/sync/semaphore"
 )
 

@@ -20,7 +20,6 @@ import (
 	"os"
 
 	"github.com/goccy/go-json"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -37,7 +36,6 @@ var _ = Describe("input/unix", func() {
 			p    types.InputPlugin
 		)
 		BeforeEach(func() {
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
@@ -108,13 +106,11 @@ var _ = Describe("input/unix", func() {
 		BeforeEach(func() {
 			path, err = nettest.LocalPath()
 			Expect(err).To(Succeed())
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 			ip, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id6","Path":"` + path + `"}`))
 			p = ip.(*unix.UnixSocket)
 
 			path, err = nettest.LocalPath()
 			Expect(err).To(Succeed())
-			prometheus.DefaultRegisterer = prometheus.NewRegistry()
 		})
 		When("failed to listen", func() {
 			BeforeEach(func() {
