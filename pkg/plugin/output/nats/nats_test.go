@@ -38,7 +38,7 @@ var _ = Describe("output/nats", func() {
 		)
 		When("type mismatch", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": 0}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats","ID":"id1","Hosts": 0}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -47,7 +47,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("vaild", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id2","Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -56,7 +56,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Host is an empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id3","Subject": "dnstap", "Format": "json/v1"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -65,7 +65,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Subject is an empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:4222"],  "Format": "json/v1"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id4","Hosts": ["127.0.0.1:4222"],  "Format": "json/v1"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -74,7 +74,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Format is empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Format": ""}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id5","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Format": ""}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -83,7 +83,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Format is invalid", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"],  "Format": "hoge"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id6","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"],  "Format": "hoge"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -92,7 +92,7 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Token exist", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Token": "token"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id7","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Token": "token"}`))
 			})
 			It("succeed", func() {
 				Expect(err).To(Succeed())
@@ -102,7 +102,7 @@ var _ = Describe("output/nats", func() {
 			When("User exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user","Password":"pass"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id8", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user","Password":"pass"}`))
 					})
 					It("succeed", func() {
 						Expect(err).To(Succeed())
@@ -110,7 +110,7 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Password not exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id9", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user"}`))
 					})
 					It("returns error", func() {
 						Expect(err).To(HaveOccurred())
@@ -121,7 +121,7 @@ var _ = Describe("output/nats", func() {
 			When("User not exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Password":"pass"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id10", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Password":"pass"}`))
 					})
 					It("succeed", func() {
 						Expect(err).To(Succeed())
@@ -179,7 +179,7 @@ var _ = Describe("output/nats", func() {
 			)
 			When("failed to connect", func() {
 				BeforeEach(func() {
-					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:15222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id11", "Hosts": ["127.0.0.1:15222"], "Subject": "dnstap", "Format": "json/v1"}`))
 					Expect(err).To(Succeed())
 					p = op.(*nats.Nats)
 					err = p.Open()
@@ -192,7 +192,7 @@ var _ = Describe("output/nats", func() {
 			})
 			When("valid", func() {
 				BeforeEach(func() {
-					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id12", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
 					Expect(err).To(Succeed())
 					p = op.(*nats.Nats)
 					err = p.Open()
@@ -208,7 +208,7 @@ var _ = Describe("output/nats", func() {
 				err error
 			)
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id13", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
 				Expect(err).To(Succeed())
 				p = op.(*nats.Nats)
 			})
@@ -218,7 +218,7 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is json/v1", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id14", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})
@@ -281,7 +281,7 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "dnstap"}`))
+						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id15", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "dnstap"}`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})

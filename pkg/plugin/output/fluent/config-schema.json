@@ -4,12 +4,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "FluentConfig",
     "Tag"
   ],
   "properties": {
     "Name": {
       "const": "fluent"
+    },
+    "ID": {
+      "type": "string"
     },
     "FluentConfig": {
       "$ref": "#/$defs/FluentConfig"

@@ -89,7 +89,7 @@ type Config struct {
 	// default value is 'info'
 	LogLevel string
 	// Listen IP and port to output metrics
-	MetricsListen string
+	ManageHTTPSServer string
 	// Input buffer settings
 	InputBufferConfig *BufferConfig
 	// Input plugin settings. Must not be empty.
@@ -148,14 +148,14 @@ func (c *Config) UnmarshalJSON(bs []byte) error {
 	cfg := struct {
 		InputFilterWorkerNum uint
 		LogLevel             string
-		MetricsListen        string
+		ManageHTTPSServer    string
 		InputBufferConfig    *BufferConfig
 		Inputs               json.RawMessage
 		Filters              json.RawMessage
 		OutputGroups         []json.RawMessage
 	}{
-		MetricsListen: ":9520",
-		LogLevel:      "info",
+		ManageHTTPSServer: ":9520",
+		LogLevel:          "info",
 		InputBufferConfig: &BufferConfig{
 			Name: "input",
 			Size: DefaultInputBufferSize,
@@ -168,7 +168,7 @@ func (c *Config) UnmarshalJSON(bs []byte) error {
 	}
 	c.InputFilterWorkerNum = cfg.InputFilterWorkerNum
 	c.LogLevel = cfg.LogLevel
-	c.MetricsListen = cfg.MetricsListen
+	c.ManageHTTPSServer = cfg.ManageHTTPSServer
 	c.InputBufferConfig = cfg.InputBufferConfig
 
 	var results error

@@ -4,12 +4,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Hosts",
     "Subject"
   ],
   "properties": {
     "Name": {
       "const": "nats"
+    },
+    "ID": {
+      "type": "string"
     },
     "MaxSize": {
       "description": "The `MaxSize` is the nats max payload size.",

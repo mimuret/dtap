@@ -35,7 +35,9 @@ func init() {
 
 func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	p := &TCPSocket{
-		Format: input.FormatDNSTAP,
+		FormatMeta: input.FormatMeta{
+			Format: input.FormatDNSTAP,
+		},
 	}
 
 	if err := json.Unmarshal(bs, p); err != nil {
@@ -44,7 +46,8 @@ func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.Port == 0 {
 		return nil, errors.Errorf("missing parameter Port")
 	}
-	if input.NewInputServer(p.Format, nil, nil) == nil {
+	p.is = input.NewInputServer(p, nil)
+	if p.is == nil {
 		return nil, errors.Errorf("invalid format")
 	}
 	return p, nil
@@ -55,15 +58,17 @@ var _ types.InputPlugin = &TCPSocket{}
 // The TCPSocket plugin get messages from the tcp socket.
 type TCPSocket struct {
 	plugin.PluginCommon
+	// Message format
+	input.FormatMeta
 
 	// Listen Address. If not given, I will listen to any.
 	Address string
 	// Listen port. Must not be empty.
 	Port uint16
-	// Message format
-	Format input.Format
 
 	ln net.Listener
+
+	is *input.InputServer
 }
 
 func (p *TCPSocket) Listen() error {
@@ -88,5 +93,5 @@ func (p *TCPSocket) Start(ctx context.Context, ic *types.InputContext) error {
 		<-ctx.Done()
 		p.Close()
 	}()
-	return input.NewInputServer(p.Format, nil, ic).Serve(p.ln, ic.Writer)
+	return p.is.Serve(p, p.ln, ic.Writer, ic)
 }

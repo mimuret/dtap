@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Format"
   ],
   "properties": {
     "Name": {
       "const": "file"
+    },
+    "ID": {
+      "type": "string"
     },
     "Logger": {
       "$ref": "#/$defs/Logger"

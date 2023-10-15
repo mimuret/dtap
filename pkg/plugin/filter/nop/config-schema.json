@@ -4,11 +4,15 @@
   "description": "The `nop` is the filter plugin that is nothing to do. It uses for testing.",
   "type": "object",
   "required": [
-    "Name"
+    "Name",
+    "ID"
   ],
   "properties": {
     "Name": {
       "const": "nop"
+    },
+    "ID": {
+      "type": "string"
     }
   }
 }

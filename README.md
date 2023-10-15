@@ -10,12 +10,10 @@
 go install github.com/mimuret/dtap/v2@latest
 ```
 
-## Configuration
+## Documents
 
 - [configuration](./doc/)
 - [JSON schema](./schemas/schema.json)
-
-## design
-
-[design](./doc/design.md)
+- [API](./doc/api.md)
+- [design](./doc/design.md)
 

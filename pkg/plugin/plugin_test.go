@@ -31,6 +31,9 @@ type testFilter struct {
 func (t *testFilter) GetName() string {
 	return "test"
 }
+func (t *testFilter) GetID() string {
+	return "test"
+}
 func (t *testFilter) Filter(dm *types.DnstapMessage) *types.DnstapMessage {
 	if t.filter {
 		return nil

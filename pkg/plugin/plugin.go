@@ -26,12 +26,18 @@ import (
 type PluginCommon struct {
 	// Plugin type name
 	Name string `json:"Name"`
+	// Plugin type id
+	ID string `json:"ID"`
 	// Maximum number of retries. A value of 0 means infinite.
 	MaxRetry uint `json:"MaxRetry"`
 }
 
 func (p *PluginCommon) GetName() string {
 	return p.Name
+}
+
+func (p *PluginCommon) GetID() string {
+	return p.ID
 }
 
 // Input plugin slices
@@ -44,11 +50,13 @@ func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
 	if err := json.Unmarshal(bs, &raws); err != nil {
 		return errors.Wrap(err, "invalid json Input")
 	}
-
 	for i, raw := range raws {
 		cc := &PluginCommon{}
 		if err := json.Unmarshal(raw, cc); err != nil {
 			return errors.Wrapf(err, "invalid json Input[%d]", i)
+		}
+		if cc.ID == "" {
+			return errors.Errorf("Input[%d].ID must not be empty", i)
 		}
 		ip, err := registry.CreateInputPlugin(cc.Name, raw)
 		if err != nil {
@@ -77,6 +85,9 @@ func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
 		if err := json.Unmarshal(raw, cc); err != nil {
 			return errors.Wrapf(err, "invalid json Output[%d]", i)
 		}
+		if cc.ID == "" {
+			return errors.Errorf("Outputs[%d].ID must not be empty", i)
+		}
 		op, err := registry.CreateOutputPlugin(cc.Name, raw)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create output plugin, no %d, name is `%s`", i, cc.Name)
@@ -102,6 +113,9 @@ func (c *FilterPlugins) UnmarshalJSON(bs []byte) error {
 		cc := &PluginCommon{}
 		if err := json.Unmarshal(raw, cc); err != nil {
 			return errors.Wrapf(err, "invalid json Filter[%d]", i)
+		}
+		if cc.ID == "" {
+			return errors.Errorf("Filters[%d].ID must not be empty", i)
 		}
 		fp, err := registry.CreateFilterPlugin(cc.Name, raw)
 		if err != nil {

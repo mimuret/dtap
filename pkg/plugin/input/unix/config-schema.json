@@ -4,11 +4,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Path"
   ],
   "properties": {
     "Name": {
       "const": "unix"
+    },
+    "ID": {
+      "type": "string"
     },
     "Path": {
       "type": "string"

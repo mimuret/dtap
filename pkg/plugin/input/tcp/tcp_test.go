@@ -33,9 +33,11 @@ var _ = Describe("input/tcp", func() {
 			err error
 			p   types.InputPlugin
 		)
+		BeforeEach(func() {
+		})
 		When("Type missmatch", func() {
 			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp","Address": 0}`))
+				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp","ID":"id1","Address": 0}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -45,7 +47,7 @@ var _ = Describe("input/tcp", func() {
 		})
 		When("Port is an empty", func() {
 			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp", "Address":"0.0.0.0"}`))
+				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id2","Address":"0.0.0.0"}`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -55,7 +57,7 @@ var _ = Describe("input/tcp", func() {
 		})
 		When("valid config", func() {
 			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp", "Port": 10053}`))
+				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id3","Port": 10053}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -77,7 +79,7 @@ var _ = Describe("input/tcp", func() {
 			Expect(ok).To(BeTrue())
 			ln.Close()
 
-			ip, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp", "Port": 10053}`))
+			ip, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id4","Port": 10053}`))
 			Expect(err).To(Succeed())
 			p = ip.(*tcp.TCPSocket)
 			p.Port = uint16(addr.Port)

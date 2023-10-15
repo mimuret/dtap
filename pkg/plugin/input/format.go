@@ -13,24 +13,33 @@ const DefaultFormat = "DNSTAP"
 // "DNSTAP" is the normal DNSTAP format.
 // "DTAPFrame" is a DNSTAP format with a label added.
 // For details, https://github.com/mimuret/dtap/blob/v2/proto/dtap_frame.proto.
-type Format string
-
-var (
-	registry = map[Format]NewFormatFunc{}
-)
-
-type NewFormatFunc func(options *framestream.DecoderOptions, ic *types.InputContext) *InputServer
-
-func RegisterFormat(f Format, newFunc NewFormatFunc) {
-	f = Format(strings.ToUpper(string(f)))
-	registry[f] = newFunc
+type FormatMeta struct {
+	Format string
 }
 
-func NewInputServer(f Format, options *framestream.DecoderOptions, ic *types.InputContext) *InputServer {
-	f = Format(strings.ToUpper(string(f)))
-	newFunc := registry[f]
+func (f FormatMeta) GetFormat() string {
+	return strings.ToUpper(f.Format)
+}
+
+var (
+	registry = map[string]NewFormatFunc{}
+)
+
+type PluginWithFormat interface {
+	types.Plugin
+	GetFormat() string
+}
+
+type NewFormatFunc func(p PluginWithFormat, options *framestream.DecoderOptions) *InputServer
+
+func RegisterFormat(f FormatMeta, newFunc NewFormatFunc) {
+	registry[f.GetFormat()] = newFunc
+}
+
+func NewInputServer(p PluginWithFormat, options *framestream.DecoderOptions) *InputServer {
+	newFunc := registry[p.GetFormat()]
 	if newFunc == nil {
 		return nil
 	}
-	return newFunc(options, ic)
+	return newFunc(p, options)
 }

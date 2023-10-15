@@ -1,7 +1,7 @@
 {
   "InputFilterWorkerNum": 1,
   "LogLevel": "info",
-  "MetricsListen": ":9520",
+  "ManageHTTPSServer": ":9520",
   "InputBufferConfig": {
     "Name": "input_common",
     "Size": 100
@@ -9,6 +9,7 @@
   "Input": [
     {
       "Name": "unix",
+      "ID": "input_unix_1",
       "Path": "/var/run/unbound/dnstap.sock",
       "User": "unbound"
     }
@@ -16,6 +17,7 @@
   "Filter": [
     {
       "Name": "grep",
+      "ID": "filter_grep_1",
       "Rules": {
         "Op": "AND",
         "Matchers": [
@@ -33,6 +35,7 @@
       "Filter": [
         {
           "Name": "grep",
+          "ID": "og1_filter_grep_1",
           "Rules": {
             "Op": "AND",
             "Matchers": [
@@ -47,10 +50,12 @@
       ],
       "Outputs": [
         {
-          "Name": "nop"
+          "Name": "nop",
+          "ID": "og1_nop_1"
         },
         {
-          "Name": "nop"
+          "Name": "nop",
+          "ID": "og1_nop_2"
         }
       ]
     }

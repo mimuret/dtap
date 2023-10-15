@@ -6,11 +6,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Path"
   ],
   "properties": {
     "Name": {
       "const": "file"
+    },
+    "ID": {
+      "type": "string"
     },
     "Path": {
       "description": "The `Path` is the file path of DNSTAP message file.",

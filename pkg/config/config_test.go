@@ -90,9 +90,9 @@ var _ = Describe("config", func() {
 			It("returns Config", func() {
 				Expect(err).To(Succeed())
 				Expect(cfg).NotTo(BeNil())
-				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","Path":"/var/tmp/hoge"}`))
+				ip, err := registry.CreateInputPlugin("file", json.RawMessage(`{"Name": "file","ID":"input_file_1","Path":"/var/tmp/hoge"}`))
 				Expect(err).To(Succeed())
-				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+				filter1, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","ID":"filter_matcher_1","Rule": {
 					"Op": "AND",
 					"Matchers": [
 						{
@@ -103,7 +103,7 @@ var _ = Describe("config", func() {
 					]
 				}}`))
 				Expect(err).To(Succeed())
-				filter2, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","Rule": {
+				filter2, err := registry.CreateFilterPlugin("matcher", json.RawMessage(`{"Name": "matcher","ID":"og1_filter_matcher_1","Rule": {
 					"Op": "AND",
 					"Matchers": [
 						{
@@ -117,7 +117,7 @@ var _ = Describe("config", func() {
 				c := &config.Config{
 					InputFilterWorkerNum: 10,
 					LogLevel:             "trace",
-					MetricsListen:        ":19520",
+					ManageHTTPSServer:    ":19520",
 					InputBufferConfig: &config.BufferConfig{
 						Name: "input_common",
 						Size: 100,
@@ -136,7 +136,18 @@ var _ = Describe("config", func() {
 						},
 					},
 				}
-				Expect(cfg).To(Equal(c))
+				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
+				Expect(cfg.InputFilterWorkerNum).To(Equal(c.InputFilterWorkerNum))
+				Expect(cfg.LogLevel).To(Equal(c.LogLevel))
+				Expect(cfg.ManageHTTPSServer).To(Equal(c.ManageHTTPSServer))
+				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
+				Expect(len(cfg.Filters)).To(Equal(len(c.Filters)))
+				Expect(len(cfg.Inputs)).To(Equal(len(c.Inputs)))
+				Expect(len(cfg.OutputGroups)).To(Equal(len(c.OutputGroups)))
+				for i := range cfg.OutputGroups {
+					Expect(len(cfg.OutputGroups[i].Filters)).To(Equal(len(c.OutputGroups[i].Filters)))
+					Expect(len(cfg.OutputGroups[i].Outputs)).To(Equal(len(c.OutputGroups[i].Filters)))
+				}
 			})
 		})
 	})

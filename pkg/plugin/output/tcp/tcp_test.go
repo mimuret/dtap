@@ -34,9 +34,11 @@ var _ = Describe("output/tcp", func() {
 			op  types.OutputPlugin
 			err error
 		)
+		BeforeEach(func() {
+		})
 		When("type mismatch", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp", "Host": 0}`))
+				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id1","Host": 0}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -45,7 +47,7 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("Host is an empty", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp"}`))
+				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id2"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -54,7 +56,7 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("Port is an empty", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp", "Host": "127.0.0.1"}`))
+				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id3","Host": "127.0.0.1"}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -63,7 +65,7 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("valid config", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp", "Host": "127.0.0.1","Port": 10053}`))
+				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id4","Host": "127.0.0.1","Port": 10053}`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -84,7 +86,7 @@ var _ = Describe("output/tcp", func() {
 			Expect(err).To(Succeed())
 			addr, ok := ln.Addr().(*net.TCPAddr)
 			Expect(ok).To(BeTrue())
-			op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp", "Host": "127.0.0.1","Port": 10053}`))
+			op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp","ID":"id5","Host": "127.0.0.1","Port": 10053}`))
 			Expect(err).To(Succeed())
 			p = op.(*tcp.TCP)
 			p.Port = uint16(addr.Port)

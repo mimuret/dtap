@@ -21,7 +21,6 @@ import (
 
 	"github.com/goccy/go-json"
 
-	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/input"
@@ -37,7 +36,9 @@ func init() {
 
 func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
 	p := &File{
-		Format: input.FormatDNSTAP,
+		FormatMeta: input.FormatMeta{
+			Format: input.FormatDNSTAP,
+		},
 	}
 	if err := json.Unmarshal(bs, p); err != nil {
 		return nil, errors.Wrapf(err, "failed to decode config")
@@ -45,11 +46,11 @@ func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.Path == "" {
 		return nil, errors.New("missing parameter Path")
 	}
-	if input.NewInputServer(p.Format, &framestream.DecoderOptions{
-		Bidirectional: false,
-	}, nil) == nil {
+	p.is = input.NewInputServer(p, &framestream.DecoderOptions{Bidirectional: false})
+	if p.is == nil {
 		return nil, errors.Errorf("invalid format")
 	}
+
 	p.fs = afero.NewOsFs()
 	return p, nil
 }
@@ -65,19 +66,17 @@ type File struct {
 	// File Path
 	Path string
 	// File format
-	Format input.Format
+	input.FormatMeta
+
+	is *input.InputServer
 }
 
 func (p *File) Start(_ context.Context, ic *types.InputContext) error {
-	is := input.NewInputServer(p.Format, &framestream.DecoderOptions{
-		ContentType:   dnstap.FSContentType,
-		Bidirectional: false,
-	}, ic)
 	r, err := p.fs.Open(p.Path)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
-	if err := is.Read(r, ic.Writer); err != nil {
+	if err := p.is.Read(r, ic.Writer, ic); err != nil {
 		return fmt.Errorf("failed to push message: %w", err)
 	}
 	return nil

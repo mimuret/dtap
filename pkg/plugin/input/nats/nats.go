@@ -40,7 +40,9 @@ func init() {
 
 func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	s := &Nats{
-		Format:   input.FormatDtapFrame,
+		FormatMeta: input.FormatMeta{
+			Format: input.FormatDtapFrame,
+		},
 		QueueLen: 64,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
@@ -55,14 +57,11 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	if s.Token == "" && s.User != "" && s.Password == "" {
 		return nil, errors.Errorf("missing parameter Password")
 	}
-	if input.NewInputServer(s.Format, &framestream.DecoderOptions{
+	s.is = input.NewInputServer(s, &framestream.DecoderOptions{
 		Bidirectional: false,
-	}, nil) == nil {
+	})
+	if s.is == nil {
 		return nil, errors.Errorf("invalid format")
-	}
-	// for test
-	s.ic = &types.InputContext{
-		Logger: zap.NewExample(),
 	}
 	return s, nil
 }
@@ -72,9 +71,12 @@ var _ types.InputPlugin = &Nats{}
 // The nats plugin retrieves messages from the nats server.
 type Nats struct {
 	plugin.PluginCommon
+	// Nats message format
+	input.FormatMeta
+
 	sync.Mutex
 
-	ic *types.InputContext
+	is *input.InputServer
 
 	// Hosts is the URL of the nats servers. Must not be empty.
 	Hosts []string
@@ -91,20 +93,16 @@ type Nats struct {
 	Password string
 	// Nats token
 	Token string
-
-	// Nats message format
-	Format input.Format
 }
 
 func (f *Nats) Start(ctx context.Context, ic *types.InputContext) error {
-	f.ic = ic
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			break LOOP
 		default:
-			if err := f.Subscribe(ctx, ic.Writer); err != nil {
+			if err := f.Subscribe(ctx, ic.Writer, ic); err != nil {
 				return err
 			}
 		}
@@ -129,10 +127,7 @@ func (f *Nats) Open() (*nats.Conn, error) {
 	return conn, nil
 }
 
-func (f *Nats) Subscribe(ctx context.Context, w types.Writer) error {
-	is := input.NewInputServer(f.Format, &framestream.DecoderOptions{
-		Bidirectional: false,
-	}, f.ic)
+func (f *Nats) Subscribe(ctx context.Context, w types.Writer, ic *types.InputContext) error {
 	nc, err := f.Open()
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect nats server")
@@ -150,7 +145,7 @@ func (f *Nats) Subscribe(ctx context.Context, w types.Writer) error {
 	}()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	f.ic.Logger.Info("start subscribe", zap.String("subject", f.Subject), zap.String("queue name", f.QueueName), zap.Int("queue len", f.QueueLen))
+	ic.Logger.Info("start subscribe", zap.String("subject", f.Subject), zap.String("queue name", f.QueueName), zap.Int("queue len", f.QueueLen))
 LOOP:
 	for {
 		select {
@@ -160,9 +155,8 @@ LOOP:
 			wg.Add(1)
 			go func(bs []byte) {
 				buf := bytes.NewBuffer(bs)
-				if err := is.Read(buf, w); err != nil {
-					input.TotalDecordError.Inc()
-					f.ic.Logger.Debug("input error", zap.Error(err))
+				if err := f.is.Read(buf, w, ic); err != nil {
+					ic.Logger.Debug("input error", zap.Error(err))
 				}
 				wg.Done()
 			}(msg.Data)

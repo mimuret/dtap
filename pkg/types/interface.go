@@ -40,6 +40,7 @@ type Counter interface {
 
 type Plugin interface {
 	GetName() string
+	GetID() string
 }
 
 type InputContext struct {

@@ -15,8 +15,8 @@
     "LogLevel": {
       "$ref": "#/$defs/LogLevel"
     },
-    "MetricsListen": {
-      "$ref": "#/$defs/MetricsListen"
+    "ManageHTTPSServer": {
+      "$ref": "#/$defs/ManageHTTPSServer"
     },
     "InputBufferConfig": {
       "$ref": "#/$defs/BufferConfig"
@@ -54,8 +54,8 @@
         "fatal"
       ]
     },
-    "MetricsListen": {
-      "title": "MetricsListen",
+    "ManageHTTPSServer": {
+      "title": "ManageHTTPSServer",
       "description": "Metrics listener address host:port format",
       "type": "string",
       "default": ":9520"

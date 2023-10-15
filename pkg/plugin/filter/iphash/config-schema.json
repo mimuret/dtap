@@ -5,11 +5,15 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Salt"
   ],
   "properties": {
     "Name": {
       "const": "iphash"
+    },
+    "ID": {
+      "type": "string"
     },
     "Salt": {
       "description": "The `string` is the hash salt.",

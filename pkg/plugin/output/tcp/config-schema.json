@@ -4,12 +4,16 @@
   "type": "object",
   "required": [
     "Name",
+    "ID",
     "Host",
     "Port"
   ],
   "properties": {
     "Name": {
       "const": "tcp"
+    },
+    "ID": {
+      "type": "string"
     },
     "Host": {
       "description": "The `Host` is the hostname or ip address to connect",

@@ -17,10 +17,13 @@
 package nats
 
 import (
+	"fmt"
 	"sync"
 
 	json "github.com/goccy/go-json"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -64,7 +67,42 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.publisher == nil {
 		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
 	}
+	if s.ID == "" {
+		return nil, errors.Errorf("`ID` must not be empty")
+	}
 	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
+
+	fmt.Println(s.GetID())
+	s.openErr = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "open_errors_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.publishCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "publish_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.publishErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "publish_failed_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.writeMessageCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "write_messages_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.writeMessageErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "write_errors_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
 	return s, nil
 }
 
@@ -107,6 +145,13 @@ type Nats struct {
 	publisher pub.Publisher
 
 	oc *types.OutputContext
+
+	openErr prometheus.Counter
+
+	publishCounter         prometheus.Counter
+	publishErrCounter      prometheus.Counter
+	writeMessageCounter    prometheus.Counter
+	writeMessageErrCounter prometheus.Counter
 }
 
 func (f *Nats) SetOutputContext(oc *types.OutputContext) {
@@ -126,6 +171,7 @@ func (f *Nats) Open() error {
 	}
 	f.conn, err = cfg.Connect()
 	if err != nil {
+		f.openErr.Inc()
 		return errors.Wrap(err, "failed to create nats producer")
 	}
 	f.publisher.Start()
@@ -133,12 +179,21 @@ func (f *Nats) Open() error {
 }
 
 func (f *Nats) Write(dm *types.DnstapMessage) error {
-	return f.publisher.Write(dm)
+	f.writeMessageCounter.Inc()
+	if err := f.publisher.Write(dm); err != nil {
+		f.writeMessageErrCounter.Inc()
+	}
+	return nil
 }
 
 func (f *Nats) Publish(data []byte) error {
 	err := f.conn.Publish(f.Subject, data)
-	return errors.Wrap(err, "publish error")
+	f.publishCounter.Inc()
+	if err != nil {
+		f.publishErrCounter.Inc()
+		return errors.Wrap(err, "publish error")
+	}
+	return nil
 }
 
 func (f *Nats) Close() {
