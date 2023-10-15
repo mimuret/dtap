@@ -19,9 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
 	"github.com/mimuret/dtap/v2/pkg/logger"
@@ -58,13 +56,16 @@ type controller struct {
 	registery      *prometheus.Registry
 
 	outputGroups []OutputGroup
+
+	reloadCh chan struct{}
 }
 
-func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry) *controller {
+func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}) *controller {
 	return &controller{
 		config:    cfg,
 		logger:    logger,
 		registery: registery,
+		reloadCh:  reloadCh,
 		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "dtap",
 			Subsystem: "global",
@@ -157,17 +158,25 @@ func (c *controller) setup() error {
 	return nil
 }
 
-func (c *controller) prometheusListen(ctx context.Context) {
+func (c *controller) startManageHTTPServer(ctx context.Context) {
 	mux := &http.ServeMux{}
 	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(
 		c.registery, promhttp.HandlerFor(c.registery, promhttp.HandlerOpts{}),
 	))
+	mux.HandleFunc("/reload", func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		c.reloadCh <- struct{}{}
+		w.WriteHeader(http.StatusAccepted)
+	})
 	srv := &http.Server{
-		Addr:    c.config.MetricsListen,
+		Addr:    c.config.ManageHTTPSServer,
 		Handler: mux,
 	}
 	var errCh = make(chan error)
-	c.logger.Info("Listening on", zap.String("address", c.config.MetricsListen))
+	c.logger.Info("Start manage http server", zap.String("address", c.config.ManageHTTPSServer))
 	go func() {
 		errCh <- srv.ListenAndServe()
 	}()
@@ -190,7 +199,7 @@ func (c *controller) prometheusListen(ctx context.Context) {
 
 // main running function
 func (c *controller) Run(ctx context.Context) error {
-	go c.prometheusListen(ctx)
+	go c.startManageHTTPServer(ctx)
 	errCh := make(chan error, 128)
 
 	// start inputPlugin
@@ -256,16 +265,17 @@ func (c *controller) Run(ctx context.Context) error {
 	c.logger.Info("semaphore", zap.Uint("num-worker", c.config.InputFilterWorkerNum))
 	iFilterSemaphore := semaphore.NewWeighted(int64(c.config.InputFilterWorkerNum))
 	c.logger.Info("Start main loop")
-	mainCtx, cancelFunc := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	mainCtx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
 LOOP:
 	for {
 		select {
 		case <-mainCtx.Done():
+			c.logger.Info("cancel recieved")
 			break LOOP
 		case err := <-errCh:
 			c.logger.Error("plugin error", zap.Error(err))
-			cancelFunc()
-			break LOOP
+			return fmt.Errorf("plugin error: %w", err)
 		// read from input plugin
 		case dm := <-c.inputBuffer.Read():
 			if dm == nil {
@@ -304,18 +314,18 @@ LOOP:
 }
 
 // main running function
-func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry) (*controller, error) {
+func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}) (*controller, *zap.Logger, error) {
 	c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	l, err := logger.New(c.LogLevel)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	ctl := newController(c, l, registery)
+	ctl := newController(c, l, registery, reloadCh)
 	if err := ctl.setup(); err != nil {
-		return nil, fmt.Errorf("failed to setup: %w", err)
+		return nil, nil, fmt.Errorf("failed to setup: %w", err)
 	}
-	return ctl, nil
+	return ctl, l, nil
 }

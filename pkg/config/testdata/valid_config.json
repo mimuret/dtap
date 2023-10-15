@@ -1,7 +1,7 @@
 {
   "InputFilterWorkerNum": 1,
   "LogLevel": "info",
-  "MetricsListen": ":9520",
+  "ManageHTTPSServer": ":9520",
   "InputBufferConfig": {
     "Name": "input_common",
     "Size": 100

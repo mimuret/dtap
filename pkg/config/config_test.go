@@ -117,7 +117,7 @@ var _ = Describe("config", func() {
 				c := &config.Config{
 					InputFilterWorkerNum: 10,
 					LogLevel:             "trace",
-					MetricsListen:        ":19520",
+					ManageHTTPSServer:    ":19520",
 					InputBufferConfig: &config.BufferConfig{
 						Name: "input_common",
 						Size: 100,
@@ -139,7 +139,7 @@ var _ = Describe("config", func() {
 				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
 				Expect(cfg.InputFilterWorkerNum).To(Equal(c.InputFilterWorkerNum))
 				Expect(cfg.LogLevel).To(Equal(c.LogLevel))
-				Expect(cfg.MetricsListen).To(Equal(c.MetricsListen))
+				Expect(cfg.ManageHTTPSServer).To(Equal(c.ManageHTTPSServer))
 				Expect(cfg.InputBufferConfig).To(Equal(c.InputBufferConfig))
 				Expect(len(cfg.Filters)).To(Equal(len(c.Filters)))
 				Expect(len(cfg.Inputs)).To(Equal(len(c.Inputs)))

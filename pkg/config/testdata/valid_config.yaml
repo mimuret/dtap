@@ -1,6 +1,6 @@
 InputFilterWorkerNum: 10
 LogLevel: "trace"
-MetricsListen: ":19520"
+ManageHTTPSServer: ":19520"
 InputBufferConfig:
   Name: "input_common"
   Size: 100
