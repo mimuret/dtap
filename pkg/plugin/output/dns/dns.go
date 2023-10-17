@@ -147,9 +147,11 @@ func (o *DNS) Open() error {
 }
 
 func (o *DNS) Write(dm *types.DnstapMessage) error {
-	o.sem.Acquire(context.Background(), 1)
+	if err := o.sem.Acquire(context.Background(), 1); err != nil {
+		return err
+	}
 	go func(dm *types.DnstapMessage) {
-		o.write(dm)
+		_ = o.write(dm)
 		o.sem.Release(1)
 	}(dm)
 	return nil

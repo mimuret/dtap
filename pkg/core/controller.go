@@ -192,7 +192,7 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 				c.logger.Fatal("failed to listen metrics port", zap.Error(err))
 			}
 		case <-ctx.Done():
-			srv.Shutdown(ctx)
+			_ = srv.Shutdown(ctx)
 		}
 	}
 }
