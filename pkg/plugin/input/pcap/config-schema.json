@@ -1,0 +1,29 @@
+{
+  "$id": "/pkg/plugin/input/pcap/config-schema.json",
+  "title": "pcap input plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "ID",
+    "Device",
+    "BPF"
+  ],
+  "properties": {
+    "Name": {
+      "const": "pcap"
+    },
+    "ID": {
+      "type": "string"
+    },
+    "Device": {
+      "type": "string"
+    },
+    "BPF": {
+      "type": "string"
+    },
+    "WorkerNum": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

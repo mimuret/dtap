@@ -1,0 +1,11 @@
+LogLevel: debug
+Inputs:
+  - Name: "pcap"
+    ID: "input_pcap_0"
+    Device: "en0"
+    LogLevel: "info"
+OutputGroups:
+  - Name: "og0"
+    Outputs:
+      - Name: "stdout"
+        ID: "og0_stdout_0"
