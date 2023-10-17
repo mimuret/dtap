@@ -2,6 +2,8 @@ module github.com/mimuret/dtap/v2
 
 go 1.21
 
+require go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0 // indirect
+
 require (
 	github.com/Shopify/sarama v1.30.0
 	github.com/dangkaka/go-kafka-avro v0.0.0-20181108134201-d57aece51a15
@@ -10,6 +12,7 @@ require (
 	github.com/fluent/fluent-logger-golang v1.9.0
 	github.com/go-kit/log v0.2.1
 	github.com/goccy/go-json v0.10.2
+	github.com/google/gopacket v1.1.19
 	github.com/grafana/loki v1.6.2-0.20230120172107-15b382294ed1
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.55
@@ -76,7 +79,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
-	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/grafana/dskit v0.0.0-20230109170026-7242706251b9 // indirect
 	github.com/grafana/regexp v0.0.0-20221005093135-b4c2bcb0a4b6 // indirect
@@ -141,7 +143,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
@@ -151,10 +153,9 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4 // indirect
 	go.mongodb.org/mongo-driver v1.11.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.36.4 // indirect
-	go.opentelemetry.io/otel v1.11.1 // indirect
-	go.opentelemetry.io/otel/metric v0.33.0 // indirect
-	go.opentelemetry.io/otel/trace v1.11.1 // indirect
+	go.opentelemetry.io/otel v1.18.0 // indirect
+	go.opentelemetry.io/otel/metric v1.18.0 // indirect
+	go.opentelemetry.io/otel/trace v1.18.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/goleak v1.2.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
