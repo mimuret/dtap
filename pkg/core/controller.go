@@ -205,11 +205,10 @@ func (c *controller) Run(ctx context.Context) error {
 	// start inputPlugin
 	iwg := sync.WaitGroup{}
 	iCtx, iCancel := context.WithCancel(ctx)
-	for i, inputPlugin := range c.inputPlugins {
+	for _, inputPlugin := range c.inputPlugins {
 		iwg.Add(1)
 		ic := &types.InputContext{
-			No:     i,
-			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.Int("no", i)),
+			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.String("id", inputPlugin.GetID())),
 			Writer: c.inputBuffer,
 		}
 		go func(ip types.InputPlugin, ic *types.InputContext) {
@@ -227,12 +226,11 @@ func (c *controller) Run(ctx context.Context) error {
 	owg := sync.WaitGroup{}
 	oCtx, oCancel := context.WithCancel(ctx)
 	for _, og := range c.outputGroups {
-		for i, outputPlugin := range og.outputs {
+		for _, outputPlugin := range og.outputs {
 			owg.Add(1)
 			oc := &types.OutputContext{
 				OutputGroup: og.name,
-				No:          i,
-				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.Int("no", i)),
+				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.String("id", outputPlugin.GetID())),
 				Reader:      og.buffer,
 			}
 			go func(op types.OutputPlugin, oc *types.OutputContext) {
