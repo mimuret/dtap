@@ -15,8 +15,8 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/grafana/loki v1.6.2-0.20230120172107-15b382294ed1
 	github.com/linkedin/goavro v2.1.0+incompatible
-	github.com/miekg/dns v1.1.55
-	github.com/mimuret/dnsutils v1.10.0
+	github.com/miekg/dns v1.1.56
+	github.com/mimuret/dnsutils v1.11.0
 	github.com/nats-io/nats-server/v2 v2.9.21
 	github.com/nats-io/nats.go v1.28.0
 	github.com/onsi/ginkgo v1.16.5
@@ -160,12 +160,12 @@ require (
 	go.uber.org/goleak v1.2.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/mod v0.11.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.9.3 // indirect
+	golang.org/x/tools v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c // indirect
 	google.golang.org/grpc v1.50.1 // indirect
