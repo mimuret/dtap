@@ -4,6 +4,10 @@ Inputs:
     ID: "input_pcap_0"
     Device: "en0"
     LogLevel: "info"
+    ClientQueryEnabled: true
+    ClientResponseEnabled: true
+    ResolverResponseEnabled: true
+    ResolverQueryEnabled: true
 OutputGroups:
   - Name: "og0"
     Outputs:
