@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"sync"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
@@ -57,15 +58,18 @@ type controller struct {
 
 	outputGroups []OutputGroup
 
+	debug bool
+
 	reloadCh chan struct{}
 }
 
-func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}) *controller {
+func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) *controller {
 	return &controller{
 		config:    cfg,
 		logger:    logger,
 		registery: registery,
 		reloadCh:  reloadCh,
+		debug:     debug,
 		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "dtap",
 			Subsystem: "global",
@@ -171,6 +175,13 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 		c.reloadCh <- struct{}{}
 		w.WriteHeader(http.StatusAccepted)
 	})
+	if c.debug {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 	srv := &http.Server{
 		Addr:    c.config.ManageHTTPSServer,
 		Handler: mux,
@@ -312,7 +323,7 @@ LOOP:
 }
 
 // main running function
-func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}) (*controller, *zap.Logger, error) {
+func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) (*controller, *zap.Logger, error) {
 	c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
 	if err != nil {
 		return nil, nil, err
@@ -321,7 +332,7 @@ func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Regist
 	if err != nil {
 		return nil, nil, err
 	}
-	ctl := newController(c, l, registery, reloadCh)
+	ctl := newController(c, l, registery, reloadCh, debug)
 	if err := ctl.setup(); err != nil {
 		return nil, nil, fmt.Errorf("failed to setup: %w", err)
 	}
