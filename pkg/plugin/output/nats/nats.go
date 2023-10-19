@@ -82,7 +82,7 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	s.publishCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
-		Name:        "publish_total",
+		Name:        "publishes_total",
 		ConstLabels: prometheus.Labels{"ID": s.GetID()},
 	})
 	s.publishErrCounter = promauto.NewCounter(prometheus.CounterOpts{

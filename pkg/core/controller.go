@@ -87,7 +87,7 @@ func (c *controller) setupOutputGroup() error {
 				prometheus.CounterOpts{
 					Namespace:   "dtap",
 					Subsystem:   "output",
-					Name:        "recv_frame_total",
+					Name:        "recv_frames_total",
 					Help:        "The total number of output frames",
 					ConstLabels: prometheus.Labels{"og": ogc.Name},
 				},
@@ -96,7 +96,7 @@ func (c *controller) setupOutputGroup() error {
 				prometheus.CounterOpts{
 					Namespace:   "dtap",
 					Subsystem:   "output",
-					Name:        "lost_frame_total",
+					Name:        "lost_frames_total",
 					Help:        "The total number of lost output frames from buffer",
 					ConstLabels: prometheus.Labels{"og": ogc.Name},
 				},
