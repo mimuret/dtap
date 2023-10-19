@@ -17,10 +17,12 @@ package matcher
 
 import (
 	"github.com/goccy/go-json"
+	"github.com/prometheus/client_golang/prometheus"
 
 	umatcher "github.com/mimuret/dnsutils/matcher"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 )
 
@@ -40,6 +42,18 @@ func setup(data json.RawMessage) (types.FilterPlugin, error) {
 	}
 	g.PluginCommon = t.PluginCommon
 	g.set = set
+	g.matchCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "filter_matcher",
+		Name:        "mactches_total",
+		ConstLabels: prometheus.Labels{"ID": g.GetID()},
+	})
+	g.filterdCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "filter_matcher",
+		Name:        "filtered_total",
+		ConstLabels: prometheus.Labels{"ID": g.GetID()},
+	})
 
 	return g, nil
 }
@@ -57,13 +71,18 @@ type MatcherConfig struct {
 type Matcher struct {
 	plugin.PluginCommon
 	set *umatcher.MatcherSet `json:"-"`
+
+	matchCounter   prometheus.Counter
+	filterdCounter prometheus.Counter
 }
 
 func (f *Matcher) Filter(dt *types.DnstapMessage) *types.DnstapMessage {
 	dnstap := dt.GetDnstap()
 	dnsmsg := dt.GetMessage()
 	if f.set.Match(dnstap, dnsmsg) {
+		f.matchCounter.Inc()
 		return dt
 	}
+	f.filterdCounter.Inc()
 	return nil
 }
