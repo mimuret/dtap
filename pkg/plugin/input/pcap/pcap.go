@@ -75,6 +75,15 @@ type PCAP struct {
 	// BPF Filter
 	BPF string
 
+	// If ResolverQueryEnabled is true, input it. Default is false.
+	ResolverQueryEnabled bool
+	// If ResolverResponseEnabled is true, input it. Default is false.
+	ResolverResponseEnabled bool
+	// If ClientQueryEnabled is true, input it. Default is false.
+	ClientQueryEnabled bool
+	// If ClientResponseEnabled is true, input it. Default is false.
+	ClientResponseEnabled bool
+
 	WorkerNum int64
 
 	bpfInstructionFilter []pcap.BPFInstruction
@@ -194,6 +203,27 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.Type = dnstap.Message_RESOLVER_RESPONSE.Enum()
 			dm.QueryMessage = payload
 		}
+	}
+
+	switch dm.GetType() {
+	case dnstap.Message_CLIENT_QUERY:
+		if !p.ClientQueryEnabled {
+			return
+		}
+	case dnstap.Message_CLIENT_RESPONSE:
+		if !p.ClientResponseEnabled {
+			return
+		}
+	case dnstap.Message_RESOLVER_QUERY:
+		if !p.ResolverQueryEnabled {
+			return
+		}
+	case dnstap.Message_RESOLVER_RESPONSE:
+		if !p.ResolverResponseEnabled {
+			return
+		}
+	default:
+		return
 	}
 
 	frame, err := types.NewDnstapMessageFromDnstap(dt)
