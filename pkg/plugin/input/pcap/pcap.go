@@ -34,6 +34,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	strToDirection = map[string]pcap.Direction{
+		"in":    pcap.DirectionIn,
+		"out":   pcap.DirectionInOut,
+		"inout": pcap.DirectionIn,
+	}
+)
+
 func init() {
 	_ = registry.RegisterInputPlugin("pcap", Setup)
 }
@@ -42,14 +50,19 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	var err error
 	p := &PCAP{
 		BPF:       "port 53",
+		Direction: "inout",
 		WorkerNum: 1,
 	}
-
 	if err = json.Unmarshal(bs, p); err != nil {
 		return nil, errors.Wrapf(err, "failed to decode config")
 	}
 	if p.Device == "" {
 		return nil, errors.New("missing parameter Device")
+	}
+	switch p.Direction {
+	case "in", "out", "inout":
+	default:
+		return nil, errors.New("invalid parameter Direction")
 	}
 	if p.device, err = net.InterfaceByName(p.Device); err != nil {
 		return nil, errors.Wrapf(err, "missing device %s", p.Device)
@@ -75,6 +88,9 @@ type PCAP struct {
 	// BPF Filter
 	BPF string
 
+	// Choose send/receive direction direction for which packets. Possible values are `in', `out' and `inout'. Default is `inout`.
+	Direction string
+
 	// If ResolverQueryEnabled is true, input it. Default is false.
 	ResolverQueryEnabled bool
 	// If ResolverResponseEnabled is true, input it. Default is false.
@@ -94,6 +110,10 @@ func (p *PCAP) Start(ctx context.Context, ic *types.InputContext) error {
 	handle, err := pcap.OpenLive(p.Device, 65535, true, pcap.BlockForever)
 	if err != nil {
 		ic.Logger.Error("failed to open device", zap.Error(err))
+		return err
+	}
+	if err := handle.SetDirection(strToDirection[p.Direction]); err != nil {
+		ic.Logger.Error("failed to set direction", zap.Error(err), zap.String("direction", p.Direction))
 		return err
 	}
 	if err := handle.SetBPFInstructionFilter(p.bpfInstructionFilter); err != nil {
