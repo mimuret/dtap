@@ -168,14 +168,15 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 		ic.Logger.Debug("failed to get NetworkLayer")
 		return
 	}
+	var src, dst net.IP
 	if ipv4, ok := n.(*layers.IPv4); ok {
 		dm.SocketFamily = dnstap.SocketFamily_INET.Enum()
-		dm.QueryAddress = ipv4.SrcIP
-		dm.ResponseAddress = ipv4.DstIP
+		src = ipv4.DstIP
+		dst = ipv4.DstIP
 	} else if ipv6, ok := n.(*layers.IPv6); ok {
 		dm.SocketFamily = dnstap.SocketFamily_INET6.Enum()
-		dm.QueryAddress = ipv6.SrcIP
-		dm.ResponseAddress = ipv6.DstIP
+		src = ipv6.DstIP
+		dst = ipv6.DstIP
 	} else {
 		ic.Logger.Debug("unknown NetworkLayer")
 		return
@@ -209,19 +210,31 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 	dm.ResponsePort = &dstPort
 	if send {
 		if srcPort == uint32(53) {
+			// resolver:53 -> client:***
 			dm.Type = dnstap.Message_CLIENT_RESPONSE.Enum()
 			dm.ResponseMessage = payload
+			dm.QueryAddress = dst
+			dm.ResponseAddress = src
 		} else {
+			// resolver:*** -> auth:***
 			dm.Type = dnstap.Message_RESOLVER_QUERY.Enum()
 			dm.QueryMessage = payload
+			dm.QueryAddress = src
+			dm.ResponseAddress = dst
 		}
 	} else {
 		if dstPort == uint32(53) {
+			// client:*** -> resolver:53
 			dm.Type = dnstap.Message_CLIENT_QUERY.Enum()
 			dm.ResponseMessage = payload
+			dm.QueryAddress = src
+			dm.ResponseAddress = dst
 		} else {
+			// auth:53 -> resolver:***
 			dm.Type = dnstap.Message_RESOLVER_RESPONSE.Enum()
 			dm.QueryMessage = payload
+			dm.QueryAddress = dst
+			dm.ResponseAddress = src
 		}
 	}
 
