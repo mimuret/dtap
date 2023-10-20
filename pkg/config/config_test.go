@@ -26,7 +26,7 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/file"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/afero"
 )

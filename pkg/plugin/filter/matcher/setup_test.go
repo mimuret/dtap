@@ -25,7 +25,7 @@ import (
 	pmatcher "github.com/mimuret/dtap/v2/pkg/plugin/filter/matcher"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/protobuf/proto"
 )
@@ -59,9 +59,9 @@ var _ = Describe("Static", func() {
 				staticDnsFalse, _ := matcher.NewMatchDNSMsgStatic(false)
 				staticDnsTrue, _ := matcher.NewMatchDNSMsgStatic(true)
 				Expect(err).To(Succeed())
-				Expect(fp).To(Equal(pmatcher.UpdateSet(&pmatcher.Matcher{
-					PluginCommon: plugin.PluginCommon{Name: "matcher"},
-				}, &matcher.MatcherSet{
+				m := fp.(*pmatcher.Matcher)
+				Expect(m.PluginCommon).To(Equal(plugin.PluginCommon{Name: "matcher", ID: "filter-matcher"}))
+				Expect(pmatcher.GetSet(m)).To(Equal(&matcher.MatcherSet{
 					Op:             matcher.SetOpOR,
 					DnstapMatchers: []matcher.DnstapMatcher{staticDnstapFalse},
 					DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse},
@@ -71,7 +71,7 @@ var _ = Describe("Static", func() {
 							DnsMsgMatchers: []matcher.DnsMsgMatcher{staticDnsFalse, staticDnsTrue},
 						},
 					},
-				})))
+				}))
 			})
 		})
 	})
@@ -85,7 +85,7 @@ var _ = Describe("Static", func() {
 		BeforeEach(func() {
 			staticDnstapTrue, _ = matcher.NewMatchDnstapStatic(true)
 			staticDnsTrue, _ = matcher.NewMatchDNSMsgStatic(true)
-			fp = pmatcher.UpdateSet(&pmatcher.Matcher{}, &matcher.MatcherSet{
+			fp = pmatcher.UpdateSet(pmatcher.NewMatcher(), &matcher.MatcherSet{
 				Op:             matcher.SetOpAND,
 				DnstapMatchers: []matcher.DnstapMatcher{staticDnstapTrue},
 			},

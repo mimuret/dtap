@@ -1,6 +1,7 @@
 {
-  "name": "matcher",
-  "rule": {
+  "Name": "matcher",
+  "ID": "filter-matcher",
+  "Rule": {
     "Op": "OR",
     "Matchers": [
       {

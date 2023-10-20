@@ -19,7 +19,7 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
 	"github.com/mimuret/dtap/v2/pkg/testtool"
 	"github.com/mimuret/dtap/v2/pkg/types"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

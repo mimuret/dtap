@@ -18,11 +18,11 @@ package pcap_test
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "input/unix package test suite")
+	RunSpecs(t, "input/pcap package test suite")
 }

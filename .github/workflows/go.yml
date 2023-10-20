@@ -21,4 +21,6 @@ jobs:
       with:
         go-version: '1.21'
     - name: Test
-      run: go test -v ./...
+      run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo
+        ginkgo run --label-filter='!privileged' ./...

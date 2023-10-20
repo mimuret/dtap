@@ -26,7 +26,7 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/nats-io/nats-server/v2/server"
 	natsio "github.com/nats-io/nats.go"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
