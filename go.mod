@@ -4,6 +4,8 @@ go 1.21
 
 require go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0 // indirect
 
+require github.com/nats-io/nats-server/v2 v2.9.23
+
 require (
 	github.com/Shopify/sarama v1.30.0
 	github.com/dangkaka/go-kafka-avro v0.0.0-20181108134201-d57aece51a15
@@ -17,7 +19,6 @@ require (
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.56
 	github.com/mimuret/dnsutils v1.11.0
-	github.com/nats-io/nats-server/v2 v2.9.21
 	github.com/nats-io/nats.go v1.28.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.10
@@ -120,7 +121,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
-	github.com/nats-io/jwt/v2 v2.4.1 // indirect
+	github.com/nats-io/jwt/v2 v2.5.0 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
