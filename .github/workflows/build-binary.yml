@@ -1,0 +1,60 @@
+name: "build binary"
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release-linux-amd64:
+    name: release linux/amd64
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: apt update && apt install libpcap-dev -y
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: linux
+        goarch: amd64
+        project_path: "."
+        binary_name: "dtap"
+        extra_files: LICENSE README.md
+  release-linux-arm64:
+    name: release linux/arm64
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: apt update && apt install libpcap-dev -y
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: linux
+        project_path: "."
+        binary_name: "dtap"
+        extra_files: LICENSE README.md
+  release-darwin-amd64:
+    name: release darwin/amd64
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: darwin
+        goarch: amd64
+        project_path: "."
+        binary_name: "dtap"
+        extra_files: LICENSE README.md
+  release-darwin-arm64:
+    name: release darwin/arm64
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: wangyoucao577/go-release-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        goos: darwin
+        goarch: arm64
+        project_path: "."
+        binary_name: "dtap"
+        extra_files: LICENSE README.md

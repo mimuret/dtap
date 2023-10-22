@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"sync"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
@@ -57,15 +58,18 @@ type controller struct {
 
 	outputGroups []OutputGroup
 
+	debug bool
+
 	reloadCh chan struct{}
 }
 
-func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}) *controller {
+func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) *controller {
 	return &controller{
 		config:    cfg,
 		logger:    logger,
 		registery: registery,
 		reloadCh:  reloadCh,
+		debug:     debug,
 		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "dtap",
 			Subsystem: "global",
@@ -87,7 +91,7 @@ func (c *controller) setupOutputGroup() error {
 				prometheus.CounterOpts{
 					Namespace:   "dtap",
 					Subsystem:   "output",
-					Name:        "recv_frame_total",
+					Name:        "recv_frames_total",
 					Help:        "The total number of output frames",
 					ConstLabels: prometheus.Labels{"og": ogc.Name},
 				},
@@ -96,7 +100,7 @@ func (c *controller) setupOutputGroup() error {
 				prometheus.CounterOpts{
 					Namespace:   "dtap",
 					Subsystem:   "output",
-					Name:        "lost_frame_total",
+					Name:        "lost_frames_total",
 					Help:        "The total number of lost output frames from buffer",
 					ConstLabels: prometheus.Labels{"og": ogc.Name},
 				},
@@ -171,6 +175,13 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 		c.reloadCh <- struct{}{}
 		w.WriteHeader(http.StatusAccepted)
 	})
+	if c.debug {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 	srv := &http.Server{
 		Addr:    c.config.ManageHTTPSServer,
 		Handler: mux,
@@ -192,7 +203,7 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 				c.logger.Fatal("failed to listen metrics port", zap.Error(err))
 			}
 		case <-ctx.Done():
-			srv.Shutdown(ctx)
+			_ = srv.Shutdown(ctx)
 		}
 	}
 }
@@ -205,11 +216,10 @@ func (c *controller) Run(ctx context.Context) error {
 	// start inputPlugin
 	iwg := sync.WaitGroup{}
 	iCtx, iCancel := context.WithCancel(ctx)
-	for i, inputPlugin := range c.inputPlugins {
+	for _, inputPlugin := range c.inputPlugins {
 		iwg.Add(1)
 		ic := &types.InputContext{
-			No:     i,
-			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.Int("no", i)),
+			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.String("id", inputPlugin.GetID())),
 			Writer: c.inputBuffer,
 		}
 		go func(ip types.InputPlugin, ic *types.InputContext) {
@@ -227,12 +237,11 @@ func (c *controller) Run(ctx context.Context) error {
 	owg := sync.WaitGroup{}
 	oCtx, oCancel := context.WithCancel(ctx)
 	for _, og := range c.outputGroups {
-		for i, outputPlugin := range og.outputs {
+		for _, outputPlugin := range og.outputs {
 			owg.Add(1)
 			oc := &types.OutputContext{
 				OutputGroup: og.name,
-				No:          i,
-				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.Int("no", i)),
+				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.String("id", outputPlugin.GetID())),
 				Reader:      og.buffer,
 			}
 			go func(op types.OutputPlugin, oc *types.OutputContext) {
@@ -314,7 +323,7 @@ LOOP:
 }
 
 // main running function
-func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}) (*controller, *zap.Logger, error) {
+func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) (*controller, *zap.Logger, error) {
 	c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
 	if err != nil {
 		return nil, nil, err
@@ -323,7 +332,7 @@ func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Regist
 	if err != nil {
 		return nil, nil, err
 	}
-	ctl := newController(c, l, registery, reloadCh)
+	ctl := newController(c, l, registery, reloadCh, debug)
 	if err := ctl.setup(); err != nil {
 		return nil, nil, fmt.Errorf("failed to setup: %w", err)
 	}

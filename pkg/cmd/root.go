@@ -37,6 +37,7 @@ type Runner interface {
 
 var cfgFile string
 var runnerCh chan Runner
+var debug bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -106,7 +107,7 @@ var rootCmd = &cobra.Command{
 func makeRunner(cfgFile string, reloadCh chan struct{}) (*zap.Logger, error) {
 	registery := prometheus.NewRegistry()
 	promauto.Set(registery)
-	runner, l, err := core.NewRunner(context.Background(), cfgFile, registery, reloadCh)
+	runner, l, err := core.NewRunner(context.Background(), cfgFile, registery, reloadCh, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -126,5 +127,6 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "", false, "enable profile api")
 	runnerCh = make(chan Runner, 1)
 }

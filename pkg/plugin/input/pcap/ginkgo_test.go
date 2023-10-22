@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package registry_test
+package pcap_test
 
 import (
 	"testing"
@@ -24,5 +24,5 @@ import (
 
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "plugin package test suite")
+	RunSpecs(t, "input/pcap package test suite")
 }

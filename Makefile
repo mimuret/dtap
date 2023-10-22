@@ -7,7 +7,7 @@ checks:
 	golangci-lint run
 
 test:
-	go test ./...
+	ginkgo run ./...
 
 build:
 	go build

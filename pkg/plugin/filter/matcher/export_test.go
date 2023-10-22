@@ -17,12 +17,21 @@ package matcher
 
 import (
 	umatcher "github.com/mimuret/dnsutils/matcher"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func UpdateSet(f *Matcher, set *umatcher.MatcherSet) *Matcher {
 	f.set = set
 	return f
 }
+
 func GetSet(f *Matcher) *umatcher.MatcherSet {
 	return f.set
+}
+
+func NewMatcher() *Matcher {
+	return &Matcher{
+		matchCounter:   prometheus.NewCounter(prometheus.CounterOpts{Name: "dummy_match_counter"}),
+		filterdCounter: prometheus.NewCounter(prometheus.CounterOpts{Name: "dummy_filterd_counter"}),
+	}
 }

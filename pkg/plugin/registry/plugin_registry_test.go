@@ -20,7 +20,7 @@ import (
 	json "github.com/goccy/go-json"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

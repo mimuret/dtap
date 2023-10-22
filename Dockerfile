@@ -1,6 +1,6 @@
 FROM golang:1.21-alpine as base
 WORKDIR /build
-RUN apk --update --no-cache add git gcc musl-dev
+RUN apk --update --no-cache add git gcc musl-dev libpcap-dev
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -8,7 +8,7 @@ RUN go mod download
 FROM base as builder
 WORKDIR /build
 COPY . .
-RUN go build
+RUN go build -ldflags '-extldflags=-static' 
 
 FROM alpine:3.18
 

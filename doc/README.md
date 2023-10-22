@@ -25,6 +25,7 @@
 - [nats](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/input/nats#Nats)
 - [tcp](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/input/tcp#TCPSocket)
 - [unix](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/input/unix#UnixSocket)
+- [pcap](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/input/pcap#PCAP)
 
 ## output plugins
 
