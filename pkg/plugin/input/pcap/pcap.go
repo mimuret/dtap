@@ -219,8 +219,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &dstPort
 			dm.ResponseAddress = src
 			dm.ResponsePort = &srcPort
-			dm.QueryTimeSec = &timeSec
-			dm.QueryTimeNsec = &timeNsec
+			dm.ResponseTimeSec = &timeSec
+			dm.ResponseTimeNsec = &timeNsec
 		} else {
 			// resolver:*** -> auth:***
 			dm.Type = dnstap.Message_RESOLVER_QUERY.Enum()
@@ -229,8 +229,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &srcPort
 			dm.ResponseAddress = dst
 			dm.ResponsePort = &dstPort
-			dm.ResponseTimeSec = &timeSec
-			dm.ResponseTimeNsec = &timeNsec
+			dm.QueryTimeSec = &timeSec
+			dm.QueryTimeNsec = &timeNsec
 		}
 	} else {
 		if dstPort == uint32(53) {
@@ -241,8 +241,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &srcPort
 			dm.ResponseAddress = dst
 			dm.ResponsePort = &dstPort
-			dm.ResponseTimeSec = &timeSec
-			dm.ResponseTimeNsec = &timeNsec
+			dm.QueryTimeSec = &timeSec
+			dm.QueryTimeNsec = &timeNsec
 		} else {
 			// auth:53 -> resolver:***
 			dm.Type = dnstap.Message_RESOLVER_RESPONSE.Enum()
@@ -251,8 +251,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &dstPort
 			dm.ResponseAddress = src
 			dm.ResponsePort = &srcPort
-			dm.QueryTimeSec = &timeSec
-			dm.QueryTimeNsec = &timeNsec
+			dm.ResponseTimeSec = &timeSec
+			dm.ResponseTimeNsec = &timeNsec
 		}
 	}
 
