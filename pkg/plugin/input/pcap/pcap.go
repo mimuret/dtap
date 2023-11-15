@@ -198,7 +198,7 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 		dm.SocketProtocol = dnstap.SocketProtocol_TCP.Enum()
 		srcPort = uint32(tcp.SrcPort)
 		dstPort = uint32(tcp.DstPort)
-		if len(tcp.Payload) == 0 {
+		if len(tcp.Payload) < 2 {
 			return
 		}
 		payload = tcp.Payload[2:]
