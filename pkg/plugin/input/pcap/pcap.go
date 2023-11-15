@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/goccy/go-json"
@@ -206,6 +207,9 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 		ic.Logger.Debug("unknown TransportLayer")
 		return
 	}
+	timeNow := time.Now()
+	timeSec := uint64(timeNow.Unix())
+	timeNsec := uint32(timeNow.Nanosecond())
 	if send {
 		if srcPort == uint32(53) {
 			// resolver:53 -> client:***
@@ -215,6 +219,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &dstPort
 			dm.ResponseAddress = src
 			dm.ResponsePort = &srcPort
+			dm.QueryTimeSec = &timeSec
+			dm.QueryTimeNsec = &timeNsec
 		} else {
 			// resolver:*** -> auth:***
 			dm.Type = dnstap.Message_RESOLVER_QUERY.Enum()
@@ -223,6 +229,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &srcPort
 			dm.ResponseAddress = dst
 			dm.ResponsePort = &dstPort
+			dm.ResponseTimeSec = &timeSec
+			dm.ResponseTimeNsec = &timeNsec
 		}
 	} else {
 		if dstPort == uint32(53) {
@@ -233,6 +241,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &srcPort
 			dm.ResponseAddress = dst
 			dm.ResponsePort = &dstPort
+			dm.ResponseTimeSec = &timeSec
+			dm.ResponseTimeNsec = &timeNsec
 		} else {
 			// auth:53 -> resolver:***
 			dm.Type = dnstap.Message_RESOLVER_RESPONSE.Enum()
@@ -241,6 +251,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryPort = &dstPort
 			dm.ResponseAddress = src
 			dm.ResponsePort = &srcPort
+			dm.QueryTimeSec = &timeSec
+			dm.QueryTimeNsec = &timeNsec
 		}
 	}
 
