@@ -36,6 +36,7 @@ func (c *connectionManager) register(conn net.Conn) {
 func (c *connectionManager) remove(conn net.Conn) {
 	c.Lock()
 	defer c.Unlock()
+	conn.Close()
 	delete(c.connections, conn)
 }
 func (c *connectionManager) close() {
@@ -137,6 +138,7 @@ func (i *InputServer) Serve(p PluginWithFormat, ln net.Listener, buf types.Write
 				i.totalDecordErrorCount.Inc()
 				ic.Logger.Debug("input error", zap.Error(err))
 			}
+
 			i.connectionManager.remove(conn)
 			wg.Done()
 		}(conn)
@@ -165,7 +167,8 @@ LOOP:
 		dm, err := i.unmarshaler(bs)
 		if err != nil {
 			i.unmarshalDecordErrCount.Inc()
-			return errors.Wrap(err, "failed to create dnstap message")
+			ic.Logger.Debug("input error", zap.Error(err))
+			continue
 		}
 		buf.Write(dm)
 	}
