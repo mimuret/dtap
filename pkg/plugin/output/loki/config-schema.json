@@ -22,6 +22,20 @@
     "MaxStream": {
       "description": "The `MaxStream` is the number of promtail stream.",
       "type": "integer"
+    },
+    "JSONIncludeKeys": {
+      "description": "JSONIncludeKeys is a key filter.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "JSONExcludeKeys": {
+      "description": "JSONExcludeKeys is a key filter.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
-  }
+        }
 }

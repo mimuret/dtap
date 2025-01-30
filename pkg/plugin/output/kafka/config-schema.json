@@ -52,8 +52,31 @@
         "Key": {
           "description": "Topic is the kafka message key.",
           "type": "string"
+        },
+        "OutputType": {
+          "description": "OutputType is output format.",
+          "type": "string",
+          "enum": [
+            "json",
+            "protobuf",
+            "avero"
+          ]
+        },
+        "JSONIncludeKeys": {
+          "description": "JSONIncludeKeys is a key filter when using the json OutputType.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "JSONExcludeKeys": {
+          "description": "JSONExcludeKeys is a key filter when using the json OutputType.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
-      }
+       }
     }
   }
 }

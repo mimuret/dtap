@@ -99,7 +99,6 @@ var _ = Describe("input/pcap", func() {
 			cancelFunc context.CancelFunc
 		)
 		BeforeEach(func() {
-			fmt.Println(`{"Name":"pcap","ID":"id6","Device":"` + ifName + `"}`)
 			ip, err = pcap.Setup(json.RawMessage(`{"Name":"pcap","ID":"id6","Device":"` + ifName + `"}`))
 			p = ip.(*pcap.PCAP)
 		})
