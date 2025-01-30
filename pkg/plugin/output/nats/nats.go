@@ -17,7 +17,6 @@
 package nats
 
 import (
-	"fmt"
 	"sync"
 
 	json "github.com/goccy/go-json"
@@ -72,7 +71,6 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	}
 	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
 
-	fmt.Println(s.GetID())
 	s.openErr = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",

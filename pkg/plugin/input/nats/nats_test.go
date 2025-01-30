@@ -18,7 +18,6 @@ package nats_test
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -238,7 +237,6 @@ var _ = Describe("input/nats", func() {
 							time.Sleep(time.Second)
 							cl, err := p.Open()
 							Expect(err).To(Succeed())
-							fmt.Println("publish")
 							err = cl.Publish("dnstap", dnstapRaw)
 							Expect(err).To(Succeed())
 						})
