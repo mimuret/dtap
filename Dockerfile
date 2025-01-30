@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine as base
+FROM golang:1.23-alpine as base
 WORKDIR /build
 RUN apk --update --no-cache add git gcc musl-dev libpcap-dev
 COPY go.mod .
