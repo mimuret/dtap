@@ -22,6 +22,20 @@
         "go-template"
       ]
     },
+    "JSONIncludeKeys": {
+      "description": "JSONIncludeKeys is a key filter when using the json/v1 format.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "JSONExcludeKeys": {
+      "description": "JSONExcludeKeys is a key filter when using the json/v1 format.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "Template": {
       "description": "The `Template` is the `text/template` style template string.",
       "type": "string"
