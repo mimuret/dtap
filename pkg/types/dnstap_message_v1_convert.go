@@ -204,6 +204,27 @@ func (d *DnstapMessage) ConvertV1JSON() ([]byte, error) {
 	return json.Marshal(flat)
 }
 
+func (d *DnstapMessage) ConvertV1JSONWithFilter(includeKeys, excludeKeys []string) ([]byte, error) {
+	mapString, err := d.ConvertV1MapString()
+	if err != nil {
+		return nil, err
+	}
+	res := map[string]interface{}{}
+	if len(includeKeys) > 0 {
+		for _, k := range includeKeys {
+			if v, ok := mapString[k]; ok {
+				res[k] = v
+			}
+		}
+	} else {
+		res = mapString
+	}
+	for _, k := range excludeKeys {
+		delete(res, k)
+	}
+	return json.Marshal(res)
+}
+
 func getName(labels []string, i int) string {
 	var res string
 	labelsLen := len(labels)

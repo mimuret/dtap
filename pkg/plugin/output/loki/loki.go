@@ -79,6 +79,10 @@ type Loki struct {
 
 	MaxStream   int
 	MaxLineSize int
+
+	ExcludeKey []string
+	IncludeKey []string
+
 	client.Config
 	client.Client
 
@@ -104,7 +108,7 @@ func (f *Loki) Open() error {
 }
 
 func (f *Loki) Write(dm *types.DnstapMessage) error {
-	jsonRaw, err := dm.ConvertV1JSON()
+	jsonRaw, err := dm.ConvertV1JSONWithFilter(f.IncludeKey, f.ExcludeKey)
 	if err != nil {
 		return err
 	}
