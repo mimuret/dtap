@@ -21,9 +21,9 @@ var _ = Describe("DnstapMessage", func() {
 			dm = testtool.CreateValidDnstapMessage()
 			res = map[string]interface{}{}
 		})
-		When("With includeKeys", func() {
+		When("With OutputFilters", func() {
 			BeforeEach(func() {
-				jsonraw, err := dm.ConvertV1JSONWithFilter([]string{"qname", "qclass", "dummy"}, nil)
+				jsonraw, err := dm.ConvertV1JSONWithFilter(types.OutputFilters{IncludeKeys: []string{"qname", "qclass", "dummy"}})
 				Expect(err).To(Succeed())
 				err = json.Unmarshal(jsonraw, &res)
 				Expect(err).To(Succeed())
@@ -36,7 +36,7 @@ var _ = Describe("DnstapMessage", func() {
 		})
 		When("With excludeKeys", func() {
 			BeforeEach(func() {
-				jsonraw, err := dm.ConvertV1JSONWithFilter(nil, []string{"qname", "qclass", "dummy"})
+				jsonraw, err := dm.ConvertV1JSONWithFilter(types.OutputFilters{ExcludeKeys: []string{"qname", "qclass", "dummy"}})
 				Expect(err).To(Succeed())
 				err = json.Unmarshal(jsonraw, &res)
 				Expect(err).To(Succeed())
@@ -50,7 +50,7 @@ var _ = Describe("DnstapMessage", func() {
 		})
 		When("With includeKeys and excludeKeys", func() {
 			BeforeEach(func() {
-				jsonraw, err := dm.ConvertV1JSONWithFilter([]string{"qname", "qclass", "dummy"}, []string{"qclass", "dummy"})
+				jsonraw, err := dm.ConvertV1JSONWithFilter(types.OutputFilters{IncludeKeys: []string{"qname", "qclass", "dummy"}, ExcludeKeys: []string{"qclass", "dummy"}})
 				Expect(err).To(Succeed())
 				err = json.Unmarshal(jsonraw, &res)
 				Expect(err).To(Succeed())

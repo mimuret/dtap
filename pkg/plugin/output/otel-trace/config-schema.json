@@ -1,0 +1,17 @@
+{
+  "$id": "/pkg/plugin/output/otel-trace/config-schema.json",
+  "title": "OpenTelemetry trace output plugin",
+  "type": "object",
+  "required": [
+    "Name",
+    "ID"
+  ],
+  "properties": {
+    "Name": {
+      "const": "nop"
+    },
+    "ID": {
+      "type": "string"
+    }
+  }
+}

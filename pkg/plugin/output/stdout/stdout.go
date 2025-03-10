@@ -74,8 +74,7 @@ type Stdout struct {
 	Type OutputFormat
 
 	// JSON Key Filter
-	JSONIncludeKeys []string
-	JSONExcludeKeys []string
+	OutputFilters types.OutputFilters
 
 	// Line go template for format type 'go-template"
 	Template string
@@ -95,7 +94,7 @@ func (o *Stdout) Open() error {
 func (o *Stdout) Write(dm *types.DnstapMessage) error {
 	switch o.Type {
 	case OutputFormatJsonV1:
-		buf, err := dm.ConvertV1JSONWithFilter(o.JSONIncludeKeys, o.JSONExcludeKeys)
+		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
 		if err != nil {
 			return err
 		}

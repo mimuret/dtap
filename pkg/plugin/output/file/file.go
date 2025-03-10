@@ -79,8 +79,7 @@ type Output struct {
 	Format OutputFormat
 
 	// JSON Key Filter
-	JSONIncludeKeys []string
-	JSONExcludeKeys []string
+	OutputFilters types.OutputFilters
 
 	// Line go template for format type 'go-template"
 	Template string
@@ -100,7 +99,7 @@ func (o *Output) Open() error {
 func (o *Output) Write(dm *types.DnstapMessage) error {
 	switch o.Format {
 	case OutputFormatJsonV1:
-		buf, err := dm.ConvertV1JSONWithFilter(o.JSONIncludeKeys, o.JSONExcludeKeys)
+		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
 		if err != nil {
 			return err
 		}
