@@ -32,9 +32,9 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 
 	"github.com/go-kit/log"
-	"github.com/grafana/loki/clients/pkg/promtail/api"
-	"github.com/grafana/loki/clients/pkg/promtail/client"
-	"github.com/grafana/loki/pkg/logproto"
+	"github.com/grafana/loki/v3/clients/pkg/promtail/api"
+	"github.com/grafana/loki/v3/clients/pkg/promtail/client"
+	"github.com/grafana/loki/v3/pkg/logproto"
 )
 
 var _ log.Logger = &loggerWrapper{}
@@ -77,8 +77,9 @@ type Loki struct {
 	plugin.PluginCommon
 	sync.Mutex
 
-	MaxStream   int
-	MaxLineSize int
+	MaxStream           int
+	MaxLineSize         int
+	MaxLineSizeTruncate bool
 
 	OutputFilters types.OutputFilters
 
@@ -99,7 +100,7 @@ func (f *Loki) Open() error {
 	var (
 		err error
 	)
-	f.Client, err = client.New(f.metrics, f.Config, f.MaxStream, f.MaxLineSize, &loggerWrapper{f.oc.Logger.Sugar()})
+	f.Client, err = client.New(f.metrics, f.Config, f.MaxStream, f.MaxLineSize, f.MaxLineSizeTruncate, &loggerWrapper{f.oc.Logger.Sugar()})
 	if err != nil {
 		return errors.Wrap(err, "failed to create loki client")
 	}
