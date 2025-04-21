@@ -25,22 +25,16 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/pcapgo"
+	gopcapfilter "github.com/packetcap/go-pcap/filter"
 	"go.uber.org/zap"
+	"golang.org/x/net/bpf"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
-)
-
-var (
-	strToDirection = map[string]pcap.Direction{
-		"in":    pcap.DirectionIn,
-		"out":   pcap.DirectionInOut,
-		"inout": pcap.DirectionIn,
-	}
 )
 
 func init() {
@@ -51,7 +45,6 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	var err error
 	p := &PCAP{
 		BPF:       "port 53",
-		Direction: "inout",
 		WorkerNum: 1,
 	}
 	if err = json.Unmarshal(bs, p); err != nil {
@@ -60,17 +53,19 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.Device == "" {
 		return nil, errors.New("missing parameter Device")
 	}
-	switch p.Direction {
-	case "in", "out", "inout":
-	default:
-		return nil, errors.New("invalid parameter Direction")
-	}
 	if p.device, err = net.InterfaceByName(p.Device); err != nil {
 		return nil, errors.Wrapf(err, "missing device %s", p.Device)
 	}
-	p.bpfInstructionFilter, err = pcap.CompileBPFFilter(layers.LinkTypeEthernet, 65535, p.BPF)
+	bpfInstructionFilters, err := gopcapfilter.NewExpression(p.BPF).Compile().Compile()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create BPF filter")
+	}
+	for _, v := range bpfInstructionFilters {
+		filter, err := v.Assemble()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create BPF filter")
+		}
+		p.bpfInstructionFilters = append(p.bpfInstructionFilters, filter)
 	}
 	if p.WorkerNum <= 0 {
 		return nil, errors.New("WorkerNum must greater than zero")
@@ -89,9 +84,6 @@ type PCAP struct {
 	// BPF Filter
 	BPF string
 
-	// Choose send/receive direction direction for which packets. Possible values are `in', `out' and `inout'. Default is `inout`.
-	Direction string
-
 	// If ResolverQueryEnabled is true, input it. Default is false.
 	ResolverQueryEnabled bool
 	// If ResolverResponseEnabled is true, input it. Default is false.
@@ -103,25 +95,21 @@ type PCAP struct {
 
 	WorkerNum int64
 
-	bpfInstructionFilter []pcap.BPFInstruction
-	device               *net.Interface
+	bpfInstructionFilters []bpf.RawInstruction
+	device                *net.Interface
 }
 
 func (p *PCAP) Start(ctx context.Context, ic *types.InputContext) error {
-	handle, err := pcap.OpenLive(p.Device, 65535, true, pcap.BlockForever)
+	handle, err := pcapgo.NewEthernetHandle(p.device.Name)
 	if err != nil {
 		ic.Logger.Error("failed to open device", zap.Error(err))
 		return err
 	}
-	if err := handle.SetDirection(strToDirection[p.Direction]); err != nil {
-		ic.Logger.Error("failed to set direction", zap.Error(err), zap.String("direction", p.Direction))
-		return err
-	}
-	if err := handle.SetBPFInstructionFilter(p.bpfInstructionFilter); err != nil {
+	if err := handle.SetBPF(p.bpfInstructionFilters); err != nil {
 		ic.Logger.Error("failed to set filter", zap.Error(err))
 		return err
 	}
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
 	sem := semaphore.NewWeighted(p.WorkerNum)
 	ic.Logger.Info("start pcap", zap.String("device", p.Device), zap.String("bpf", p.BPF))
 LOOP:
