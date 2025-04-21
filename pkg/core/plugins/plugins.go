@@ -28,7 +28,7 @@ import (
 	// input
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/file"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/nats"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/pcap"
+
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
 
@@ -40,6 +40,7 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/loki"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/otel-log"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/stdout"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/tcp"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/unix"

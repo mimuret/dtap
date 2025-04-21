@@ -6,10 +6,16 @@ import (
 )
 
 var (
-	f *origin.Factory
+	f          *origin.Factory
+	registerer prometheus.Registerer
 )
 
+func DefaultRegisterer() prometheus.Registerer {
+	return registerer
+}
+
 func Set(r prometheus.Registerer) {
+	registerer = r
 	fac := origin.With(r)
 	f = &fac
 }

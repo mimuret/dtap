@@ -18,7 +18,8 @@ package config_test
 
 import (
 	_ "embed"
-	"encoding/json"
+
+	"github.com/goccy/go-json"
 
 	"github.com/mimuret/dtap/v2/pkg/config"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
