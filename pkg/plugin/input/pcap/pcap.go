@@ -18,6 +18,7 @@ package pcap
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -45,6 +46,7 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	var err error
 	p := &PCAP{
 		BPF:       "port 53",
+		Direction: "inout",
 		WorkerNum: 1,
 	}
 	if err = json.Unmarshal(bs, p); err != nil {
@@ -56,7 +58,19 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.device, err = net.InterfaceByName(p.Device); err != nil {
 		return nil, errors.Wrapf(err, "missing device %s", p.Device)
 	}
-	bpfInstructionFilters, err := gopcapfilter.NewExpression(p.BPF).Compile().Compile()
+	var bpfHw string
+	switch p.Direction {
+	case "in":
+		bpfHw = fmt.Sprintf("ether src host %s", p.device.HardwareAddr)
+	case "out":
+		bpfHw = fmt.Sprintf("ether dst host %s", p.device.HardwareAddr)
+	case "inout":
+		bpfHw = fmt.Sprintf("ether host %s", p.device.HardwareAddr)
+	default:
+		return nil, errors.New("invalid parameter Direction")
+	}
+
+	bpfInstructionFilters, err := gopcapfilter.NewExpression(fmt.Sprintf("(%s) and (%s)", bpfHw, p.BPF)).Compile().Compile()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create BPF filter")
 	}
@@ -83,6 +97,9 @@ type PCAP struct {
 	Device string
 	// BPF Filter
 	BPF string
+
+	// Choose send/receive direction direction for which packets. Possible values are `in', `out' and `inout'. Default is `inout`.
+	Direction string
 
 	// If ResolverQueryEnabled is true, input it. Default is false.
 	ResolverQueryEnabled bool
