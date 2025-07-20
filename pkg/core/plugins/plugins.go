@@ -38,6 +38,7 @@ import (
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/fluent"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/kafka"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/loki"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/multi"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/otel-log"
