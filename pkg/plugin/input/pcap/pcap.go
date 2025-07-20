@@ -60,6 +60,9 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	if p.device, err = net.InterfaceByName(p.Device); err != nil {
 		return nil, errors.Wrapf(err, "missing device %s", p.Device)
 	}
+	if p.device.HardwareAddr == nil {
+		return nil, fmt.Errorf("device does not have a hardware address: %s", p.Device)
+	}
 	var bpfHw string
 	switch p.Direction {
 	case "in":
@@ -72,7 +75,8 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 		return nil, errors.New("invalid parameter Direction")
 	}
 
-	bpfInstructionFilters, err := gopcapfilter.NewExpression(fmt.Sprintf("(%s) and (%s)", bpfHw, p.BPF)).Compile().Compile()
+	p.bpfFilterStr = fmt.Sprintf("(%s) and (%s)", bpfHw, p.BPF)
+	bpfInstructionFilters, err := gopcapfilter.NewExpression(p.bpfFilterStr).Compile().Compile()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create BPF filter")
 	}
@@ -102,19 +106,19 @@ type PCAP struct {
 	BPF string
 
 	// Direction specifies the packet direction to capture: `in`, `out`, or `inout`.
-	Direction string `json:"direction,omitempty"`
+	Direction string
 
 	// Enable or disable processing of resolver queries.
-	ResolverQueryEnabled bool `json:"resolver_query_enabled,omitempty"`
+	ResolverQueryEnabled bool
 
 	// Enable or disable processing of resolver responses.
-	ResolverResponseEnabled bool `json:"resolver_response_enabled,omitempty"`
+	ResolverResponseEnabled bool
 
 	// Enable or disable processing of client queries.
-	ClientQueryEnabled bool `json:"client_query_enabled,omitempty"`
+	ClientQueryEnabled bool
 
 	// Enable or disable processing of client responses.
-	ClientResponseEnabled bool `json:"client_response_enabled,omitempty"`
+	ClientResponseEnabled bool
 
 	// WorkerNum specifies the number of workers to process packets concurrently.
 	// The default value is 1.
@@ -122,6 +126,7 @@ type PCAP struct {
 
 	bpfInstructionFilters []bpf.RawInstruction
 	device                *net.Interface
+	bpfFilterStr          string
 }
 
 func (p *PCAP) Start(ctx context.Context, ic *types.InputContext) error {
@@ -136,7 +141,7 @@ func (p *PCAP) Start(ctx context.Context, ic *types.InputContext) error {
 	}
 	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
 	sem := semaphore.NewWeighted(p.WorkerNum)
-	ic.Logger.Info("start pcap", zap.String("device", p.Device), zap.String("bpf", p.BPF))
+	ic.Logger.Info("start pcap", zap.String("device", p.Device), zap.String("bpf", p.bpfFilterStr))
 LOOP:
 	for {
 		select {
@@ -145,6 +150,7 @@ LOOP:
 				ic.Logger.Debug("failed to acquire token")
 				continue
 			}
+
 			go func(packet gopacket.Packet) {
 				p.handlePacket(ic, packet)
 				sem.Release(1)
