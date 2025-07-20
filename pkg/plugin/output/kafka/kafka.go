@@ -112,8 +112,7 @@ type KafkaConfig struct {
 	Topic            string
 	Key              string
 	OutputType       OutputType
-	JSONIncludeKeys  []string
-	JSONExcludeKeys  []string
+	OutputFilters    types.OutputFilters
 }
 
 func (o *Kafka) Open() error {
@@ -195,7 +194,7 @@ func (o *Kafka) Write(dm *types.DnstapMessage) error {
 			return err
 		}
 	case OutputTypeJSON:
-		buf, err := dm.ConvertV1JSONWithFilter(o.KafkaConfig.JSONIncludeKeys, o.KafkaConfig.JSONExcludeKeys)
+		buf, err := dm.ConvertV1JSONWithFilter(o.KafkaConfig.OutputFilters)
 		if err != nil {
 			return err
 		}

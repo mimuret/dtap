@@ -19,6 +19,9 @@
     },
     "User": {
       "type": "string"
+    },
+    "Format": {
+      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputBinFormat"
     }
   }
 }

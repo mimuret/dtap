@@ -28,6 +28,7 @@ import (
 	"github.com/mimuret/dnsutils/getter"
 	"github.com/mimuret/dnsutils/testtool"
 	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/protobuf/proto"
@@ -58,7 +59,7 @@ func getCounterValue(rule *metrics.MetricsRule, labels []string) (float64, error
 
 var _ = Describe("output/metrics", func() {
 	BeforeEach(func() {
-		prometheus.DefaultRegisterer = prometheus.NewRegistry()
+		promauto.Set(prometheus.NewRegistry())
 	})
 	Context("Setup", func() {
 		var (

@@ -23,6 +23,7 @@ import (
 	"github.com/mimuret/dnsutils/getter"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -139,7 +140,7 @@ func (c *MetricsRule) Setup() error {
 		c.labels = append(c.labels, string(label.Name))
 	}
 	c.counter = prometheus.NewCounterVec(c.CounterOps, c.labels)
-	if err := prometheus.DefaultRegisterer.Register(c.counter); err != nil {
+	if err := promauto.DefaultRegisterer().Register(c.counter); err != nil {
 		return errors.Wrap(err, "failed to register metrics")
 	}
 	return nil

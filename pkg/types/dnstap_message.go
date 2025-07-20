@@ -18,6 +18,7 @@ package types
 
 import (
 	"fmt"
+	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
@@ -168,6 +169,38 @@ func (d *DnstapMessage) ToDtapFrame() *DtapFrame {
 		Dnstap: d.GetDnstap(),
 		Labels: d.Labels,
 	}
+}
+
+func (d *DnstapMessage) GetTimestamp() *time.Time {
+	res := d.GetResponseTime()
+	if res != nil {
+		return res
+	}
+	return d.GetQueryTime()
+}
+
+func (d *DnstapMessage) GetQueryTime() *time.Time {
+	msg := d.GetDnstap()
+	if d.GetDnstap() == nil {
+		return nil
+	}
+	if msg.Message.QueryTimeSec == nil {
+		return nil
+	}
+	res := time.Unix(int64(msg.Message.GetQueryTimeSec()), int64(msg.Message.GetQueryTimeNsec()))
+	return &res
+}
+
+func (d *DnstapMessage) GetResponseTime() *time.Time {
+	msg := d.GetDnstap()
+	if d.GetDnstap() == nil {
+		return nil
+	}
+	if msg.Message.ResponseTimeSec == nil {
+		return nil
+	}
+	res := time.Unix(int64(msg.Message.GetResponseTimeSec()), int64(msg.Message.GetResponseTimeNsec()))
+	return &res
 }
 
 type DnstapMessageGetFunc func(*DnstapMessage) string

@@ -23,19 +23,8 @@
       "description": "The `MaxStream` is the number of promtail stream.",
       "type": "integer"
     },
-    "JSONIncludeKeys": {
-      "description": "JSONIncludeKeys is a key filter.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "JSONExcludeKeys": {
-      "description": "JSONExcludeKeys is a key filter.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "OutputFilters": {
+      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputFilters"
     }
-        }
+  }
 }

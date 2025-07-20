@@ -1,4 +1,4 @@
-//go:build linux
+// go:build linux
 
 /*
  * Copyright (c) 2022 Manabu Sonoda
@@ -15,16 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package pcap_test
+package plugin
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/pcap"
 )
-
-func TestGinkgo(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "input/pcap package test suite")
-}

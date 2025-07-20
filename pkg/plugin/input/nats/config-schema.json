@@ -44,9 +44,7 @@
       "type": "string"
     },
     "Format": {
-      "description": "The `Format` is the nats message format.",
-      "type": "string",
-      "default": "DtapFrame"
+      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputBinFormat"
     }
   }
 }

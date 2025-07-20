@@ -204,23 +204,18 @@ func (d *DnstapMessage) ConvertV1JSON() ([]byte, error) {
 	return json.Marshal(flat)
 }
 
-func (d *DnstapMessage) ConvertV1JSONWithFilter(includeKeys, excludeKeys []string) ([]byte, error) {
+func (d *DnstapMessage) ConvertV1MapStringWithFilter(kf OutputFilters) (map[string]interface{}, error) {
 	mapString, err := d.ConvertV1MapString()
 	if err != nil {
 		return nil, err
 	}
-	res := map[string]interface{}{}
-	if len(includeKeys) > 0 {
-		for _, k := range includeKeys {
-			if v, ok := mapString[k]; ok {
-				res[k] = v
-			}
-		}
-	} else {
-		res = mapString
-	}
-	for _, k := range excludeKeys {
-		delete(res, k)
+	return kf.Filter(mapString), nil
+}
+
+func (d *DnstapMessage) ConvertV1JSONWithFilter(kf OutputFilters) ([]byte, error) {
+	res, err := d.ConvertV1MapStringWithFilter(kf)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(res)
 }

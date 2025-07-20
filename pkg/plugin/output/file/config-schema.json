@@ -18,26 +18,10 @@
       "$ref": "#/$defs/Logger"
     },
     "Format": {
-      "description": "Format is the output format.",
-      "type": "string",
-      "enum": [
-        "json/v1",
-        "go-template"
-      ]
+      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputTextFormat"
     },
-    "JSONIncludeKeys": {
-      "description": "JSONIncludeKeys is a key filter when using the json/v1 format.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "JSONExcludeKeys": {
-      "description": "JSONExcludeKeys is a key filter when using the json/v1 format.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+    "OutputFilters": {
+      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputFilters"
     },
     "Template": {
       "description": "Template is the text/template template string.",
