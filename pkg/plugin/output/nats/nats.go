@@ -18,6 +18,7 @@ package nats
 
 import (
 	"sync"
+	"time"
 
 	json "github.com/goccy/go-json"
 	"github.com/mimuret/dtap/v2/pkg/promauto"
@@ -101,6 +102,12 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 		Name:        "write_errors_total",
 		ConstLabels: prometheus.Labels{"ID": s.GetID()},
 	})
+	s.publishDurationSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_nats",
+		Name:        "publish_duration_seconds",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
 	return s, nil
 }
 
@@ -148,6 +155,7 @@ type Nats struct {
 
 	publishCounter         prometheus.Counter
 	publishErrCounter      prometheus.Counter
+	publishDurationSeconds prometheus.Histogram
 	writeMessageCounter    prometheus.Counter
 	writeMessageErrCounter prometheus.Counter
 }
@@ -185,7 +193,9 @@ func (f *Nats) Write(dm *types.DnstapMessage) error {
 }
 
 func (f *Nats) Publish(data []byte) error {
+	start := time.Now().Unix()
 	err := f.conn.Publish(f.Subject, data)
+	f.publishDurationSeconds.Observe(float64(time.Now().Unix() - start))
 	f.publishCounter.Inc()
 	if err != nil {
 		f.publishErrCounter.Inc()
