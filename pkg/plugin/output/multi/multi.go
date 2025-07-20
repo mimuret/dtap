@@ -52,6 +52,36 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	return s, nil
 }
 
+// MultiRunner is a plugin that creates multiple instances of an Output Plugin
+// defined in the `Plugin` field. It is useful for load balancing or distributing
+// output to multiple destinations.
+//
+// The number of instances is controlled by the `Concurency` field. Each instance
+// of the plugin will have a unique ID, which is derived from the MultiRunner's ID
+// followed by a hyphen and a sequential number starting from 0.
+//
+// For example, the following configurations are equivalent:
+//
+// Configuration 1:
+//   - Name: multi
+//		 ID: test-multi
+//     Concurency: 2
+//     Plugin:
+//     Name: dummy
+//
+// Configuration 2:
+//   - Name: dummy
+//     ID: test-multi-0
+//   - Name: dummy
+//     ID: test-multi-1
+//
+// Fields:
+// - `Concurency`: Specifies the number of concurrent plugin instances to create.
+// - `Plugin`: Defines the configuration for the child plugin to be instantiated.
+//
+// The `Start` method initializes all created plugins, and errors are returned if
+// any of the plugins fail to start.
+
 type MultiRunner struct {
 	plugin.PluginCommon
 

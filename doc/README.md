@@ -34,6 +34,7 @@
 - [stdout](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/stdout#Stdout)
 - [tcp](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/tcp#TCP)
 - [unix](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/unix#Unix)
+- [multi](https://pkg.go.dev/github.com/mimuret/dtap/v2/pkg/plugin/output/multi#Unix)
 
 ### debug and experimental plugins
 
