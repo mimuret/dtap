@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/goccy/go-json"
+	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output/multi"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
@@ -13,12 +14,8 @@ import (
 
 // モックプラグインを登録
 type MockOutputPlugin struct {
-	types.OutputPlugin
+	plugin.PluginCommon
 	startCalled bool
-}
-
-func (m *MockOutputPlugin) GetName() string {
-	return "mock"
 }
 
 func (m *MockOutputPlugin) Start(ctx context.Context, oc *types.OutputContext) error {
@@ -28,7 +25,11 @@ func (m *MockOutputPlugin) Start(ctx context.Context, oc *types.OutputContext) e
 
 var _ = BeforeSuite(func() {
 	_ = registry.RegisterOutputPlugin("mock", func(config json.RawMessage) (types.OutputPlugin, error) {
-		return &MockOutputPlugin{}, nil
+		o := &MockOutputPlugin{}
+		if err := json.Unmarshal(config, o); err != nil {
+			return nil, err
+		}
+		return o, nil
 	})
 })
 
@@ -40,8 +41,7 @@ var _ = Describe("MultiRunner", func() {
                 "ID": "test-multi",
                 "Concurency": 2,
                 "Plugin": {
-                    "Name": "mock",
-                    "ID": "mock-plugin"
+                    "Name": "mock"
                 }
             }`
 
@@ -51,6 +51,10 @@ var _ = Describe("MultiRunner", func() {
 			Expect(ok).To(BeTrue())
 			Expect(multiRunner.Concurency).To(Equal(uint(2)))
 			Expect(multiRunner.Plugins()).To(HaveLen(2))
+			Expect(multiRunner.Plugins()[0].GetName()).To(Equal("mock"))
+			Expect(multiRunner.Plugins()[0].GetID()).To(Equal("test-multi-0"))
+			Expect(multiRunner.Plugins()[1].GetName()).To(Equal("mock"))
+			Expect(multiRunner.Plugins()[1].GetID()).To(Equal("test-multi-1"))
 		})
 
 		It("should fail when Concurency is 0", func() {

@@ -2,6 +2,7 @@ package multi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/goccy/go-json"
 
@@ -25,12 +26,24 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	if s.Concurency == 0 {
 		return nil, errors.New("Concurency must be greater than 0")
 	}
-	pluginObj := &plugin.PluginCommon{}
-	if err := json.Unmarshal(s.Plugin, pluginObj); err != nil {
-		return nil, errors.Wrap(err, "failed to decode plugin common config")
+	var pluginName string
+	if err := json.Unmarshal(s.Plugin["Name"], &pluginName); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal Plugin.Name")
+	}
+	if pluginName == "" {
+		return nil, errors.New("`Plugin.Name` must not be empty")
 	}
 	for i := 0; i < int(s.Concurency); i++ {
-		p, err := registry.CreateOutputPlugin(pluginObj.GetName(), s.Plugin)
+		var err error
+		s.Plugin["ID"], err = json.Marshal(fmt.Sprintf(`%s-%d`, s.GetID(), i))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshal Plugin.ID for concurrency %d", i)
+		}
+		cfg, err := json.Marshal(s.Plugin)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to marshal plugin config: %s", pluginName)
+		}
+		p, err := registry.CreateOutputPlugin(pluginName, cfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create output plugin %s", s.PluginCommon.Name)
 		}
@@ -43,7 +56,7 @@ type MultiRunner struct {
 	plugin.PluginCommon
 
 	Concurency uint
-	Plugin     json.RawMessage
+	Plugin     map[string]json.RawMessage
 
 	plugns []types.OutputPlugin
 }
