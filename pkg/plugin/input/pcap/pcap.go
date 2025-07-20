@@ -38,6 +38,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const DNSPort uint32 = 53
+
 func init() {
 	_ = registry.RegisterInputPlugin("pcap", Setup)
 }
@@ -93,23 +95,29 @@ var _ types.InputPlugin = &PCAP{}
 type PCAP struct {
 	plugin.PluginCommon
 
-	// Network device
+	// Device is the network interface to capture packets from.
 	Device string
-	// BPF Filter
+
+	// BPF is the Berkeley Packet Filter expression to filter packets.
 	BPF string
 
-	// Choose send/receive direction direction for which packets. Possible values are `in', `out' and `inout'. Default is `inout`.
-	Direction string
+	// Direction specifies the packet direction to capture: `in`, `out`, or `inout`.
+	Direction string `json:"direction,omitempty"`
 
-	// If ResolverQueryEnabled is true, input it. Default is false.
-	ResolverQueryEnabled bool
-	// If ResolverResponseEnabled is true, input it. Default is false.
-	ResolverResponseEnabled bool
-	// If ClientQueryEnabled is true, input it. Default is false.
-	ClientQueryEnabled bool
-	// If ClientResponseEnabled is true, input it. Default is false.
-	ClientResponseEnabled bool
+	// Enable or disable processing of resolver queries.
+	ResolverQueryEnabled bool `json:"resolver_query_enabled,omitempty"`
 
+	// Enable or disable processing of resolver responses.
+	ResolverResponseEnabled bool `json:"resolver_response_enabled,omitempty"`
+
+	// Enable or disable processing of client queries.
+	ClientQueryEnabled bool `json:"client_query_enabled,omitempty"`
+
+	// Enable or disable processing of client responses.
+	ClientResponseEnabled bool `json:"client_response_enabled,omitempty"`
+
+	// WorkerNum specifies the number of workers to process packets concurrently.
+	// The default value is 1.
 	WorkerNum int64
 
 	bpfInstructionFilters []bpf.RawInstruction
@@ -148,26 +156,54 @@ LOOP:
 	return nil
 }
 
+func (p *PCAP) extractLinkLayer(packet gopacket.Packet, ic *types.InputContext) (*layers.Ethernet, bool) {
+	l := packet.LinkLayer()
+	if l == nil {
+		ic.Logger.Debug("failed to get link")
+		return nil, false
+	}
+	eth, ok := l.(*layers.Ethernet)
+	if !ok {
+		ic.Logger.Debug("failed to get layers.Ethernet")
+		return nil, false
+	}
+	return eth, true
+}
+
+// handlePacket processes a single network packet captured by the PCAP plugin.
+// It extracts the link layer, network layer, and transport layer information,
+// determines the type of DNS message (query or response), and constructs a
+// dnstap.Message object. If the message matches the processing criteria, it
+// is serialized and written to the output writer.
+//
+// Parameters:
+// - ic: The InputContext containing logger and writer for output.
+// - packet: The gopacket.Packet object representing the captured network packet.
+//
+// The function performs the following steps:
+// 1. Extracts the Ethernet layer and checks if the packet is sent by the configured device.
+// 2. Extracts the IP layer (IPv4 or IPv6) and determines source and destination addresses.
+// 3. Extracts the transport layer (UDP or TCP) and retrieves payload and port information.
+// 4. Determines the type of DNS message (client query, client response, resolver query, or resolver response).
+// 5. Constructs a dnstap.Message object with the extracted information.
+// 6. Writes the message to the output writer if it matches the processing criteria.
+
 func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 	dm := &dnstap.Message{}
 	dt := &dnstap.Dnstap{
 		Type:    dnstap.Dnstap_MESSAGE.Enum(),
 		Message: dm,
 	}
-	l := packet.LinkLayer()
-	if l == nil {
-		ic.Logger.Debug("failed to get link")
-		return
-	}
-	eth, ok := l.(*layers.Ethernet)
+	eth, ok := p.extractLinkLayer(packet, ic)
 	if !ok {
 		ic.Logger.Debug("failed to get layers.Ethernet")
 		return
 	}
-	var send bool
-	if bytes.Equal([]byte(eth.SrcMAC), []byte(p.device.HardwareAddr)) {
-		send = true
+	if eth.SrcMAC == nil {
+		ic.Logger.Error("failed to get ethernet src mac,can't process packet", zap.String("device", p.Device))
+		return
 	}
+	send := bytes.Equal(eth.SrcMAC, p.device.HardwareAddr)
 
 	n := packet.NetworkLayer()
 	if n == nil {
@@ -195,20 +231,22 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 	}
 	var payload []byte
 	var dstPort, srcPort uint32
-	if udp, ok := t.(*layers.UDP); ok {
+	switch t := t.(type) {
+	case *layers.UDP:
 		dm.SocketProtocol = dnstap.SocketProtocol_UDP.Enum()
-		payload = udp.Payload
-		srcPort = uint32(udp.SrcPort)
-		dstPort = uint32(udp.DstPort)
-	} else if tcp, ok := t.(*layers.TCP); ok {
+		payload = t.Payload
+		srcPort = uint32(t.SrcPort)
+		dstPort = uint32(t.DstPort)
+	case *layers.TCP:
 		dm.SocketProtocol = dnstap.SocketProtocol_TCP.Enum()
-		srcPort = uint32(tcp.SrcPort)
-		dstPort = uint32(tcp.DstPort)
-		if len(tcp.Payload) < 2 {
+		srcPort = uint32(t.SrcPort)
+		dstPort = uint32(t.DstPort)
+		if len(t.Payload) < 2 {
+			// TCP payload is too short to contain DNS message
 			return
 		}
-		payload = tcp.Payload[2:]
-	} else {
+		payload = t.Payload[2:]
+	default:
 		ic.Logger.Debug("unknown TransportLayer")
 		return
 	}
@@ -216,8 +254,11 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 	timeSec := uint64(timeNow.Unix())
 	timeNsec := uint32(timeNow.Nanosecond())
 	if send {
-		if srcPort == uint32(53) {
+		if srcPort == uint32(DNSPort) {
 			// resolver:53 -> client:***
+			if !p.ClientResponseEnabled {
+				return
+			}
 			dm.Type = dnstap.Message_CLIENT_RESPONSE.Enum()
 			dm.ResponseMessage = payload
 			dm.QueryAddress = dst
@@ -228,6 +269,9 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.ResponseTimeNsec = &timeNsec
 		} else {
 			// resolver:*** -> auth:***
+			if !p.ResolverQueryEnabled {
+				return
+			}
 			dm.Type = dnstap.Message_RESOLVER_QUERY.Enum()
 			dm.QueryMessage = payload
 			dm.QueryAddress = src
@@ -238,8 +282,11 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryTimeNsec = &timeNsec
 		}
 	} else {
-		if dstPort == uint32(53) {
+		if dstPort == uint32(DNSPort) {
 			// client:*** -> resolver:53
+			if !p.ClientQueryEnabled {
+				return
+			}
 			dm.Type = dnstap.Message_CLIENT_QUERY.Enum()
 			dm.ResponseMessage = payload
 			dm.QueryAddress = src
@@ -250,6 +297,9 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.QueryTimeNsec = &timeNsec
 		} else {
 			// auth:53 -> resolver:***
+			if !p.ResolverResponseEnabled {
+				return
+			}
 			dm.Type = dnstap.Message_RESOLVER_RESPONSE.Enum()
 			dm.QueryMessage = payload
 			dm.QueryAddress = dst
@@ -259,27 +309,6 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 			dm.ResponseTimeSec = &timeSec
 			dm.ResponseTimeNsec = &timeNsec
 		}
-	}
-
-	switch dm.GetType() {
-	case dnstap.Message_CLIENT_QUERY:
-		if !p.ClientQueryEnabled {
-			return
-		}
-	case dnstap.Message_CLIENT_RESPONSE:
-		if !p.ClientResponseEnabled {
-			return
-		}
-	case dnstap.Message_RESOLVER_QUERY:
-		if !p.ResolverQueryEnabled {
-			return
-		}
-	case dnstap.Message_RESOLVER_RESPONSE:
-		if !p.ResolverResponseEnabled {
-			return
-		}
-	default:
-		return
 	}
 
 	frame, err := types.NewDnstapMessageFromDnstap(dt)
