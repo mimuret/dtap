@@ -23,7 +23,7 @@
       "maximum": 65535
     },
     "Format": {
-      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputBinFormat"
+      "$ref": "/schemas/schema.json#/$defs/OutputBinFormat"
     }
   }
 }
