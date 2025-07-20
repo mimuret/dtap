@@ -15,10 +15,10 @@
       "type": "string"
     },
     "Format": {
-      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputTextFormat"
+      "$ref": "/schemas/schema.json#/$defs/OutputTextFormat"
     },
     "OutputFilters": {
-      "$ref": "https://github.com/mimuret/dtap/raw/refs/heads/v2/schemas/types.json#/$defs/OutputFilters"
+      "$ref": "/schemas/schema.json#/$defs/OutputFilters"
     },
     "Template": {
       "description": "The `Template` is the `text/template` style template string.",

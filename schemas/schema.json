@@ -120,6 +120,45 @@
           }
         }
       }
+    },
+    "OutputTextFormat": {
+      "description": "Text Format is the output format.",
+      "type": "string",
+      "enum": [
+        "json/v1",
+        "go-template"
+      ]
+    },
+    "OutputBinFormat": {
+      "description": "Bin Format is the output format.",
+      "type": "string",
+      "enum": [
+        "DNSTAP",
+        "DtapFrame"
+      ]
+    },
+    "OutputFilters": {
+      "title": "OutputFilters",
+      "description": "The filter setting for output",
+      "type": "object",
+      "properties": {
+        "IncludeKeys": {
+          "description": "If IncludeKeys is specified, only the keys specified in IncludeKeys will be output. If IncludeKeys is empty, all keys are output.",
+          "type": "array",
+          "items": {
+            "description": "key name",
+            "type": "string"
+          }
+        },
+        "ExcludeKeys": {
+          "description": "f ExcludeKeys is specified, the keys specified in ExcludeKeys will not be output. If ExcludeKeyss is empty, all keys are output.",
+          "type": "array",
+          "items": {
+            "description": "key name",
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

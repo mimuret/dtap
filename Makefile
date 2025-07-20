@@ -38,5 +38,5 @@ schemas/output_plugins.json: $(output_plugin_schemas)
 	go run misc/merge-schema/main.go pkg/plugin/output /schemas/output_plugins.json > schemas/output_plugins.json.tmp && mv schemas/output_plugins.json.tmp schemas/output_plugins.json
 schemas/filter_plugins.json: $(filter_plugin_schemas)
 	go run misc/merge-schema/main.go pkg/plugin/filter /schemas/filter_plugins.json > schemas/filter_plugins.json.tmp && mv schemas/filter_plugins.json.tmp schemas/filter_plugins.json
-schema: $(schemas) schema/input_plugins.json schema/output_plugins.json schema/filter_plugins.json
+schema: $(schemas)
 	ajv compile -s schemas/schema.json --allow-union-types --inline-refs=true --spec=draft2019 $(addprefix -r ,$(plugin_schemas)) $(addprefix -r ,$(schemas))

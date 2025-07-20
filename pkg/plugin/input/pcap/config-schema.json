@@ -1,6 +1,5 @@
 {
   "$id": "/pkg/plugin/input/pcap/config-schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "pcap input plugin",
   "type": "object",
   "properties": {
