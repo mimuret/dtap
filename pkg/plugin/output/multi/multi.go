@@ -81,6 +81,11 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 //
 // The `Start` method initializes all created plugins, and errors are returned if
 // any of the plugins fail to start.
+// Note:
+// - If an Output Plugin that does not support concurrent writes (e.g., file output)
+//   is specified in the `Plugin` field, the MultiRunner may not function correctly.
+//   Ensure that the specified Output Plugin supports concurrent usage if `Concurency`
+//   is greater than 1.
 
 type MultiRunner struct {
 	plugin.PluginCommon
