@@ -18,5 +18,5 @@
 package plugin
 
 import (
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/pcap"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/input/pcap"
 )

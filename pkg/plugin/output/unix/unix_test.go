@@ -16,13 +16,13 @@
 package unix_test
 
 import (
+	"context"
 	"io"
 	"net"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/output/unix"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output/unix"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/nettest"
@@ -34,27 +34,18 @@ var _ = Describe("output/unix", func() {
 			op  types.OutputPlugin
 			err error
 		)
-		When("type mismatch", func() {
-			BeforeEach(func() {
-				op, err = unix.Setup(json.RawMessage(`{"Name": "unix", "Path": 0}`))
-			})
-			It("returns error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
-				op, err = unix.Setup(json.RawMessage(`{"Name": "unix", "Path": ""}`))
+				op, err = unix.Setup(testtool.MustOutputBlock("unix", "test_unix", ``))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Path"))
+				Expect(err.Error()).To(MatchRegexp(`The argument "path" is required`))
 			})
 		})
 		When("valid config", func() {
 			BeforeEach(func() {
-				op, err = unix.Setup(json.RawMessage(`{"Name": "unix", "Path": "/var/run/dnstap.sock"}`))
+				op, err = unix.Setup(testtool.MustOutputBlock("unix", "test_unix", `path = "/var/run/dnstap.sock"`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -76,7 +67,7 @@ var _ = Describe("output/unix", func() {
 			Expect(err).To(Succeed())
 			ln, err = net.Listen("unix", path)
 			Expect(err).To(Succeed())
-			op, err = unix.Setup(json.RawMessage(`{"Name": "unix", "Path": "/var/tmp/hoge.sock"}`))
+			op, err = unix.Setup(testtool.MustOutputBlock("unix", "test_unix", `path = "/var/run/dnstap.sock"`))
 			Expect(err).To(Succeed())
 			p = op.(*unix.Unix)
 		})
@@ -85,7 +76,7 @@ var _ = Describe("output/unix", func() {
 		})
 		When("failed to connect", func() {
 			BeforeEach(func() {
-				conn, err = p.NewConnect()
+				conn, err = p.NewConnect(context.Background())
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -95,7 +86,7 @@ var _ = Describe("output/unix", func() {
 		When("valid", func() {
 			BeforeEach(func() {
 				p.Path = path
-				conn, err = p.NewConnect()
+				conn, err = p.NewConnect(context.Background())
 			})
 			It("Succeed", func() {
 				Expect(err).To(Succeed())

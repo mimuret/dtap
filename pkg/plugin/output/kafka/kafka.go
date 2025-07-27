@@ -17,23 +17,28 @@
 package kafka
 
 import (
+	"context"
 	_ "embed"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"math"
 
-	json "github.com/goccy/go-json"
-	"github.com/pkg/errors"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/riferrei/srclient"
 
 	"github.com/dangkaka/go-kafka-avro"
 	"github.com/linkedin/goavro"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 
 	"github.com/Shopify/sarama"
 )
+
+const PLUGIN_NAME = "kafka"
 
 //go:embed assets/flat.avsc
 var valueSchemaStr string
@@ -42,20 +47,24 @@ var valueSchemaStr string
 var keySchemaStr string
 
 func init() {
-	_ = registry.RegisterOutputPlugin("kafka", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
 	var err error
-	s := &Kafka{}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	s := &Kafka{
+		OutputBlock:   *cfg,
+		OutputFilters: &types.OutputFilters{},
+	}
+	diags := gohcl.DecodeBody(cfg.Body, nil, s)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(s, "failed to setup otel-log plugin: %w", errors.Join(diags.Errs()...))
 	}
 
 	s.samaraConfig = sarama.NewConfig()
 	s.samaraConfig.Producer.Return.Successes = true
 	s.samaraConfig.Producer.Return.Errors = true
-	s.samaraConfig.Producer.Retry.Max = int(s.KafkaConfig.Retry)
+	s.samaraConfig.Producer.Retry.Max = int(s.Retry)
 
 	s.keyCodec, err = goavro.NewCodec(keySchemaStr)
 	if err != nil {
@@ -77,11 +86,33 @@ type KafkaClient interface {
 
 // The kafka plugin outputs messages to the kafka server.
 type Kafka struct {
-	plugin.PluginCommon
-	// kafka config
-	KafkaConfig KafkaConfig
-	*output.DnstapOutput
+	config.OutputBlock
 
+	// Hosts is the list of kafka hosts.
+	Hosts []string `hcl:"hosts"`
+
+	// SchemaRegistries is the list of schema registry hosts.
+	SchemaRegistries []string `hcl:"schema_registries,optional"`
+
+	// Retry is the number of retries to send the message.
+	Retry uint `hcl:"retry,optional"`
+
+	// Topic is the kafka topic to send the message.
+	Topic string `hcl:"topic"`
+
+	// Key is the key to send the message.
+	Key string `hcl:"key,optional"`
+
+	// OutputType is the type of output.
+	OutputType OutputType `hcl:"output_type,optional"`
+
+	// OutputFilters is the filters to apply to the output.
+	OutputFilters *types.OutputFilters `hcl:"output_filters,block"`
+
+	// MaxRetry is the maximum number of retries to connect to server.
+	MaxRetry uint `hcl:"max_retry,optional"`
+
+	// sarama config
 	samaraConfig  *sarama.Config
 	producer      sarama.SyncProducer
 	registry      *kafka.CachedSchemaRegistryClient
@@ -89,11 +120,8 @@ type Kafka struct {
 	valueSchemaID []byte
 	keyCodec      *goavro.Codec
 	keySchemaID   []byte
-	oc            *types.OutputContext
-}
 
-func (f *Kafka) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
+	*output.DnstapOutput
 }
 
 type OutputType string
@@ -106,28 +134,21 @@ var (
 
 // kafka config
 type KafkaConfig struct {
-	Hosts            []string
-	SchemaRegistries []string
-	Retry            uint
-	Topic            string
-	Key              string
-	OutputType       OutputType
-	OutputFilters    types.OutputFilters
 }
 
-func (o *Kafka) Open() error {
+func (o *Kafka) Open(context.Context) error {
 	var err error
-	o.producer, err = sarama.NewSyncProducer(o.KafkaConfig.Hosts, o.samaraConfig)
+	o.producer, err = sarama.NewSyncProducer(o.Hosts, o.samaraConfig)
 	if err != nil {
-		return errors.Wrap(err, "failed to create kafka producer")
+		return fmt.Errorf("failed to create kafka producer: %w", err)
 	}
-	o.registry = kafka.NewCachedSchemaRegistryClient(o.KafkaConfig.SchemaRegistries)
-	if o.KafkaConfig.OutputType == OutputTypeAvero {
-		if o.valueSchemaID, err = o.getSchemaID(o.KafkaConfig.Topic+"-value", valueSchemaStr); err != nil {
-			return errors.Wrap(err, "failed to get value schema id")
+	o.registry = kafka.NewCachedSchemaRegistryClient(o.SchemaRegistries)
+	if o.OutputType == OutputTypeAvero {
+		if o.valueSchemaID, err = o.getSchemaID(o.Topic+"-value", valueSchemaStr); err != nil {
+			return fmt.Errorf("failed to get value schema id: %w", err)
 		}
-		if o.keySchemaID, err = o.getSchemaID(o.KafkaConfig.Topic+"-key", keySchemaStr); err != nil {
-			return errors.Wrap(err, "failed to get key schema id")
+		if o.keySchemaID, err = o.getSchemaID(o.Topic+"-key", keySchemaStr); err != nil {
+			return fmt.Errorf("failed to get key schema id: %w", err)
 		}
 	}
 	return nil
@@ -138,7 +159,7 @@ func (o *Kafka) getSchemaID(subject string, schemaStr string) ([]byte, error) {
 		err    error
 		schema *srclient.Schema
 	)
-	for _, host := range o.KafkaConfig.SchemaRegistries {
+	for _, host := range o.SchemaRegistries {
 		client := srclient.CreateSchemaRegistryClient(host)
 		schema, err = client.GetLatestSchema(subject)
 		if err != nil {
@@ -175,12 +196,12 @@ func (o *Kafka) GetEncoder(v interface{}, codec *goavro.Codec, schemaID []byte) 
 	return sarama.ByteEncoder(binaryMsg), nil
 }
 
-func (o *Kafka) Write(dm *types.DnstapMessage) error {
+func (o *Kafka) Write(ctx context.Context, dm *types.DnstapMessage) error {
 	var err error
 	var v, k sarama.Encoder
-	switch o.KafkaConfig.OutputType {
+	switch o.OutputType {
 	case OutputTypePtoroBuf:
-		k = sarama.ByteEncoder(o.KafkaConfig.Key)
+		k = sarama.ByteEncoder(o.Key)
 		v = sarama.ByteEncoder(dm.GetRaw())
 	case OutputTypeAvero:
 		mapString, err := dm.ConvertV1Flat()
@@ -190,20 +211,20 @@ func (o *Kafka) Write(dm *types.DnstapMessage) error {
 		if v, err = o.GetEncoder(mapString, o.valueCodec, o.valueSchemaID); err != nil {
 			return err
 		}
-		if k, err = o.GetEncoder(o.KafkaConfig.Key, o.keyCodec, o.keySchemaID); err != nil {
+		if k, err = o.GetEncoder(o.Key, o.keyCodec, o.keySchemaID); err != nil {
 			return err
 		}
 	case OutputTypeJSON:
-		buf, err := dm.ConvertV1JSONWithFilter(o.KafkaConfig.OutputFilters)
+		buf, err := dm.ConvertV1JSONWithFilter(*o.OutputFilters)
 		if err != nil {
 			return err
 		}
-		k = sarama.StringEncoder(o.KafkaConfig.Key)
+		k = sarama.StringEncoder(o.Key)
 		v = sarama.StringEncoder(buf)
 	}
 
 	msg := &sarama.ProducerMessage{
-		Topic: o.KafkaConfig.Topic,
+		Topic: o.Topic,
 		Key:   k,
 		Value: v,
 	}
@@ -212,6 +233,10 @@ func (o *Kafka) Write(dm *types.DnstapMessage) error {
 	return err
 }
 
-func (o *Kafka) Close() {
+func (o *Kafka) Close(context.Context) {
 	o.producer.Close()
+}
+
+func (p *Kafka) MaxConcurrent() uint {
+	return math.MaxUint32
 }

@@ -17,20 +17,22 @@
 package output
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"sync"
 	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"github.com/pkg/errors"
 )
 
 type SocketOutput interface {
-	SetOutputContext(*types.OutputContext)
-	NewConnect() (io.Writer, error)
-	Close()
+	types.OutputPlugin
+	NewConnect(context.Context) (io.Writer, error)
+	Close(context.Context)
 }
 
 var _ OutputHandler = &DnstapFstrmSocketOutput{}
@@ -38,7 +40,6 @@ var _ OutputHandler = &DnstapFstrmSocketOutput{}
 type DnstapFstrmSocketOutput struct {
 	handler      SocketOutput
 	flushTimeout time.Duration
-	oc           *types.OutputContext
 
 	enc     *framestream.Encoder
 	encOpt  *framestream.EncoderOptions
@@ -62,19 +63,14 @@ func NewDnstapFstrmSocketOutput(handler SocketOutput, flushTimeout time.Duration
 	}
 }
 
-func (o *DnstapFstrmSocketOutput) SetOutputContext(oc *types.OutputContext) {
-	o.oc = oc
-	o.handler.SetOutputContext(oc)
-}
-
-func (o *DnstapFstrmSocketOutput) Open() error {
-	w, err := o.handler.NewConnect()
+func (o *DnstapFstrmSocketOutput) Open(ctx context.Context) error {
+	w, err := o.handler.NewConnect(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to connect socket")
+		return fmt.Errorf("failed to connect socket: %w", err)
 	}
 	o.enc, err = framestream.NewEncoder(w, o.encOpt)
 	if err != nil {
-		o.handler.Close()
+		o.handler.Close(ctx)
 		return errors.Wrapf(err, "failed to create fstrm encoder")
 	}
 	o.closeCh = make(chan struct{})
@@ -96,14 +92,14 @@ func (o *DnstapFstrmSocketOutput) Open() error {
 	return nil
 }
 
-func (o *DnstapFstrmSocketOutput) Write(dm *types.DnstapMessage) error {
+func (o *DnstapFstrmSocketOutput) Write(ctx context.Context, dm *types.DnstapMessage) error {
 	if _, err := o.enc.Write(dm.GetRaw()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *DnstapFstrmSocketOutput) Close() {
+func (o *DnstapFstrmSocketOutput) Close(ctx context.Context) {
 	// stop flush loop
 	close(o.closeCh)
 	o.wg.Wait()
@@ -112,5 +108,5 @@ func (o *DnstapFstrmSocketOutput) Close() {
 	o.enc.Close()
 
 	// close connection
-	o.handler.Close()
+	o.handler.Close(ctx)
 }

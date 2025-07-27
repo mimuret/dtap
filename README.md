@@ -7,13 +7,9 @@
 ## install
 
 ```
-go install github.com/mimuret/dtap/v2@latest
+go install github.com/mimuret/dtap/v3@latest
 ```
 
 ## Documents
 
-- [configuration](./doc/)
-- [JSON schema](./schemas/schema.json)
-- [API](./doc/api.md)
-- [design](./doc/design.md)
-
+- [configuration](./configuration.md)

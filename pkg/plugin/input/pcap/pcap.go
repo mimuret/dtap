@@ -23,45 +23,57 @@ import (
 	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
-	"github.com/goccy/go-json"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	gopcapfilter "github.com/packetcap/go-pcap/filter"
 	"go.uber.org/zap"
 	"golang.org/x/net/bpf"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"errors"
+
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
+
+const PLUGIN_NAME = "pcap"
 
 const DNSPort uint32 = 53
 
 func init() {
-	_ = registry.RegisterInputPlugin("pcap", Setup)
+	_ = registry.RegisterInputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.InputPlugin, error) {
+func Setup(cfg *config.InputBlock) (types.InputPlugin, error) {
 	var err error
 	p := &PCAP{
-		BPF:       "port 53",
-		Direction: "inout",
-		WorkerNum: 1,
+		InputBlock:              *cfg,
+		BPF:                     "port 53",
+		Direction:               "inout",
+		WorkerNum:               1,
+		ResolverQueryEnabled:    false,
+		ResolverResponseEnabled: false,
+		ClientQueryEnabled:      false,
+		ClientResponseEnabled:   false,
 	}
-	if err = json.Unmarshal(bs, p); err != nil {
-		return nil, errors.Wrapf(err, "failed to decode config")
+	// Decode the HCL body into the pcap struct.
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup pcap plugin: %w", errors.Join(diags.Errs()...))
 	}
 	if p.Device == "" {
-		return nil, errors.New("missing parameter Device")
+		return nil, plugin.PluginError(p, "missing parameter Device")
 	}
 	if p.device, err = net.InterfaceByName(p.Device); err != nil {
-		return nil, errors.Wrapf(err, "missing device %s", p.Device)
+		return nil, plugin.PluginError(p, "missing device %s: err: %w", p.Device, err)
 	}
 	if p.device.HardwareAddr == nil {
-		return nil, fmt.Errorf("device does not have a hardware address: %s", p.Device)
+		return nil, plugin.PluginError(p, "device does not have a hardware address: %s", p.Device)
 	}
 	var bpfHw string
 	switch p.Direction {
@@ -72,23 +84,23 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	case "inout":
 		bpfHw = fmt.Sprintf("ether host %s", p.device.HardwareAddr)
 	default:
-		return nil, errors.New("invalid parameter Direction")
+		return nil, plugin.PluginError(p, "invalid parameter Direction")
 	}
 
 	p.bpfFilterStr = fmt.Sprintf("(%s) and (%s)", bpfHw, p.BPF)
 	bpfInstructionFilters, err := gopcapfilter.NewExpression(p.bpfFilterStr).Compile().Compile()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create BPF filter")
+		return nil, plugin.PluginError(p, "failed to create BPF filter: %w", err)
 	}
 	for _, v := range bpfInstructionFilters {
 		filter, err := v.Assemble()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create BPF filter")
+			return nil, plugin.PluginError(p, "failed to create BPF filter: %w", err)
 		}
 		p.bpfInstructionFilters = append(p.bpfInstructionFilters, filter)
 	}
 	if p.WorkerNum <= 0 {
-		return nil, errors.New("WorkerNum must greater than zero")
+		return nil, plugin.PluginError(p, "WorkerNum must greater than zero")
 	}
 	return p, nil
 }
@@ -96,63 +108,86 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 var _ types.InputPlugin = &PCAP{}
 
 // The UnixSocket plugin get messages from the unix socket.
+// It captures network packets from a specified network interface using the pcap library.
+// It processes DNS messages and forwards them to a specified forwarder.
+// Example HCL configuration:
+// ```hcl
+//
+//	input "pcap" "pcap_default" {
+//	  device = "eth0"
+//	  bpf = "port 53"
+//	  direction = "inout"
+//	  resolver_query_enabled = true
+//	  resolver_response_enabled = true
+//	  client_query_enabled = true
+//	  client_response_enabled = true
+//	  worker_num = 4
+//	}
+//
+// ```
 type PCAP struct {
-	plugin.PluginCommon
+	config.InputBlock
 
 	// Device is the network interface to capture packets from.
-	Device string
+	Device string `hcl:"device"`
 
-	// BPF is the Berkeley Packet Filter expression to filter packets.
-	BPF string
+	// BPF is the Berkeley Packet Filter expression to filter packets. Default is "port 53".
+	BPF string `hcl:"bpf,optional"`
 
-	// Direction specifies the packet direction to capture: `in`, `out`, or `inout`.
-	Direction string
+	// Direction specifies the packet direction to capture: `in`, `out`, or `inout`. Default is `inout`.
+	Direction string `hcl:"direction,optional"`
 
-	// Enable or disable processing of resolver queries.
-	ResolverQueryEnabled bool
+	// Enable or disable processing of resolver queries. Default is false.
+	ResolverQueryEnabled bool `hcl:"resolver_query_enabled,optional"`
 
-	// Enable or disable processing of resolver responses.
-	ResolverResponseEnabled bool
+	// Enable or disable processing of resolver responses. Default is false.
+	ResolverResponseEnabled bool `hcl:"resolver_response_enabled,optional"`
 
 	// Enable or disable processing of client queries.
-	ClientQueryEnabled bool
+	ClientQueryEnabled bool `hcl:"client_query_enabled,optional"`
 
-	// Enable or disable processing of client responses.
-	ClientResponseEnabled bool
+	// Enable or disable processing of client responses. Default is false.
+	ClientResponseEnabled bool `hcl:"client_response_enabled,optional"`
 
 	// WorkerNum specifies the number of workers to process packets concurrently.
 	// The default value is 1.
-	WorkerNum int64
+	WorkerNum int64 `hcl:"worker_num,optional"`
 
 	bpfInstructionFilters []bpf.RawInstruction
 	device                *net.Interface
 	bpfFilterStr          string
 }
 
-func (p *PCAP) Start(ctx context.Context, ic *types.InputContext) error {
+func (p *PCAP) Start(ctx context.Context, forwarder types.Forwarder) error {
 	handle, err := pcapgo.NewEthernetHandle(p.device.Name)
 	if err != nil {
-		ic.Logger.Error("failed to open device", zap.Error(err))
+		ctxzap.Error(ctx, "failed to open device", zap.Error(err))
 		return err
 	}
+	defer handle.Close()
+
 	if err := handle.SetBPF(p.bpfInstructionFilters); err != nil {
-		ic.Logger.Error("failed to set filter", zap.Error(err))
+		ctxzap.Error(ctx, "failed to set filter", zap.Error(err))
 		return err
 	}
 	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
 	sem := semaphore.NewWeighted(p.WorkerNum)
-	ic.Logger.Info("start pcap", zap.String("device", p.Device), zap.String("bpf", p.bpfFilterStr))
+	ctxzap.Info(ctx, "start pcap", zap.String("device", p.Device), zap.String("bpf", p.bpfFilterStr))
 LOOP:
 	for {
 		select {
-		case packet := <-packetSource.Packets():
+		case packet, ok := <-packetSource.Packets():
+			if !ok {
+				ctxzap.Info(ctx, "packet source closed")
+				break LOOP
+			}
 			if err := sem.Acquire(ctx, 1); err != nil {
-				ic.Logger.Debug("failed to acquire token")
+				ctxzap.Debug(ctx, "failed to acquire token")
 				continue
 			}
 
 			go func(packet gopacket.Packet) {
-				p.handlePacket(ic, packet)
+				p.handlePacket(ctx, forwarder, packet)
 				sem.Release(1)
 			}(packet)
 		case <-ctx.Done():
@@ -162,15 +197,15 @@ LOOP:
 	return nil
 }
 
-func (p *PCAP) extractLinkLayer(packet gopacket.Packet, ic *types.InputContext) (*layers.Ethernet, bool) {
+func (p *PCAP) extractLinkLayer(ctx context.Context, packet gopacket.Packet) (*layers.Ethernet, bool) {
 	l := packet.LinkLayer()
 	if l == nil {
-		ic.Logger.Debug("failed to get link")
+		ctxzap.Debug(ctx, "failed to get link")
 		return nil, false
 	}
 	eth, ok := l.(*layers.Ethernet)
 	if !ok {
-		ic.Logger.Debug("failed to get layers.Ethernet")
+		ctxzap.Debug(ctx, "failed to get layers.Ethernet")
 		return nil, false
 	}
 	return eth, true
@@ -194,26 +229,26 @@ func (p *PCAP) extractLinkLayer(packet gopacket.Packet, ic *types.InputContext) 
 // 5. Constructs a dnstap.Message object with the extracted information.
 // 6. Writes the message to the output writer if it matches the processing criteria.
 
-func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
+func (p *PCAP) handlePacket(ctx context.Context, forwarder types.Forwarder, packet gopacket.Packet) {
 	dm := &dnstap.Message{}
 	dt := &dnstap.Dnstap{
 		Type:    dnstap.Dnstap_MESSAGE.Enum(),
 		Message: dm,
 	}
-	eth, ok := p.extractLinkLayer(packet, ic)
+	eth, ok := p.extractLinkLayer(ctx, packet)
 	if !ok {
-		ic.Logger.Debug("failed to get layers.Ethernet")
+		ctxzap.Debug(ctx, "failed to get layers.Ethernet")
 		return
 	}
 	if eth.SrcMAC == nil {
-		ic.Logger.Error("failed to get ethernet src mac,can't process packet", zap.String("device", p.Device))
+		ctxzap.Error(ctx, "failed to get ethernet src mac,can't process packet", zap.String("device", p.Device))
 		return
 	}
 	send := bytes.Equal(eth.SrcMAC, p.device.HardwareAddr)
 
 	n := packet.NetworkLayer()
 	if n == nil {
-		ic.Logger.Debug("failed to get NetworkLayer")
+		ctxzap.Debug(ctx, "failed to get NetworkLayer")
 		return
 	}
 	var src, dst net.IP
@@ -226,13 +261,13 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 		src = ipv6.SrcIP
 		dst = ipv6.DstIP
 	} else {
-		ic.Logger.Debug("unknown NetworkLayer")
+		ctxzap.Debug(ctx, "unknown NetworkLayer")
 		return
 	}
 
 	t := packet.TransportLayer()
 	if t == nil {
-		ic.Logger.Debug("failed to get TransportLayer")
+		ctxzap.Debug(ctx, "failed to get TransportLayer")
 		return
 	}
 	var payload []byte
@@ -253,7 +288,7 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 		}
 		payload = t.Payload[2:]
 	default:
-		ic.Logger.Debug("unknown TransportLayer")
+		ctxzap.Debug(ctx, "unknown TransportLayer")
 		return
 	}
 	timeNow := time.Now()
@@ -319,8 +354,8 @@ func (p *PCAP) handlePacket(ic *types.InputContext, packet gopacket.Packet) {
 
 	frame, err := types.NewDnstapMessageFromDnstap(dt)
 	if err != nil {
-		ic.Logger.Debug("failed to create DtapFrame", zap.Error(err))
+		ctxzap.Debug(ctx, "failed to create DtapFrame", zap.Error(err))
 		return
 	}
-	ic.Writer.Write(frame)
+	forwarder.Forward(frame)
 }

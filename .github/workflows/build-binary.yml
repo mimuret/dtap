@@ -4,21 +4,31 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  release-linux-amd64:
-    name: release linux/amd64
+  release:
+    name: release ${{ matrix.os }}/${{ matrix.arch }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        osgoos: [linux, darwin]
+        goarch: [amd64, arm64]
     steps:
     - uses: actions/checkout@v3
     - run: apt update && apt install libpcap-dev -y
     - uses: wangyoucao577/go-release-action@v1
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        goos: linux
-        goarch: amd64
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
         project_path: "."
         binary_name: "dtap"
         extra_files: LICENSE README.md
+        ldflags: -s -w -X main.version=${{ steps.set-tag.outputs.version }}
   release-linux-arm64:
     name: release linux/arm64
     runs-on: ubuntu-latest

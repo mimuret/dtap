@@ -17,27 +17,29 @@ package output
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"go.uber.org/zap"
 )
 
 const MaxRetryDuration = time.Minute * 1
 
 type OutputHandler interface {
-	SetOutputContext(oc *types.OutputContext)
-	Open() error
-	Write(*types.DnstapMessage) error
-	Close()
+	Open(context.Context) error
+	Write(context.Context, *types.DnstapMessage) error
+	Close(context.Context)
 }
 
 type DnstapOutput struct {
-	handler        OutputHandler
+	// handler is the output handler that implements Open, Write, and Close methods.
+	handler OutputHandler
+	// maxRetry is the maximum number of times to retry opening the output handler.
+	maxRetry uint
+	// retryOpenCount is the number of times the output handler has been opened.
 	retryOpenCount uint
-	maxRetry       uint
-	oc             *types.OutputContext
 }
 
 func NewDnstapOutput(handler OutputHandler, maxRetry uint) *DnstapOutput {
@@ -47,35 +49,33 @@ func NewDnstapOutput(handler OutputHandler, maxRetry uint) *DnstapOutput {
 	return &DnstapOutput{
 		handler:        handler,
 		retryOpenCount: 0,
-		maxRetry:       0,
+		maxRetry:       maxRetry,
 	}
 }
 
-func (o *DnstapOutput) Start(ctx context.Context, oc *types.OutputContext) error {
-	o.oc = oc
-	o.handler.SetOutputContext(oc)
-	o.oc.Logger.Debug("start output run")
+func (o *DnstapOutput) Start(ctx context.Context, r types.Reader) error {
+	ctxzap.Debug(ctx, "start output run")
 L:
 	for {
 		select {
 		case <-ctx.Done():
-			o.oc.Logger.Debug("Run ctx done")
+			ctxzap.Debug(ctx, "Run ctx done")
 			break L
 		default:
-			if err := o.Run(ctx, oc.Reader); err != nil {
+			if err := o.Run(ctx, r); err != nil {
 				if o.maxRetry != 0 && o.maxRetry <= o.retryOpenCount {
-					return errors.Wrap(err, "failed to open output resource")
+					return fmt.Errorf("failed to open output resource: %w", err)
 				}
-				o.oc.Logger.Debug("output running error", zap.Error(err))
+				ctxzap.Debug(ctx, "output running error", zap.Error(err))
 			}
 		}
 	}
-	o.oc.Logger.Debug("end output run")
+	ctxzap.Debug(ctx, "finish output loop")
 	return nil
 }
 
 func (o *DnstapOutput) Run(ctx context.Context, r types.Reader) error {
-	if err := o.handler.Open(); err != nil {
+	if err := o.handler.Open(ctx); err != nil {
 		retryDuration := time.Second * time.Duration(1+o.retryOpenCount*o.retryOpenCount)
 		if retryDuration > MaxRetryDuration {
 			retryDuration = MaxRetryDuration
@@ -90,8 +90,8 @@ func (o *DnstapOutput) Run(ctx context.Context, r types.Reader) error {
 	}
 	o.retryOpenCount = 0
 
-	defer o.handler.Close()
-	o.oc.Logger.Debug("start writer")
+	defer o.handler.Close(ctx)
+	ctxzap.Debug(ctx, "start writer")
 L:
 	for {
 		select {
@@ -99,13 +99,13 @@ L:
 			break L
 		case frame := <-r.Read():
 			if frame != nil {
-				if err := o.handler.Write(frame); err != nil {
-					o.oc.Logger.Debug("writer error", zap.Error(err))
+				if err := o.handler.Write(ctx, frame); err != nil {
+					ctxzap.Debug(ctx, "writer error", zap.Error(err))
 					return err
 				}
 			}
 		}
 	}
-	o.oc.Logger.Debug("end writer")
+	ctxzap.Debug(ctx, "end writer")
 	return nil
 }

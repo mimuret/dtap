@@ -1,28 +1,37 @@
 package nop
 
 import (
-	"github.com/goccy/go-json"
+	"context"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "nop"
+
 func init() {
-	_ = registry.RegisterFilterPlugin("nop", Setup)
+	_ = registry.RegisterFilterPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
-	return &Nop{plugin.PluginCommon{Name: "nop"}}, nil
+func Setup(cfg *config.FilterBlock) (types.FilterPlugin, error) {
+	return &Nop{
+		FilterBlock: *cfg,
+	}, nil
 }
 
 var _ types.FilterPlugin = &Nop{}
 
-// No operation for debugs
+// No operation
+// Example HCL configuration:
+//
+//	filter "nop" "default" {
+//	  # No operation, just pass through the message
+//	}
 type Nop struct {
-	plugin.PluginCommon
+	config.FilterBlock
 }
 
-func (f *Nop) Filter(t *types.DnstapMessage) *types.DnstapMessage {
+func (f *Nop) Filter(ctx context.Context, t *types.DnstapMessage) *types.DnstapMessage {
 	return t
 }

@@ -16,44 +16,58 @@
 package nop_test
 
 import (
-	_ "embed"
+	"context"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/filter/nop"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin/filter/nop"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Nop", func() {
+	var (
+		ctx context.Context
+		msg *types.DnstapMessage
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		msg = &types.DnstapMessage{
+			Labels: map[string]string{
+				"example_label": "example_value",
+			},
+		}
+	})
+
 	Context("Setup", func() {
-		var (
-			err error
-			fp  types.FilterPlugin
-		)
-		BeforeEach(func() {
-			fp, err = nop.Setup(json.RawMessage(`{"Name": "nop"}`))
-		})
-		It("returns nop", func() {
+		It("should successfully setup the Nop plugin", func() {
+			block := &config.FilterBlock{
+				Type: "nop",
+				Name: "test_nop",
+			}
+
+			plugin, err := nop.Setup(block)
 			Expect(err).To(Succeed())
-			Expect(fp).To(Equal(&nop.Nop{PluginCommon: plugin.PluginCommon{Name: "nop"}}))
+			Expect(plugin).ToNot(BeNil())
 		})
 	})
+
 	Context("Filter", func() {
 		var (
-			fp  *nop.Nop
-			dm1 *types.DnstapMessage
-			dm2 *types.DnstapMessage
+			plugin types.FilterPlugin
 		)
+
 		BeforeEach(func() {
-			fp = &nop.Nop{}
-			dm1 = &types.DnstapMessage{}
-			dm2 = fp.Filter(dm1)
+			var err error
+			plugin, err = nop.Setup(testtool.MustFilterBlock("nop", "test_nop", ``))
+			Expect(err).To(Succeed())
 		})
-		It("through", func() {
-			Expect(dm2).To(Equal(dm1))
+
+		It("should return the same message without modification", func() {
+			result := plugin.Filter(ctx, msg)
+			Expect(result).To(Equal(msg))
 		})
 	})
 })

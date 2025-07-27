@@ -19,12 +19,9 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/buffer"
-	"github.com/mimuret/dtap/v2/pkg/plugin/input/file"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input/file"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/afero"
@@ -42,19 +39,9 @@ var _ = Describe("input/file", func() {
 			err error
 			p   types.InputPlugin
 		)
-		When("invalid json", func() {
-			BeforeEach(func() {
-				p, err = file.SetupFile(json.RawMessage(`{"Name":100,"ID":"id1"}`))
-			})
-			It("returns error", func() {
-				Expect(p).To(BeNil())
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
 		When("Path is an empty", func() {
 			BeforeEach(func() {
-				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id2"}`))
+				p, err = file.Setup(testtool.MustInputBlock("file", "file_test", ``))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -64,7 +51,7 @@ var _ = Describe("input/file", func() {
 		})
 		When("vaild config", func() {
 			BeforeEach(func() {
-				p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id3","Path":"/var/tmp/dump.fstrm"}`))
+				p, err = file.Setup(testtool.MustInputBlock("file", "file_test", `file = "/var/tmp/dump.fstrm"`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -74,26 +61,25 @@ var _ = Describe("input/file", func() {
 	})
 	Context("Start", func() {
 		var (
-			p   types.InputPlugin
-			ic  *types.InputContext
-			fp  *file.File
-			err error
-			fs  afero.Fs
-			buf types.Buffer
-			f   afero.File
+			p        types.InputPlugin
+			forwader *testtool.TestForwader
+			fp       *file.File
+			err      error
+			fs       afero.Fs
+			buf      types.Buffer
+			f        afero.File
 		)
 		BeforeEach(func() {
-			buf = buffer.NewRingBuffer(10, nil, nil)
-			ic = testtool.NewTestInputContext(buf)
+			forwader = &testtool.TestForwader{}
 			fs = afero.NewMemMapFs()
-			p, err = file.SetupFile(json.RawMessage(`{"Name":"file","ID":"id4","Path":"/var/tmp/dump.fstrm"}`))
+			p, err = file.Setup(testtool.MustInputBlock("file", "file_test", `file = "/var/tmp/dump.fstrm"`))
 			Expect(err).To(Succeed())
 			fp = p.(*file.File)
 			file.SetFS(fp, fs)
 		})
 		When("file not exist", func() {
 			BeforeEach(func() {
-				err = fp.Start(context.TODO(), ic)
+				err = fp.Start(context.TODO(), forwader)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -107,7 +93,7 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(dummyData)
 				Expect(err).To(Succeed())
 				f.Close()
-				err = fp.Start(context.TODO(), ic)
+				err = fp.Start(context.TODO(), forwader)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -121,7 +107,7 @@ var _ = Describe("input/file", func() {
 				_, err = f.Write(validData)
 				Expect(err).To(Succeed())
 				f.Close()
-				err = fp.Start(context.TODO(), ic)
+				err = fp.Start(context.TODO(), forwader)
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())

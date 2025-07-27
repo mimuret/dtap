@@ -16,162 +16,123 @@
 package mask_test
 
 import (
-	_ "embed"
+	"context"
 	"net"
 
-	"github.com/goccy/go-json"
-
 	dnstap "github.com/dnstap/golang-dnstap"
-	"github.com/mimuret/dtap/v2/pkg/plugin/filter/mask"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/miekg/dns"
+	"github.com/mimuret/dtap/v3/pkg/plugin/filter/mask"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("mask", func() {
+var _ = Describe("Mask", func() {
+	var (
+		ctx         context.Context
+		dnsMsg      *dns.Msg
+		dnsMsgBytes []byte
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		dnsMsg = &dns.Msg{}
+		dnsMsg.SetQuestion("example.com.", dns.TypeA)
+		dnsMsgBytes, _ = dnsMsg.Pack()
+	})
+
 	Context("Setup", func() {
-		var (
-			err error
-			fp  types.FilterPlugin
-		)
-		When("invalid json", func() {
-			BeforeEach(func() {
-				fp, err = mask.Setup(json.RawMessage(`{"Name": 0}`))
-			})
-			It("returns mask", func() {
-				Expect(err).To(HaveOccurred())
-			})
+		It("should successfully setup with valid HCL", func() {
+			hclData := `
+mask_len4 = 24
+mask_len6 = 64
+query_address_enabled = true
+response_address_enabled = false
+`
+			plugin, err := mask.Setup(testtool.MustFilterBlock("mask", "test_mask", hclData))
+			Expect(err).To(Succeed())
+			Expect(plugin).ToNot(BeNil())
 		})
-		When("MaskLen4 is invalid", func() {
-			BeforeEach(func() {
-				fp, err = mask.Setup(json.RawMessage(`{"Name": "mask", "MaskLen4": 33}`))
-			})
-			It("returns mask", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("invalid value MaskLen4"))
-			})
+
+		It("should return an error for invalid MaskLen4", func() {
+			hclData := `
+mask_len4 = 33
+`
+			plugin, err := mask.Setup(testtool.MustFilterBlock("mask", "test_mask", hclData))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("MaskLen4 must be between 0 and 32"))
+			Expect(plugin).To(BeNil())
 		})
-		When("MaskLen6 is invalid", func() {
-			BeforeEach(func() {
-				fp, err = mask.Setup(json.RawMessage(`{"Name": "mask", "MaskLen6": 129}`))
-			})
-			It("returns mask", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("invalid value MaskLen6"))
-			})
-		})
-		When("valid json", func() {
-			BeforeEach(func() {
-				fp, err = mask.Setup(json.RawMessage(`{"Name": "mask"}`))
-			})
-			It("returns mask", func() {
-				Expect(err).To(Succeed())
-				Expect(fp).NotTo(BeNil())
-			})
+
+		It("should return an error for invalid MaskLen6", func() {
+			hclData := `
+mask_len6 = 129
+`
+
+			plugin, err := mask.Setup(testtool.MustFilterBlock("mask", "test_mask", hclData))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("MaskLen6 must be between 0 and 128"))
+			Expect(plugin).To(BeNil())
 		})
 	})
+
 	Context("Filter", func() {
 		var (
-			err error
-			fp  types.FilterPlugin
-			dm1 *types.DnstapMessage
-			dm2 *types.DnstapMessage
-			dt  *dnstap.Dnstap
+			plugin types.FilterPlugin
 		)
+
 		BeforeEach(func() {
-			dm1 = testtool.CreateValidDnstapMessage()
-			dt = dm1.GetDnstap()
+			hclData := `
+mask_len4 = 24
+mask_len6 = 64
+query_address_enabled = true
+response_address_enabled = true
+`
+
+			var err error
+			plugin, err = mask.Setup(testtool.MustFilterBlock("mask", "test_mask", hclData))
+			Expect(err).To(Succeed())
 		})
-		When("protocol is IPv4", func() {
-			BeforeEach(func() {
-				dt.Message.SocketFamily = dnstap.SocketFamily_INET.Enum()
-				dt.Message.ResponseAddress = []byte(net.IPv4(192, 168, 255, 255).To4())
-				dt.Message.QueryAddress = []byte(net.IPv4(10, 0, 255, 255).To4())
-				dm1, err = types.NewDnstapMessageFromDnstap(dt)
-				Expect(err).To(Succeed())
-			})
-			When("MaskLen4 is 32", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask","MaskLen4":32}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /32", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte{192, 168, 255, 255}))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte{10, 0, 255, 255}))
-				})
-			})
-			When("MaskLen4 default", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask"}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /22", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte{192, 168, 252, 0}))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte{10, 0, 252, 0}))
-				})
-			})
-			When("MaskLen4 is 0", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask","MaskLen4":0}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /0", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte{0, 0, 0, 0}))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte{0, 0, 0, 0}))
-				})
-			})
+
+		It("should mask IPv4 addresses correctly", func() {
+			dt := &dnstap.Dnstap{
+				Type: dnstap.Dnstap_MESSAGE.Enum(),
+				Message: &dnstap.Message{
+					SocketFamily:    dnstap.SocketFamily_INET.Enum(),
+					QueryAddress:    net.IPv4(192, 168, 1, 1).To4(),
+					ResponseAddress: net.IPv4(10, 0, 0, 1).To4(),
+					Type:            dnstap.Message_AUTH_RESPONSE.Enum(),
+					QueryMessage:    dnsMsgBytes,
+				},
+			}
+			msg, err := types.NewDnstapMessageFromDnstap(dt)
+			Expect(err).To(Succeed())
+
+			result := plugin.Filter(ctx, msg)
+			Expect(result).ToNot(BeNil())
+			Expect(result.GetDnstap().Message.QueryAddress).To(Equal([]byte(net.IPv4(192, 168, 1, 0).To4())))
+			Expect(result.GetDnstap().Message.ResponseAddress).To(Equal([]byte(net.IPv4(10, 0, 0, 0).To4())))
 		})
-		When("protocol is IPv6", func() {
-			BeforeEach(func() {
-				dt.Message.SocketFamily = dnstap.SocketFamily_INET6.Enum()
-				dt.Message.ResponseAddress = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-				dt.Message.QueryAddress = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-				dm1, err = types.NewDnstapMessageFromDnstap(dt)
-				Expect(err).To(Succeed())
-			})
-			When("MaskLen6 is 128", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask","MaskLen6":128}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /128", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}))
-				})
-			})
-			When("MaskLen6 default", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask"}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /40", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}))
-				})
-			})
-			When("MaskLen6 is 0", func() {
-				BeforeEach(func() {
-					fp, err = mask.Setup(json.RawMessage(`{"Name": "mask","MaskLen6":0}`))
-					Expect(err).To(Succeed())
-					dm2 = fp.Filter(dm1)
-				})
-				It("mask /0", func() {
-					Expect(dm2).NotTo(BeNil())
-					Expect(dm2.GetDnstap().GetMessage().ResponseAddress).To(Equal([]byte(net.IPv6zero)))
-					Expect(dm2.GetDnstap().GetMessage().QueryAddress).To(Equal([]byte(net.IPv6zero)))
-				})
-			})
+
+		It("should mask IPv6 addresses correctly", func() {
+			dt := &dnstap.Dnstap{
+				Type: dnstap.Dnstap_MESSAGE.Enum(),
+				Message: &dnstap.Message{
+					SocketFamily:    dnstap.SocketFamily_INET6.Enum(),
+					QueryAddress:    net.ParseIP("2001:db8::1"),
+					ResponseAddress: net.ParseIP("2001:db8:abcd::1"),
+					Type:            dnstap.Message_AUTH_RESPONSE.Enum(),
+					QueryMessage:    dnsMsgBytes,
+				},
+			}
+			msg, err := types.NewDnstapMessageFromDnstap(dt)
+			Expect(err).To(Succeed())
+
+			result := plugin.Filter(ctx, msg)
+			Expect(result).ToNot(BeNil())
+			Expect(result.GetDnstap().Message.QueryAddress).To(Equal([]byte(net.ParseIP("2001:db8::"))))
+			Expect(result.GetDnstap().Message.ResponseAddress).To(Equal([]byte(net.ParseIP("2001:db8:abcd::"))))
 		})
 	})
 })

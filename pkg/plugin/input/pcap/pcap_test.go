@@ -24,11 +24,10 @@ import (
 	"os"
 	"sync"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/input/pcap"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input/pcap"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -52,7 +51,7 @@ var _ = Describe("input/pcap", func() {
 		)
 		When("Interface is an empty", func() {
 			BeforeEach(func() {
-				p, err = pcap.Setup(json.RawMessage(`{"Name": "pcap", "ID": "id1"}`))
+				p, err = pcap.Setup(testtool.MustInputBlock("pcap", "test_pcap", ``))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -60,19 +59,9 @@ var _ = Describe("input/pcap", func() {
 				Expect(err.Error()).To(MatchRegexp("missing parameter Device"))
 			})
 		})
-		When("Interface is not string", func() {
-			BeforeEach(func() {
-				p, err = pcap.Setup(json.RawMessage(`{"Name": "pcap", "ID": "id2", "Device": 0}`))
-			})
-			It("returns error", func() {
-				Expect(p).To(BeNil())
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
 		When("Device missing", func() {
 			BeforeEach(func() {
-				p, err = pcap.Setup(json.RawMessage(`{"Name":"pcap","ID":"id3","Device":"missing"}`))
+				p, err = pcap.Setup(testtool.MustInputBlock("pcap", "test_pcap", `device = "missing"`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
@@ -82,7 +71,10 @@ var _ = Describe("input/pcap", func() {
 		})
 		When("Valid config ", func() {
 			BeforeEach(func() {
-				p, err = pcap.Setup(json.RawMessage(`{"Name":"pcap","ID":"id5","Device":"` + ifName + `","BPF":"udp and port 53"}`))
+				p, err = pcap.Setup(testtool.MustInputBlock("pcap", "test_pcap", `
+device = "`+ifName+`"
+bpf = "udp and port 53"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -101,7 +93,9 @@ var _ = Describe("input/pcap", func() {
 			cancelFunc context.CancelFunc
 		)
 		BeforeEach(func() {
-			ip, err = pcap.Setup(json.RawMessage(`{"Name":"pcap","ID":"id6","Device":"` + ifName + `"}`))
+			ip, err = pcap.Setup(testtool.MustInputBlock("pcap", "test_pcap", `
+			device = "`+ifName+`"
+			`))
 			p = ip.(*pcap.PCAP)
 		})
 		When("open socket", func() {
@@ -111,7 +105,7 @@ var _ = Describe("input/pcap", func() {
 				wg := sync.WaitGroup{}
 				wg.Add(1)
 				go func() {
-					err = p.Start(ctx, testtool.NewTestInputContext(nil))
+					err = p.Start(ctx, &plugin.Forwarder{})
 					wg.Done()
 				}()
 				cancelFunc()

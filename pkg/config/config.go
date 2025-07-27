@@ -18,176 +18,314 @@ package config
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
+	"strings"
 
-	json "github.com/goccy/go-json"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
+	_ "github.com/go-viper/encoding/hcl"
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/spf13/afero"
 
-	gerrors "errors"
-
-	"github.com/pkg/errors"
-	"sigs.k8s.io/yaml"
+	"errors"
 )
 
-const DefaultInputBufferSize = 10000
-const DefaultOutputBufferSize = 10000
-const DefaultInputFilterWorkerNum = 1
-
-type BufferConfig struct {
-	// Buffer name
-	Name string
-	// Buffer size
-	Size uint
+func blockError(block ConfigBlock, format string, args ...interface{}) error {
+	return fmt.Errorf("plugin %s: %s", block.GetFullName(), fmt.Sprintf(format, args...))
 }
 
-func (c *BufferConfig) GetName() string {
-	return c.Name
+func NewInputBlock(ptype, name, hclString string) (*InputBlock, error) {
+	parser := hclparse.NewParser()
+	file, diags := parser.ParseHCL([]byte(hclString), "input.hcl")
+	if diags.HasErrors() {
+		return nil, errors.Join(diags.Errs()...)
+	}
+	block := &InputBlock{
+		Type: ptype,
+		Name: name,
+		Body: file.Body,
+	}
+	return block, nil
 }
 
-func (c *BufferConfig) GetSize() uint {
-	return c.Size
+type ConfigBlock interface {
+	GetFullName() string
 }
 
-// An output group consists of a buffer (queue) for the output group,
-// Filter settings specific to the output group, and output plug-in settings.
-// When a message passes through the global filter and is written to the
-// output group's buffer, the global workers runs a filter for the output group.
-// Only messages that pass through it are written to the output group's Buffer.
-// Each output plugin runs in its own goroutine, receiving and processing
-// messages from the output buffer (queue).
-// Since output plug-ins are executed in parallel, a message is not processed
-// by all output plug-ins, but by one of them. If you want all plug-ins to process
-// a message at the same time, for example, standard output and file output, please separate the output groups.
-// The current use case for setting up multiple output plugins is to increase
-// throughput by setting up multiple plugins with the same configuration, for example, for forwarding to remote.
-type OutputGroupConfig struct {
-	// Output group name
-	Name string
-	// Output group shared queue config
-	BufferConfig *BufferConfig
-	// Filter settings for groups.
-	// After filtering, it is added to the output buffer.
-	Filters plugin.FilterPlugins
-	// Output plugin settings.
-	// A message is processed only by one of the plugins.
-	Outputs plugin.OutputPlugins
+type InputBlock struct {
+	Type            string            `hcl:"type,label"`
+	Name            string            `hcl:"name,label"`
+	Body            hcl.Body          `hcl:",remain"`
+	ForwardToString []string          `hcl:"forward_to,attr"`
+	ConstLabels     map[string]string `hcl:"labels,optional"`
 }
 
-// Configuration file structure.
-// The configuration file must be in yaml or json format.
-// The file extension must be 'yaml' or 'yml' or 'json'.
+func (b *InputBlock) GetType() string {
+	return b.Type
+}
+
+func (b *InputBlock) GetName() string {
+	return b.Name
+}
+
+func (b *InputBlock) GetFullName() string {
+	return fmt.Sprintf("input.%s.%s", b.Type, b.Name)
+}
+
+func NewFilterBlock(ptype, name, hclString string) (*FilterBlock, error) {
+	parser := hclparse.NewParser()
+	file, diags := parser.ParseHCL([]byte(hclString), "filter.hcl")
+	if diags.HasErrors() {
+		return nil, errors.Join(diags.Errs()...)
+	}
+	block := &FilterBlock{
+		Type: ptype,
+		Name: name,
+		Body: file.Body,
+	}
+	return block, nil
+}
+
+type FilterBlock struct {
+	Type            string            `hcl:"type,label"`
+	Name            string            `hcl:"name,label"`
+	Body            hcl.Body          `hcl:",remain"`
+	BufferSize      uint              `hcl:"buffer_size,optional"`
+	ForwardToString []string          `hcl:"forward_to,attr"`
+	ConstLabels     map[string]string `hcl:"labels,optional"`
+}
+
+func (b *FilterBlock) GetType() string {
+	return b.Type
+}
+
+func (b *FilterBlock) GetName() string {
+	return b.Name
+}
+
+func (b *FilterBlock) GetFullName() string {
+	return fmt.Sprintf("filter.%s.%s", b.Type, b.Name)
+}
+
+func (b *FilterBlock) GetBufferSize() uint {
+	return b.BufferSize
+}
+
+func NewOutputBlock(ptype, name, hclString string) (*OutputBlock, error) {
+	parser := hclparse.NewParser()
+	file, diags := parser.ParseHCL([]byte(hclString), "output.hcl")
+	if diags.HasErrors() {
+		return nil, errors.Join(diags.Errs()...)
+	}
+	block := &OutputBlock{
+		Type: ptype,
+		Name: name,
+		Body: file.Body,
+	}
+	return block, nil
+}
+
+type OutputBlock struct {
+	Type        string            `hcl:"type,label"`
+	Name        string            `hcl:"name,label"`
+	Body        hcl.Body          `hcl:",remain"`
+	BufferSize  uint              `hcl:"buffer_size,optional"`
+	Concurrency uint              `hcl:"concurrency,optional"`
+	ConstLabels map[string]string `hcl:"labels,optional"`
+}
+
+func (b *OutputBlock) GetType() string {
+	return b.Type
+}
+
+func (b *OutputBlock) GetName() string {
+	return b.Name
+}
+
+func (b *OutputBlock) GetFullName() string {
+	return fmt.Sprintf("output.%s.%s", b.Type, b.Name)
+}
+
+func (b *OutputBlock) GetBufferSize() uint {
+	return b.BufferSize
+}
+
+func (b *OutputBlock) GetConcurrency() uint {
+	if b.Concurrency == 0 {
+		return 1 // Default concurrency is 1 if not specified
+	}
+	return b.Concurrency
+}
+
+func checkDuplicate[T ConfigBlock](data []T) error {
+	var res error
+	seen := make(map[string]struct{})
+	for _, block := range data {
+		key := block.GetFullName()
+		if _, exists := seen[key]; exists {
+			res = errors.Join(res, fmt.Errorf("duplicate config block found: %s", key))
+		}
+
+		seen[key] = struct{}{}
+	}
+	return res
+}
+
+// Config represents the entire configuration for the application.
 type Config struct {
-	// Number of global workers that process messages.
-	// Global workers input messages from global buffers,
-	// filter messages with global filters, and copy messages
-	// with filter words to output group buffers.
-	// default value is 1
-	InputFilterWorkerNum uint
-	// Output log level.
-	// Select one of 'debug', 'info', 'warn', 'error', or 'fatal'.
-	// default value is 'info'
-	LogLevel string
-	// Listen IP and port to output metrics
-	ManageHTTPSServer string
-	// Input buffer settings
-	InputBufferConfig *BufferConfig
-	// Input plugin settings. Must not be empty.
-	Inputs plugin.InputPlugins
-	// The global filters are the filter that is processed for all messages.
-	// It can be empty.
-	Filters plugin.FilterPlugins
-	// Output group settings. Must not be empty.
-	// If multiple output groups are specified, messages that pass through
-	// the Global Filter are copied to all output groups.
-	OutputGroups []OutputGroupConfig
+	// Input configuration.
+	InputBlocks []*InputBlock `hcl:"input,block"`
+
+	// Filter configuration.
+	FilterBlocks []*FilterBlock `hcl:"filter,block"`
+
+	// Output configuration.
+	OutputBlocks []*OutputBlock `hcl:"output,block"`
 }
 
-func LoadConfig(fs afero.Fs, cfgFile string) (*Config, error) {
-	c := &Config{}
-	bs, err := afero.ReadFile(fs, cfgFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open config file")
+func (c *Config) checkDuplicate() error {
+	var res error
+	if err := checkDuplicate(c.InputBlocks); err != nil {
+		res = errors.Join(res, fmt.Errorf("input blocks validation failed: %w", err))
 	}
-	switch path.Ext(cfgFile) {
-	case ".yaml", ".yml":
-		err = yaml.Unmarshal(bs, c)
-	case ".json":
-		err = json.Unmarshal(bs, c)
-	default:
-		return nil, errors.New("unsupported config format")
+	if err := checkDuplicate(c.FilterBlocks); err != nil {
+		res = errors.Join(res, fmt.Errorf("filter blocks validation failed: %w", err))
 	}
-	if err != nil {
-		return nil, errors.Wrap(err, "failed parse config file")
+	if err := checkDuplicate(c.OutputBlocks); err != nil {
+		res = errors.Join(res, fmt.Errorf("output blocks validation failed: %w", err))
+	}
+	return res
+}
+
+func detectLoop(plugins map[string][]string, start string, visited map[string]bool, stack map[string]bool) error {
+	if stack[start] {
+		return fmt.Errorf("loop detected in forward_to chain: %s", start)
+	}
+	if visited[start] {
+		return nil
+	}
+	visited[start] = true
+	stack[start] = true
+	for _, next := range plugins[start] {
+		if err := detectLoop(plugins, next, visited, stack); err != nil {
+			return err
+		}
+	}
+	stack[start] = false
+	return nil
+}
+
+func (c *Config) checkForwardTo() error {
+	var res error
+	plugins := map[string]struct{}{}
+	pluginGraph := map[string][]string{}
+
+	// Register output blocks
+	for _, block := range c.OutputBlocks {
+		plugins[block.GetFullName()] = struct{}{}
 	}
 
-	OutputGroupName := map[string]struct{}{}
-	for i := range c.OutputGroups {
-		og := &c.OutputGroups[i]
-		if og.Name == "input" {
-			return nil, fmt.Errorf("invalid parameter OutputGroups[%d].Name must not input", i)
+	// Register filter blocks
+	for _, block := range c.FilterBlocks {
+		plugins[block.GetFullName()] = struct{}{}
+	}
+
+	// Register input blocks
+	for _, block := range c.InputBlocks {
+		plugins[block.GetFullName()] = struct{}{}
+	}
+
+	// Validate input blocks
+	for _, block := range c.InputBlocks {
+		if len(block.ForwardToString) == 0 {
+			res = errors.Join(res, blockError(block, "forward_to must not be empty"))
 		}
-		if og.Name == "" {
-			og.Name = fmt.Sprintf("output-group-%d", i)
-		}
-		if _, exist := OutputGroupName[og.Name]; exist {
-			return nil, fmt.Errorf("invalid parameter OutputGroups[%d].Name `%s` is already exist", i, og.Name)
-		}
-		if og.BufferConfig == nil {
-			og.BufferConfig = &BufferConfig{
-				Size: DefaultInputBufferSize,
+		for _, forwardTo := range block.ForwardToString {
+			if strings.HasPrefix(forwardTo, "input") {
+				res = errors.Join(res, blockError(block, "forward_to `%s` is not supported", forwardTo))
+			}
+			if _, ok := plugins[forwardTo]; !ok {
+				res = errors.Join(res, blockError(block, "forward_to `%s` does not exist", forwardTo))
 			}
 		}
-		og.BufferConfig.Name = og.Name
-		OutputGroupName[og.Name] = struct{}{}
 	}
-	return c, nil
+
+	// Validate filter blocks
+	for _, block := range c.FilterBlocks {
+		if len(block.ForwardToString) == 0 {
+			res = errors.Join(res, blockError(block, "forward_to must not be empty"))
+		}
+		for _, forwardTo := range block.ForwardToString {
+			if strings.HasPrefix(forwardTo, "input") {
+				res = errors.Join(res, blockError(block, "forward_to `%s` is not supported", forwardTo))
+			}
+			if _, ok := plugins[forwardTo]; !ok {
+				res = errors.Join(res, blockError(block, "forward_to `%s` does not exist", forwardTo))
+			}
+			// Build the plugin graph for loop detection
+			pluginGraph[block.GetFullName()] = append(pluginGraph[block.GetFullName()], forwardTo)
+		}
+	}
+
+	// Detect loops in filter chains
+	visited := map[string]bool{}
+	stack := map[string]bool{}
+	for plugin := range pluginGraph {
+		if err := detectLoop(pluginGraph, plugin, visited, stack); err != nil {
+			res = errors.Join(res, err)
+		}
+	}
+
+	return res
 }
 
-func (c *Config) UnmarshalJSON(bs []byte) error {
-	cfg := struct {
-		InputFilterWorkerNum uint
-		LogLevel             string
-		ManageHTTPSServer    string
-		InputBufferConfig    *BufferConfig
-		Inputs               json.RawMessage
-		Filters              json.RawMessage
-		OutputGroups         []json.RawMessage
-	}{
-		ManageHTTPSServer: ":9520",
-		LogLevel:          "info",
-		InputBufferConfig: &BufferConfig{
-			Name: "input",
-			Size: DefaultInputBufferSize,
-		},
-		InputFilterWorkerNum: DefaultInputFilterWorkerNum,
+func LoadConfig(fs afero.Fs, cfgDir string) (*Config, error) {
+	stat, err := fs.Stat(cfgDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %w", cfgDir, err)
 	}
-
-	if err := json.Unmarshal(bs, &cfg); err != nil {
-		return errors.Wrap(err, "invalid json Input")
-	}
-	c.InputFilterWorkerNum = cfg.InputFilterWorkerNum
-	c.LogLevel = cfg.LogLevel
-	c.ManageHTTPSServer = cfg.ManageHTTPSServer
-	c.InputBufferConfig = cfg.InputBufferConfig
-
-	var results error
-
-	if err := json.Unmarshal(cfg.Inputs, &c.Inputs); err != nil {
-		results = gerrors.Join(results, errors.Wrap(err, "failed to create input plugins"))
-	}
-	if cfg.Filters != nil {
-		if err := json.Unmarshal(cfg.Filters, &c.Filters); err != nil {
-			results = gerrors.Join(results, errors.Wrap(err, "failed to create global filter plugins"))
+	var files []string
+	if stat.IsDir() {
+		files, err = afero.Glob(fs, filepath.Join(cfgDir, "*.hcl"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config dir %s: %w", cfgDir, err)
 		}
+	} else {
+		files = []string{cfgDir}
 	}
-	for i, v := range cfg.OutputGroups {
-		var og OutputGroupConfig
-		if err := json.Unmarshal(v, &og); err != nil {
-			results = gerrors.Join(results, errors.Wrapf(err, "failed to create output groups no %d", i))
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no HCL files found in directory %s", cfgDir)
+	}
+	// HCLパーサーを作成
+	parser := hclparse.NewParser()
+	hcFiles := make([]*hcl.File, 0, len(files))
+	for _, file := range files {
+		bs, err := afero.ReadFile(fs, file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open config file: %w", err)
 		}
-		c.OutputGroups = append(c.OutputGroups, og)
+		// HCLファイルをパース
+		hclFile, diags := parser.ParseHCL(bs, file)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse HCL: %w", errors.Join(diags.Errs()...))
+		}
+		hcFiles = append(hcFiles, hclFile)
 	}
 
-	return results
+	// 構造体にデコード
+	var c Config
+	diags := gohcl.DecodeBody(hcl.MergeFiles(hcFiles), nil, &c)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode HCL into struct: %w", errors.Join(diags.Errs()...))
+	}
+	// 重複チェック
+	if err := c.checkDuplicate(); err != nil {
+		return nil, err
+	}
+
+	// forward_to check
+	if err := c.checkForwardTo(); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

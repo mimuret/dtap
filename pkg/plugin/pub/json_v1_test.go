@@ -16,9 +16,11 @@
 package pub_test
 
 import (
-	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"context"
+
+	"github.com/mimuret/dtap/v3/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -28,7 +30,7 @@ type TestPublisherHandler struct {
 	num        int
 }
 
-func (t *TestPublisherHandler) Publish(_ []byte) error {
+func (t *TestPublisherHandler) Publish(ctx context.Context, _ []byte) error {
 	t.num++
 	return t.ErrPublish
 }
@@ -39,6 +41,7 @@ var _ = Describe("pub", func() {
 			th  *TestPublisherHandler
 			op  pub.Publisher
 			err error
+			ctx = context.Background()
 		)
 		BeforeEach(func() {
 			th = &TestPublisherHandler{}
@@ -64,7 +67,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024 - 2) / (len(data) + 1)
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -79,7 +82,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024-2)/(len(data)+1) + 1
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -94,7 +97,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024-2)/(len(data)+1)*2 + 2
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -111,7 +114,7 @@ var _ = Describe("pub", func() {
 				})
 				When("Format is json/v1", func() {
 					BeforeEach(func() {
-						err = op.Write(dm)
+						err = op.Write(ctx, dm)
 					})
 					It("returns error", func() {
 						Expect(err).To(HaveOccurred())

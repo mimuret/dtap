@@ -1,21 +1,32 @@
 package static
 
 import (
-	"github.com/goccy/go-json"
+	"context"
+	"errors"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "static"
+
 func init() {
-	_ = registry.RegisterFilterPlugin("static", Setup)
+	_ = registry.RegisterFilterPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
-	fp := &Static{}
-	if err := json.Unmarshal(raw, fp); err != nil {
-		return nil, err
+func Setup(cfg *config.FilterBlock) (types.FilterPlugin, error) {
+	fp := &Static{
+		FilterBlock: *cfg,
+		Deny:        false, // Default value for Deny is false
+	}
+	// Decode the HCL body into the Relabel struct.
+	diags := gohcl.DecodeBody(cfg.Body, nil, fp)
+	if diags.HasErrors() {
+		// Return an error if there are issues decoding the HCL body.
+		return nil, plugin.PluginError(fp, "failed to setup Relabel plugin: %w", errors.Join(diags.Errs()...))
 	}
 
 	return fp, nil
@@ -24,14 +35,19 @@ func Setup(raw json.RawMessage) (types.FilterPlugin, error) {
 var _ types.FilterPlugin = &Static{}
 
 // Static plugin for debug
+// Example HCL configuration:
+//
+//	filter "static" "default" {
+//	  deny = true
+//	}
 type Static struct {
-	plugin.PluginCommon
-	Deny bool `json:"Deny"`
+	config.FilterBlock
+	Deny bool `hcl:"deny,optional"`
 }
 
-func (f *Static) Filter(t *types.DnstapMessage) *types.DnstapMessage {
+func (f *Static) Filter(ctx context.Context, msg *types.DnstapMessage) *types.DnstapMessage {
 	if f.Deny {
 		return nil
 	}
-	return t
+	return msg
 }

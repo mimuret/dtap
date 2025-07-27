@@ -16,9 +16,11 @@
 package pub_test
 
 import (
-	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"context"
+
+	"github.com/mimuret/dtap/v3/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -29,6 +31,7 @@ var _ = Describe("pub", func() {
 			th  *TestPublisherHandler
 			op  pub.Publisher
 			err error
+			ctx = context.Background()
 		)
 		BeforeEach(func() {
 			th = &TestPublisherHandler{}
@@ -54,7 +57,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024 - pub.DnstapFstrmControlHeaderSize*2) / (len(data) + 4)
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -69,7 +72,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024-pub.DnstapFstrmControlHeaderSize*2)/(len(data)+4) + 1
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -84,7 +87,7 @@ var _ = Describe("pub", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (1024*1024-pub.DnstapFstrmControlHeaderSize*2)/(len(data)+4)*2 + 2
 							for i := 0; i < maxMsg; i++ {
-								err = op.Write(dm)
+								err = op.Write(ctx, dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -101,7 +104,7 @@ var _ = Describe("pub", func() {
 				})
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						err = op.Write(dm)
+						err = op.Write(ctx, dm)
 					})
 					It("succeed", func() {
 						Expect(err).To(Succeed())

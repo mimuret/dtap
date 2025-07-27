@@ -7,7 +7,7 @@ import (
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
 	dnsutilstesttool "github.com/mimuret/dnsutils/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -1,0 +1,35 @@
+services:
+  dtap1:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    command: ["run", "--loglevel","debug"]
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail-with-body", "--max-time", "5", "http://localhost:9520/readyz"]
+    volumes:
+      - ./dtap1/conf:/etc/dtap
+      - ./dtap1/data:/data
+      - ./run:/run
+    depends_on:
+      - nats
+      - dtap2
+  dtap2:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    command: ["run", "--loglevel","debug"]
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail-with-body", "--max-time", "5", "http://localhost:9520/readyz"]
+    volumes:
+      - ./dtap2/conf:/etc/dtap
+      - ./dtap2/data:/data
+      - ./run:/run
+    depends_on:
+      - nats
+  nats:
+    image: nats:latest
+    hostname: nats
+    ports:
+      - "4222:4222"
+      - "6222:6222"
+      - "8222:8222"

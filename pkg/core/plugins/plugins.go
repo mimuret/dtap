@@ -17,32 +17,29 @@ package plugin
 
 import (
 	//filters
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/iphash"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/label"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/mask"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/matcher"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/metrics"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/nop"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/expr"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/iphash"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/mask"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/nop"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/relabel"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/filter/static"
 
 	// input
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/file"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/nats"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/input/file"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/input/nats"
 
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/input/tcp"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/input/unix"
 
 	// output
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/dns"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/file"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/fluent"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/kafka"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/loki"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/multi"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/otel-log"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/stdout"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/tcp"
-	_ "github.com/mimuret/dtap/v2/pkg/plugin/output/unix"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/dns"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/file"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/kafka"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/loki"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/nats"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/nop"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/otel-log"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/stdout"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/tcp"
+	_ "github.com/mimuret/dtap/v3/pkg/plugin/output/unix"
 )

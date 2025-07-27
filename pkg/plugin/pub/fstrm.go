@@ -2,12 +2,14 @@ package pub
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -41,18 +43,18 @@ type FstrmPublisher struct {
 	writeCount      int
 }
 
-func NewFstrmPublisher(maxSize int, intervalSec uint, handler PublisherHandler) *FstrmPublisher {
+func NewFstrmPublisher(maxSize int, interval time.Duration, handler PublisherHandler) *FstrmPublisher {
 	buf := make([]byte, 0, maxSize)
 	return &FstrmPublisher{
 		buf:             bytes.NewBuffer(buf),
 		handler:         handler,
 		maxSize:         maxSize,
-		intervalFlusher: newIntervalFlusher(intervalSec),
+		intervalFlusher: newIntervalFlusher(interval),
 	}
 }
 
-func NewFstrmDNSTAPPublisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
-	publisher := NewFstrmPublisher(maxSize, intervalSec, handler)
+func NewFstrmDNSTAPPublisher(maxSize int, interval time.Duration, handler PublisherHandler) Publisher {
+	publisher := NewFstrmPublisher(maxSize, interval, handler)
 	publisher.marshaler = func(dm *types.DnstapMessage) ([]byte, error) {
 		return dm.GetRaw(), nil
 	}
@@ -60,8 +62,8 @@ func NewFstrmDNSTAPPublisher(maxSize int, intervalSec uint, handler PublisherHan
 	return publisher
 }
 
-func NewFstrmDtapFramePublisher(maxSize int, intervalSec uint, handler PublisherHandler) Publisher {
-	publisher := NewFstrmPublisher(maxSize, intervalSec, handler)
+func NewFstrmDtapFramePublisher(maxSize int, interval time.Duration, handler PublisherHandler) Publisher {
+	publisher := NewFstrmPublisher(maxSize, interval, handler)
 	publisher.marshaler = func(dm *types.DnstapMessage) ([]byte, error) {
 		return proto.Marshal(dm.ToDtapFrame())
 	}
@@ -69,8 +71,8 @@ func NewFstrmDtapFramePublisher(maxSize int, intervalSec uint, handler Publisher
 	return publisher
 }
 
-func (f *FstrmPublisher) Start() {
-	f.intervalFlusher.Start(f)
+func (f *FstrmPublisher) Start(ctx context.Context) {
+	f.intervalFlusher.Start(ctx, f)
 }
 
 func (f *FstrmPublisher) reset() {
@@ -80,25 +82,26 @@ func (f *FstrmPublisher) reset() {
 	f.writeCount = 0
 }
 
-func (f *FstrmPublisher) Write(dm *types.DnstapMessage) error {
+func (f *FstrmPublisher) Write(ctx context.Context, dm *types.DnstapMessage) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.write(dm); err != nil {
+	if err := f.write(ctx, dm); err != nil {
 		f.reset()
 		return err
 	}
 	return nil
 }
 
-func (f *FstrmPublisher) write(dm *types.DnstapMessage) error {
+func (f *FstrmPublisher) write(ctx context.Context, dm *types.DnstapMessage) error {
 	var err error
 	data, err := f.marshaler(dm)
 	if err != nil {
+		// broken message is not processed, return nil error
 		return nil
 	}
 	if f.writeSize+4+len(data)+DnstapFstrmControlHeaderSize > f.maxSize {
-		if err := f.publish(); err != nil {
-			return errors.Wrap(err, "failed to publish message")
+		if err := f.publish(ctx); err != nil {
+			return fmt.Errorf("failed to publish message: %w", err)
 		}
 	}
 	if f.writeState == writeStateInit {
@@ -107,50 +110,53 @@ func (f *FstrmPublisher) write(dm *types.DnstapMessage) error {
 			Bidirectional: false,
 		})
 		if err != nil {
-			return errors.Wrap(err, "failed to create writer")
+			return fmt.Errorf("failed to create writer: %w", err)
 		}
 		f.writeState = writeStateActive
 		f.writeSize = DnstapFstrmControlHeaderSize
 		f.writeCount = 0
 	}
 	n, err := f.writer.WriteFrame(data)
+	if err != nil {
+		return fmt.Errorf("failed to write frame: %w", err)
+	}
 	f.writeSize += n + DnstapFstrmMsgHeaderSize
 	f.writeCount++
-	return errors.Wrap(err, "failed to write message")
+	return nil
 }
 
-func (f *FstrmPublisher) Publish() error {
+func (f *FstrmPublisher) Publish(ctx context.Context) error {
 	f.Lock()
 	defer f.Unlock()
-	return f.publish()
+	return f.publish(ctx)
 }
 
-func (f *FstrmPublisher) publish() error {
+func (f *FstrmPublisher) publish(ctx context.Context) error {
 	if f.writeState != writeStateActive {
 		return nil
 	}
 	if err := f.writer.Flush(); err != nil {
-		return errors.Wrap(err, "failed to flush fstrm")
+		return fmt.Errorf("failed to flush fstrm: %w", err)
 	}
 	if err := f.writer.Close(); err != nil {
-		return errors.Wrap(err, "failed to close fstrm")
+		return fmt.Errorf("failed to close fstrm: %w", err)
 	}
 	f.writeSize += DnstapFstrmControlHeaderSize
 	if f.writeCount == 0 {
 		return nil
 	}
 	data := f.buf.Bytes()
-	err := f.handler.Publish(data[:f.writeSize])
+	err := f.handler.Publish(ctx, data[:f.writeSize])
 	if err != nil {
-		return errors.Wrap(err, "publish error")
+		return fmt.Errorf("publish error: %w", err)
 	}
 	f.reset()
 	return nil
 }
 
-func (f *FstrmPublisher) Close() error {
-	f.intervalFlusher.Close()
-	return f.Publish()
+func (f *FstrmPublisher) Close(ctx context.Context) error {
+	f.intervalFlusher.Close(ctx)
+	return f.Publish(ctx)
 }
 
 func init() {

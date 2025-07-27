@@ -17,86 +17,92 @@ package stdout
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"net"
 	"runtime"
 	"time"
 
-	json "github.com/goccy/go-json"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/miekg/dns"
 	"github.com/mimuret/dnsutils"
 	"github.com/mimuret/dnsutils/dig"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/promauto"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 )
 
+const PLUGIN_NAME = "dns"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("dns", setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
 type ExchangeContextInterface interface {
 	ExchangeContext(ctx context.Context, m *dns.Msg, a string) (*dns.Msg, time.Duration, error)
 }
 
-func setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	s := &DNS{
-		Protocol:  DNSProtocolUDP,
-		Timeout:   time.Second,
-		WorkerNum: 4,
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	p := &DNS{
+		OutputBlock: *cfg,
+		Protocol:    DNSProtocolUDP,
+		Timeout:     time.Second,
+		WorkerNum:   4,
 	}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
-	}
-
-	if _, _, err := net.SplitHostPort(s.Host); err != nil {
-		return nil, fmt.Errorf("invalid Host %s, %w", s.Host, err)
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup dn plugin: %w", errors.Join(diags.Errs()...))
 	}
 
-	if s.WorkerNum == 0 {
-		s.WorkerNum = uint(runtime.NumCPU())
+	if _, _, err := net.SplitHostPort(p.Host); err != nil {
+		return nil, plugin.PluginError(p, "host is an invalid address: %s", p.Host)
 	}
 
-	switch s.Protocol {
+	if p.WorkerNum == 0 {
+		p.WorkerNum = uint(runtime.NumCPU())
+	}
+
+	switch p.Protocol {
 	case DNSProtocolUDP, DNSProtocolTCP, DNSProtocolTLS:
 	case DNSProtocolHTTPS, DNSProtocolHTTPSGet, DNSProtocolHTTPSPost:
 	default:
-		return nil, fmt.Errorf("invalid Protocol %s", s.Protocol)
+		return nil, plugin.PluginError(p, "invalid protocol: %s", p.Protocol)
 	}
-	s.cl = dig.NewDig()
-	s.cl.Client = &dns.Client{
-		Net: string(s.Protocol),
+	p.cl = dig.NewDig()
+	p.cl.Client = &dns.Client{
+		Net: string(p.Protocol),
 	}
-	op := &dig.OptionTarget{Target: s.Host}
-	if err := op.Option(s.cl); err != nil {
+	op := &dig.OptionTarget{Target: p.Host}
+	if err := op.Option(p.cl); err != nil {
 		return nil, fmt.Errorf("failed to set dig option: %w", err)
 	}
-	s.outCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.outCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_dns",
 		Name:        "queries_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.errCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.errCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_dns",
 		Name:        "request_errors_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.rcodeCoutner = promauto.NewCounterVec(prometheus.CounterOpts{
+	p.rcodeCoutner = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_dns",
 		Name:        "responses_by_rcode_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	}, []string{"rcodes"})
 
-	s.DnstapOutput = output.NewDnstapOutput(s, 0)
-	return s, nil
+	p.DnstapOutput = output.NewDnstapOutput(p, 0)
+	return p, nil
 }
 
 type DNSProtocol string
@@ -116,37 +122,37 @@ var _ types.OutputPlugin = &DNS{}
 // The DNS plugin sends the same question as
 // the message to the DNS server.
 type DNS struct {
-	plugin.PluginCommon
+	config.OutputBlock
 	*output.DnstapOutput
 
-	// target DNS server
-	Host string
+	// Host is the DNS server address and port .
+	Host string `hcl:"host"`
+
 	// Transport Protocol
-	Protocol DNSProtocol
+	// Supported protocols are "udp", "tcp", "tcp-tls", "https", "https-get", and "https-post".
+	// Default is "udp".
+	Protocol DNSProtocol `hcl:"protocol,optional"`
+
 	// Timeout setting (duration)
-	Timeout time.Duration
-	// SendOnly flag
-	WorkerNum uint
+	Timeout time.Duration `hcl:"timeout,optional"`
+
+	// WorkerNum is the number of workers that process messages.
+	WorkerNum uint `hcl:"worker_num,optional"`
 
 	sem *semaphore.Weighted
 	cl  *dig.Dig
-	oc  *types.OutputContext
 
 	outCounter   prometheus.Counter
 	errCounter   prometheus.Counter
 	rcodeCoutner *prometheus.CounterVec
 }
 
-func (o *DNS) SetOutputContext(oc *types.OutputContext) {
-	o.oc = oc
-}
-
-func (o *DNS) Open() error {
+func (o *DNS) Open(context.Context) error {
 	o.sem = semaphore.NewWeighted(int64(o.WorkerNum))
 	return nil
 }
 
-func (o *DNS) Write(dm *types.DnstapMessage) error {
+func (o *DNS) Write(ctx context.Context, dm *types.DnstapMessage) error {
 	if err := o.sem.Acquire(context.Background(), 1); err != nil {
 		return err
 	}
@@ -176,5 +182,9 @@ func (o *DNS) write(dm *types.DnstapMessage) error {
 	return nil
 }
 
-func (o *DNS) Close() {
+func (o *DNS) Close(context.Context) {
+}
+
+func (p *DNS) MaxConcurrent() uint {
+	return math.MaxUint32
 }

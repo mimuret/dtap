@@ -17,20 +17,27 @@
 package nats
 
 import (
-	"sync"
+	"context"
+	"crypto/tls"
+	"fmt"
+	"math"
 	"time"
 
-	json "github.com/goccy/go-json"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
-	"github.com/pkg/errors"
+	"errors"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/promauto"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/types"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
 	"github.com/nats-io/nats.go"
 )
 
@@ -38,77 +45,89 @@ const DefaultMaxPayloadSize = 1024 * 1024
 const DnstapFstrmControlHeaderSize = 42
 const DnstapFstrmMsgHeaderSize = 4
 
+const PLUGIN_NAME = "nats"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("nats", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	s := &Nats{
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	p := &Nats{
+		OutputBlock: *cfg,
 		MaxSize:     DefaultMaxPayloadSize,
-		Format:      pub.DefaultFormat,
-		IntervalSec: 1,
+		Format:      pub.FormatDtapFrame,
+		Interval:    time.Second,
 	}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup loki plugin: %w", errors.Join(diags.Errs()...))
 	}
-	if len(s.Hosts) == 0 {
-		return nil, errors.Errorf("missing parameter Hosts")
+	if len(p.Hosts) == 0 {
+		return nil, plugin.PluginError(p, "missing parameter hosts")
 	}
-	if s.Subject == "" {
-		return nil, errors.Errorf("missing parameter Subject")
+	if p.Subject == "" {
+		return nil, plugin.PluginError(p, "missing parameter subject")
 	}
-	if s.Token == "" && s.User != "" && s.Password == "" {
-		return nil, errors.Errorf("missing parameter Password")
+	if p.Token == "" && p.User != "" && p.Password == "" {
+		return nil, plugin.PluginError(p, "missing parameter password")
 	}
-	if s.IntervalSec == 0 {
-		s.IntervalSec = 1
+	if p.Token == "" && p.User == "" && p.Password != "" {
+		return nil, plugin.PluginError(p, "missing parameter user")
 	}
-	s.publisher = pub.NewPublisher(s.Format, s.MaxSize, s.IntervalSec, s)
-	if s.publisher == nil {
-		return nil, errors.Errorf("failed to create publisher for format %s", s.Format)
+	if p.Interval == 0 {
+		p.Interval = time.Second
 	}
-	if s.ID == "" {
-		return nil, errors.Errorf("`ID` must not be empty")
+	p.publisher = pub.NewPublisher(p.Format, p.MaxSize, p.Interval, p)
+	if p.publisher == nil {
+		return nil, plugin.PluginError(p, "failed to create publisher for format %s", p.Format)
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
+	if p.TLSConfig != nil {
+		tlsConfig, err := p.TLSConfig.CryptoTLSConfig()
+		if err != nil {
+			return nil, plugin.PluginError(p, "failed to create TLS config: %w", err)
+		}
+		p.tlsConfig = tlsConfig
+	}
 
-	s.openErr = promauto.NewCounter(prometheus.CounterOpts{
+	p.DnstapOutput = output.NewDnstapOutput(p, p.MaxRetry)
+
+	p.openErr = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "open_errors_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.publishCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.publishCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "publishes_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.publishErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.publishErrCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "publish_failed_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.writeMessageCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.writeMessageCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "write_messages_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.writeMessageErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+	p.writeMessageErrCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "write_errors_total",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	s.publishDurationSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+	p.publishDurationSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace:   "dtap",
 		Subsystem:   "output_nats",
 		Name:        "publish_duration_seconds",
-		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+		ConstLabels: prometheus.Labels{"plugin": p.GetFullName()},
 	})
-	return s, nil
+	return p, nil
 }
 
 var _ output.OutputHandler = &Nats{}
@@ -122,34 +141,46 @@ var _ pub.PublisherHandler = &Nats{}
 // message is exceeded or when the number of seconds specified
 // by IntervalSec elapses.
 type Nats struct {
-	plugin.PluginCommon
-	sync.Mutex
+	config.OutputBlock
 
 	*output.DnstapOutput
 
 	// Hosts is the URL of the nats servers. Must not be empty.
-	Hosts []string
+	Hosts []string `hcl:"hosts"`
 	// Nats subject. Must not be empty.
-	Subject string
+	Subject string `hcl:"subject"`
 
 	// Nats user, If a token is given, it is not used.
-	User string
-	// Nats password, If a token is given, it is not used.
-	Password string
-	// Nats token
-	Token string
+	User string `hcl:"user,optional"`
 
-	conn *nats.Conn
+	// Nats password, If a token is given, it is not used.
+	Password string `hcl:"password,optional"`
+
+	// Nats token
+	Token string `hcl:"token,optional"`
+
+	// Secure indicates whether to use a secure connection (TLS).
+	Secure bool `hcl:"secure,optional"`
+
+	// TLSConfig is the TLS configuration for the NATS connection.
+	TLSConfig *config.TLSClientConfig `hcl:"tls_config,block"`
 
 	// Max nats message size. Default is 1KByte.
-	MaxSize int
-	// Interval to flush nats messages.
-	IntervalSec uint
-	// Nats message format.
-	Format    pub.Format
-	publisher pub.Publisher
+	MaxSize int `hcl:"max_size,optional"`
 
-	oc *types.OutputContext
+	// Interval to flush nats messages.
+	Interval time.Duration `hcl:"interval,optional"`
+
+	// Nats message format.
+	Format pub.Format `hcl:"format,optional"`
+
+	// MaxRetry is the maximum number of retries to connect nats server.
+	MaxRetry uint `hcl:"max_retry,optional"`
+
+	conn      *nats.Conn
+	tlsConfig *tls.Config
+
+	publisher pub.Publisher
 
 	openErr prometheus.Counter
 
@@ -160,51 +191,56 @@ type Nats struct {
 	writeMessageErrCounter prometheus.Counter
 }
 
-func (f *Nats) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (f *Nats) Open() error {
+func (p *Nats) Open(ctx context.Context) error {
 	var err error
 
 	cfg := nats.GetDefaultOptions()
-	cfg.Servers = f.Hosts
-	if f.Token != "" {
-		cfg.Token = f.Token
-	} else if f.User != "" {
-		cfg.User = f.User
-		cfg.Password = f.Password
+	cfg.Servers = p.Hosts
+	if p.Token != "" {
+		cfg.Token = p.Token
+	} else if p.User != "" {
+		cfg.User = p.User
+		cfg.Password = p.Password
 	}
-	f.conn, err = cfg.Connect()
+	cfg.Secure = p.Secure
+	if p.Secure && p.tlsConfig != nil {
+		cfg.TLSConfig = p.tlsConfig
+	}
+	p.conn, err = cfg.Connect()
 	if err != nil {
-		f.openErr.Inc()
-		return errors.Wrap(err, "failed to create nats producer")
+		p.openErr.Inc()
+		return plugin.PluginError(p, "failed to create nats producer: %w", err)
 	}
-	f.publisher.Start()
+	p.publisher.Start(ctx)
 	return nil
 }
 
-func (f *Nats) Write(dm *types.DnstapMessage) error {
-	f.writeMessageCounter.Inc()
-	if err := f.publisher.Write(dm); err != nil {
-		f.writeMessageErrCounter.Inc()
+func (p *Nats) Write(ctx context.Context, dm *types.DnstapMessage) error {
+	p.writeMessageCounter.Inc()
+	if err := p.publisher.Write(ctx, dm); err != nil {
+		ctxzap.Debug(ctx, "failed to write", zap.Any("message", dm), zap.Error(err))
+		p.writeMessageErrCounter.Inc()
 	}
 	return nil
 }
 
-func (f *Nats) Publish(data []byte) error {
+func (p *Nats) Publish(ctx context.Context, data []byte) error {
 	start := time.Now().Unix()
-	err := f.conn.Publish(f.Subject, data)
-	f.publishDurationSeconds.Observe(float64(time.Now().Unix() - start))
-	f.publishCounter.Inc()
+	err := p.conn.Publish(p.Subject, data)
+	p.publishDurationSeconds.Observe(float64(time.Now().Unix() - start))
+	p.publishCounter.Inc()
 	if err != nil {
-		f.publishErrCounter.Inc()
-		return errors.Wrap(err, "publish error")
+		p.publishErrCounter.Inc()
+		return fmt.Errorf("publish error: %w", err)
 	}
 	return nil
 }
 
-func (f *Nats) Close() {
-	f.publisher.Close()
-	f.conn.Close()
+func (p *Nats) Close(ctx context.Context) {
+	p.publisher.Close(ctx)
+	p.conn.Close()
+}
+
+func (p *Nats) MaxConcurrent() uint {
+	return math.MaxUint32
 }

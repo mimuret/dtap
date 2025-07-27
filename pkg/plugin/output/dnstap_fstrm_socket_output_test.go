@@ -16,28 +16,35 @@
 package output_test
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"time"
 
 	dnstap "github.com/dnstap/golang-dnstap"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 type socketOutput struct {
+	config.OutputBlock
 	ErrNewConnect error
 	RunNewConnect int
 	RunClose      int
 	Conn          net.Conn
 }
 
-func (s *socketOutput) SetOutputContext(*types.OutputContext) {}
-func (s *socketOutput) NewConnect() (io.Writer, error) {
+func (s *socketOutput) Start(ctx context.Context, buf types.Reader) error {
+	return nil
+}
+
+func (s *socketOutput) NewConnect(ctx context.Context) (io.Writer, error) {
 	s.RunNewConnect++
 	if s.ErrNewConnect != nil {
 		return nil, s.ErrNewConnect
@@ -45,8 +52,11 @@ func (s *socketOutput) NewConnect() (io.Writer, error) {
 	return net.Dial("tcp", "127.0.0.1:10153")
 }
 
-func (s *socketOutput) Close() {
+func (s *socketOutput) Close(ctx context.Context) {
 	s.RunClose++
+}
+func (s *socketOutput) MaxConcurrent() uint {
+	return math.MaxUint32
 }
 
 var _ = Describe("DnstapFstrmSocketOutput", func() {
@@ -79,7 +89,7 @@ var _ = Describe("DnstapFstrmSocketOutput", func() {
 			When("failed to dial", func() {
 				BeforeEach(func() {
 					so.ErrNewConnect = fmt.Errorf("dummy")
-					err = h.Open()
+					err = h.Open(context.Background())
 				})
 				It("returns error", func() {
 					Expect(err).To(HaveOccurred())
@@ -89,7 +99,7 @@ var _ = Describe("DnstapFstrmSocketOutput", func() {
 			})
 			When("failed to negotiate", func() {
 				BeforeEach(func() {
-					err = h.Open()
+					err = h.Open(context.Background())
 				})
 				It("returns error", func() {
 					Expect(err).To(HaveOccurred())
@@ -102,10 +112,10 @@ var _ = Describe("DnstapFstrmSocketOutput", func() {
 					go func() {
 						iServer.ReadInto(resQueue)
 					}()
-					err = h.Open()
+					err = h.Open(context.Background())
 				})
 				AfterEach(func() {
-					h.Close()
+					h.Close(context.Background())
 				})
 				It("returns error", func() {
 					Expect(err).To(Succeed())
@@ -119,12 +129,12 @@ var _ = Describe("DnstapFstrmSocketOutput", func() {
 				go func() {
 					iServer.ReadInto(resQueue)
 				}()
-				err := h.Open()
+				err := h.Open(context.Background())
 				Expect(err).To(Succeed())
 
-				defer h.Close()
+				defer h.Close(context.Background())
 				Expect(so.RunNewConnect).To(Equal(1))
-				err = h.Write(msg)
+				err = h.Write(context.Background(), msg)
 				Expect(err).To(Succeed())
 			})
 			It("write handle", func() {

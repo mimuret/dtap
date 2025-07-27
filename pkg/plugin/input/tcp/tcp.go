@@ -20,78 +20,107 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/goccy/go-json"
+	"errors"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/input"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
+	"go.uber.org/zap"
 )
 
+const PLUGIN_NAME = "tcp"
+
 func init() {
-	_ = registry.RegisterInputPlugin("tcp", SetupTCPSocket)
+	_ = registry.RegisterInputPlugin(PLUGIN_NAME, Setup)
 }
 
-func SetupTCPSocket(bs json.RawMessage) (types.InputPlugin, error) {
+func Setup(cfg *config.InputBlock) (types.InputPlugin, error) {
 	p := &TCPSocket{
-		FormatMeta: input.FormatMeta{
-			Format: input.FormatDNSTAP,
-		},
+		InputBlock: *cfg,
+		Format:     input.FormatDNSTAP,
 	}
 
-	if err := json.Unmarshal(bs, p); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	// Decode the HCL body into the TCPSocket struct.
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup TCPSocket plugin: %w", errors.Join(diags.Errs()...))
+	}
+	if net.ParseIP(p.Address) == nil {
+		return nil, plugin.PluginError(p, "invalid address: %s", p.Address)
 	}
 	if p.Port == 0 {
-		return nil, errors.Errorf("missing parameter Port")
+		return nil, plugin.PluginError(p, "missing parameter Port")
 	}
-	p.is = input.NewInputServer(p, nil)
+	p.is = input.NewInputServer(p, p.Format, nil)
 	if p.is == nil {
-		return nil, errors.Errorf("invalid format")
+		return nil, plugin.PluginError(p, "invalid format: %s", p.Format)
 	}
+
 	return p, nil
 }
 
 var _ types.InputPlugin = &TCPSocket{}
 
 // The TCPSocket plugin get messages from the tcp socket.
+// Example HCL configuration:
+// ```hcl
+//
+//		input "tcp" "tcp_example" {
+//		  address = "127.0.0.1"
+//		  port    = 12345
+//		  format  = "DNSTAP"
+//		}
+//		input "tcp" "tls_example" {
+//		  address = "127.0.0.1"
+//		  port    = 12345
+//		  format  = "DNSTAP"
+//		  tls_config {
+//		    certificate = "/path/to/cert.pem"
+//		    private_key  = "/path/to/key.pem"
+//	   }
+//		}
+//
+// ```
+
 type TCPSocket struct {
-	plugin.PluginCommon
-	// Message format
-	input.FormatMeta
+	config.InputBlock
 
-	// Listen Address. If not given, I will listen to any.
-	Address string
+	// Format specifies the message format. Optional, defaults to "DNSTAP".
+	Format string `hcl:"format,optional"`
+
+	// Listen Address. Must not be empty.
+	Address string `hcl:"address"`
+
 	// Listen port. Must not be empty.
-	Port uint16
+	Port uint16 `hcl:"port"`
 
-	ln net.Listener
+	TLSConfig *config.TLSServerConfig `hcl:"tls_config,block"`
 
 	is *input.InputServer
 }
 
-func (p *TCPSocket) Listen() error {
-	var err error
-	target := net.JoinHostPort(p.Address, strconv.Itoa(int(p.Port)))
-	p.ln, err = net.Listen("tcp", target)
-	if err != nil {
-		return errors.Wrapf(err, "failed to listen %s", target)
+func (p *TCPSocket) listen(addr string) (net.Listener, error) {
+	if p.TLSConfig == nil {
+		return net.Listen("tcp", addr)
 	}
-	return nil
+	return p.TLSConfig.Listen(addr)
 }
 
-func (p *TCPSocket) Close() error {
-	return p.ln.Close()
-}
-
-func (p *TCPSocket) Start(ctx context.Context, ic *types.InputContext) error {
-	if err := p.Listen(); err != nil {
-		return err
+func (p *TCPSocket) Start(ctx context.Context, forwarder types.Forwarder) error {
+	addr := net.JoinHostPort(p.Address, strconv.Itoa(int(p.Port)))
+	ln, err := p.listen(addr)
+	if err != nil {
+		return plugin.PluginError(p, "failed to listen on %s: %w", addr, err)
 	}
 	go func() {
 		<-ctx.Done()
-		p.Close()
+		if err := ln.Close(); err != nil {
+			ctxzap.Error(ctx, "failed to close TCPSocket", zap.Error(err))
+		}
 	}()
-	return p.is.Serve(p, p.ln, ic.Writer, ic)
+	return p.is.Serve(ctx, forwarder, ln)
 }

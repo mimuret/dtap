@@ -17,37 +17,44 @@ package nop
 
 import (
 	"context"
+	"math"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "nop"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("nop", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	return &NOP{}, nil
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	return &NOP{
+		OutputBlock: *cfg,
+	}, nil
 }
 
 var _ types.OutputPlugin = &NOP{}
 
 // NOP does nothing.
 type NOP struct {
-	plugin.PluginCommon
+	config.OutputBlock
 }
 
-func (f *NOP) Start(ctx context.Context, oc *types.OutputContext) error {
+func (f *NOP) Start(ctx context.Context, r types.Reader) error {
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			break LOOP
-		case <-oc.Reader.Read():
+		case <-r.Read():
 		}
 	}
 	return nil
+}
+
+func (p *NOP) MaxConcurrent() uint {
+	return math.MaxUint32
 }

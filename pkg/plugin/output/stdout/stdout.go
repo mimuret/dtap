@@ -16,44 +16,60 @@
 package stdout
 
 import (
+	"context"
+	"io"
+	"math"
 	"os"
 	"text/template"
 
-	json "github.com/goccy/go-json"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"errors"
+
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "stdout"
+
+const DefaultTemplate = `{{ .Message.Timestamp }} {{ .Message.Type }} {{ .Message.Qclass }} {{ .Message.Qtype }} {{ .Message.Qname }}`
+
 func init() {
-	_ = registry.RegisterOutputPlugin("stdout", setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func setup(bs json.RawMessage) (types.OutputPlugin, error) {
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
 	var err error
-	s := &Stdout{
-		Type: OutputFormatJsonV1,
+	p := &Stdout{
+		OutputBlock:   *cfg,
+		Format:        OutputFormatJsonV1,
+		OutputFilters: &types.OutputFilters{},
+		Template:      DefaultTemplate,
 	}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup stdout plugin: %w", errors.Join(diags.Errs()...))
 	}
-	switch s.Type {
+	switch p.Format {
 	case OutputFormatGoTpl:
-		if s.Template == "{{ .Type }} {{ .Timestamp }} {{ .Qclass }} {{ .Qtype }} {{ .Qname }}" {
-			return nil, errors.New("missing parameter Template")
-		}
-		s.t, err = template.New("").Parse(s.Template)
+		p.t, err = template.New("").Parse(p.Template)
 		if err != nil {
-			return nil, errors.Wrap(err, "Template is an invalid value")
+			return nil, plugin.PluginError(p, "template is an invalid value: %w", err)
 		}
 	case OutputFormatJsonV1:
 	default:
-		return nil, errors.New("Type is an invalid value")
+		return nil, plugin.PluginError(p, "format is an invalid value: %s", p.Format)
 	}
-	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
-	return s, nil
+	p.DnstapOutput = output.NewDnstapOutput(p, uint(0))
+
+	if p.Stderr {
+		p.w = os.Stderr
+	} else {
+		p.w = os.Stdout
+	}
+	return p, nil
 }
 
 type OutputFormat string
@@ -67,58 +83,62 @@ var _ types.OutputPlugin = &Stdout{}
 
 // The stdout plugin ouput the message to stdout.
 type Stdout struct {
-	plugin.PluginCommon
+	config.OutputBlock
 	*output.DnstapOutput
 
-	// output format type
-	Type OutputFormat
+	// Stderr is true, output to stderr instead of stdout.
+	Stderr bool `hcl:"stderr,optional"`
+
+	// File format
+	Format OutputFormat `hcl:"format,optional"`
 
 	// JSON Key Filter
-	OutputFilters types.OutputFilters
+	OutputFilters *types.OutputFilters `hcl:"output_filters,block"`
 
 	// Line go template for format type 'go-template"
-	Template string
+	Template string `hcl:"template,optional"`
 
-	t  *template.Template
-	oc *types.OutputContext
+	t *template.Template
+
+	w io.Writer
 }
 
-func (f *Stdout) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (o *Stdout) Open() error {
+func (p *Stdout) Open(context.Context) error {
 	return nil
 }
 
-func (o *Stdout) Write(dm *types.DnstapMessage) error {
-	switch o.Type {
+func (p *Stdout) Write(ctx context.Context, dm *types.DnstapMessage) error {
+	switch p.Format {
 	case OutputFormatJsonV1:
-		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
+		buf, err := dm.ConvertV1JSONWithFilter(*p.OutputFilters)
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write(buf); err != nil {
+		if _, err := p.w.Write(buf); err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+		if _, err := p.w.Write([]byte("\n")); err != nil {
 			return err
 		}
 	case OutputFormatGoTpl:
-		data, err := dm.ConvertV1Flat()
+		val, err := types.CreateMsgValue(p, dm)
 		if err != nil {
 			return err
 		}
-		if err := o.t.Execute(os.Stdout, data); err != nil {
+		if err := p.t.Execute(p.w, val); err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+		if _, err := p.w.Write([]byte("\n")); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (o *Stdout) Close() {
+func (p *Stdout) Close(context.Context) {
 
+}
+
+func (p *Stdout) MaxConcurrent() uint {
+	return math.MaxUint32
 }

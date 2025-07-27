@@ -17,38 +17,41 @@ package file
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/goccy/go-json"
+	"errors"
 
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/input"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"github.com/spf13/afero"
 )
 
+const PLUGIN_NAME = "file"
+
 func init() {
-	_ = registry.RegisterInputPlugin("file", SetupFile)
+	_ = registry.RegisterInputPlugin(PLUGIN_NAME, Setup)
 }
 
-func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
+func Setup(cfg *config.InputBlock) (types.InputPlugin, error) {
 	p := &File{
-		FormatMeta: input.FormatMeta{
-			Format: input.FormatDNSTAP,
-		},
+		InputBlock: *cfg,
+		Format:     input.FormatDNSTAP,
 	}
-	if err := json.Unmarshal(bs, p); err != nil {
-		return nil, errors.Wrapf(err, "failed to decode config")
+	// Decode the HCL body into the file struct.
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup file plugin: %w", errors.Join(diags.Errs()...))
 	}
 	if p.Path == "" {
-		return nil, errors.New("missing parameter Path")
+		return nil, plugin.PluginError(p, "missing parameter Path")
 	}
-	p.is = input.NewInputServer(p, &framestream.DecoderOptions{Bidirectional: false})
+	p.is = input.NewInputServer(p, p.Format, &framestream.DecoderOptions{Bidirectional: false})
 	if p.is == nil {
-		return nil, errors.Errorf("invalid format")
+		return nil, plugin.PluginError(p, "invalid format")
 	}
 
 	p.fs = afero.NewOsFs()
@@ -58,26 +61,37 @@ func SetupFile(bs json.RawMessage) (types.InputPlugin, error) {
 var _ types.InputPlugin = &File{}
 
 // The file plugin enters the DNSTAP message only once from the file.
+// Example configuration:
+// ```hcl
+//
+//	input "file" "example" {
+//	  path = "/var/log/dnstap.log"
+//	  format = "DNSTAP"
+//	}
+//
+// ```
 type File struct {
-	plugin.PluginCommon
+	config.InputBlock
 
-	fs afero.Fs
+	// Message format default is "DNSTAP".
+	// Supported values are "DNSTAP", "DtapFrame",
+	Format string `hcl:"format,optional"`
 
 	// File Path
-	Path string
-	// File format
-	input.FormatMeta
+	Path string `hcl:"path"`
+
+	fs afero.Fs
 
 	is *input.InputServer
 }
 
-func (p *File) Start(_ context.Context, ic *types.InputContext) error {
+func (p *File) Start(ctx context.Context, forwarder types.Forwarder) error {
 	r, err := p.fs.Open(p.Path)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return plugin.PluginError(p, "failed to open file: %w", err)
 	}
-	if err := p.is.Read(r, ic.Writer, ic); err != nil {
-		return fmt.Errorf("failed to push message: %w", err)
+	if err := p.is.Read(ctx, forwarder, r); err != nil {
+		return plugin.PluginError(p, "failed to push message: %w", err)
 	}
 	return nil
 }

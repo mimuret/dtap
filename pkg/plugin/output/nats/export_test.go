@@ -16,7 +16,7 @@
 package nats
 
 import (
-	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v3/pkg/plugin/pub"
 	"github.com/nats-io/nats.go"
 )
 

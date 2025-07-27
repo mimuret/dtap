@@ -16,15 +16,14 @@
 package iphash_test
 
 import (
+	"context"
 	_ "embed"
 	"net"
 
-	"github.com/goccy/go-json"
-
 	dnstap "github.com/dnstap/golang-dnstap"
-	"github.com/mimuret/dtap/v2/pkg/plugin/filter/iphash"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/filter/iphash"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -35,17 +34,18 @@ var _ = Describe("iphash", func() {
 			err error
 			fp  types.FilterPlugin
 		)
-		When("invalid json", func() {
+		When("Salt not set", func() {
 			BeforeEach(func() {
-				fp, err = iphash.Setup(json.RawMessage(`{"Name": 0}`))
+				fp, err = iphash.Setup(testtool.MustFilterBlock("filter", "filter_test", ``))
 			})
 			It("returns iphash", func() {
 				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(MatchRegexp(`The argument "salt" is required`))
 			})
 		})
 		When("Salt is an empty", func() {
 			BeforeEach(func() {
-				fp, err = iphash.Setup(json.RawMessage(`{"Name": "iphash"}`))
+				fp, err = iphash.Setup(testtool.MustFilterBlock("filter", "filter_test", `salt = ""`))
 			})
 			It("returns iphash", func() {
 				Expect(err).To(HaveOccurred())
@@ -54,7 +54,7 @@ var _ = Describe("iphash", func() {
 		})
 		When("valid json", func() {
 			BeforeEach(func() {
-				fp, err = iphash.Setup(json.RawMessage(`{"Name": "iphash","Salt": "hogehoge"}`))
+				fp, err = iphash.Setup(testtool.MustFilterBlock("filter", "filter_test", `salt = "hogehoge"`))
 			})
 			It("returns iphash", func() {
 				Expect(err).To(Succeed())
@@ -73,7 +73,7 @@ var _ = Describe("iphash", func() {
 		BeforeEach(func() {
 			dm1 = testtool.CreateValidDnstapMessage()
 			dt = dm1.GetDnstap()
-			fp, err = iphash.Setup(json.RawMessage(`{"Name": "iphash","Salt":"hogehoge"}`))
+			fp, err = iphash.Setup(testtool.MustFilterBlock("filter", "filter_test", `salt = "hogehoge"`))
 			Expect(err).To(Succeed())
 		})
 		When("protocol is IPv4", func() {
@@ -83,7 +83,7 @@ var _ = Describe("iphash", func() {
 				dt.Message.QueryAddress = []byte(net.IPv4(10, 0, 255, 255).To4())
 				dm1, err = types.NewDnstapMessageFromDnstap(dt)
 				Expect(err).To(Succeed())
-				dm2 = fp.Filter(dm1)
+				dm2 = fp.Filter(context.Background(), dm1)
 			})
 			It("adds hash", func() {
 				Expect(dm2).NotTo(BeNil())
@@ -98,7 +98,7 @@ var _ = Describe("iphash", func() {
 				dt.Message.QueryAddress = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 				dm1, err = types.NewDnstapMessageFromDnstap(dt)
 				Expect(err).To(Succeed())
-				dm2 = fp.Filter(dm1)
+				dm2 = fp.Filter(context.Background(), dm1)
 			})
 			It("adds hash", func() {
 				Expect(dm2).NotTo(BeNil())

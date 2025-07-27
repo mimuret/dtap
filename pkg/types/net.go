@@ -17,6 +17,7 @@
 package types
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -64,7 +65,7 @@ func (n *Net) UnmarshalJSON(b []byte) error {
 		plen, err := strconv.ParseUint(bs[1], 10, 8)
 		n.PrefixLength = int(plen)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse Prefixlength `%s`", bs[1])
+			return fmt.Errorf("failed to parse Prefixlength `%s`: err: %w", bs[1], err)
 		}
 		if n.PrefixLength < 0 ||
 			!isIPv6(n.IP) && n.PrefixLength > 32 ||

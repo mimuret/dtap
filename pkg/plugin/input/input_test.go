@@ -16,24 +16,31 @@
 package input_test
 
 import (
+	"context"
 	"net"
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	framestream "github.com/farsightsec/golang-framestream"
-	"github.com/mimuret/dtap/v2/pkg/buffer"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/input"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/buffer"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/nettest"
 	"google.golang.org/protobuf/proto"
 )
 
+var _ types.InputPlugin = &dummyPlugin{}
+
 type dummyPlugin struct {
-	plugin.PluginCommon
-	input.FormatMeta
+	config.InputBlock
+}
+
+func (p *dummyPlugin) Start(ctx context.Context, forwarder types.Forwarder) error {
+	return nil
 }
 
 type counter struct {
@@ -47,26 +54,29 @@ func (c *counter) Inc() {
 var _ = Describe("InputServer", func() {
 	Context("Serve", func() {
 		var (
-			srvErr error
-			ln     net.Listener
-			srv    *input.InputServer
-			buf    types.Writer
-			dp     *dummyPlugin
+			srvErr    error
+			ln        net.Listener
+			srv       *input.InputServer
+			buf       types.Writer
+			forwarder *plugin.Forwarder
+			dp        *dummyPlugin
 		)
 		BeforeEach(func() {
 			dp = &dummyPlugin{
-				PluginCommon: plugin.PluginCommon{
-					ID: "id1",
+				InputBlock: config.InputBlock{
+					Type: "dummy",
+					Name: "default",
 				},
-				FormatMeta: input.FormatMeta{Format: input.FormatDNSTAP},
 			}
-			srv = input.NewInputServer(dp, nil)
+			srv = input.NewInputServer(dp, "", nil)
 			srvErr = nil
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
+			forwarder = &plugin.Forwarder{}
+			forwarder.SetupForwardTo([]types.Writer{buf})
 			ln, srvErr = nettest.NewLocalListener("unix")
 			Expect(srvErr).To(Succeed())
 			go func() {
-				srvErr = srv.Serve(dp, ln, buf, testtool.NewTestInputContext(nil))
+				srvErr = srv.Serve(context.Background(), forwarder, ln)
 			}()
 		})
 		When("write message", func() {
@@ -86,24 +96,28 @@ var _ = Describe("InputServer", func() {
 	})
 	Context("Read", func() {
 		var (
-			srvErr  error
-			connOut net.Conn
-			connIn  net.Conn
-			srv     *input.InputServer
-			buf     types.Buffer
+			srvErr    error
+			connOut   net.Conn
+			connIn    net.Conn
+			srv       *input.InputServer
+			buf       types.Buffer
+			forwarder *plugin.Forwarder
 		)
 		BeforeEach(func() {
 			srv = input.NewInputServer(&dummyPlugin{
-				PluginCommon: plugin.PluginCommon{
-					ID: "id1",
+				InputBlock: config.InputBlock{
+					Type: "dummy",
+					Name: "default",
 				},
-				FormatMeta: input.FormatMeta{Format: input.FormatDNSTAP},
-			}, nil)
+			}, input.FormatDNSTAP, nil)
+
 			buf = buffer.NewRingBuffer(100, &counter{}, &counter{})
+			forwarder = &plugin.Forwarder{}
+			forwarder.SetupForwardTo([]types.Writer{buf})
 			connOut, connIn = net.Pipe()
 			srvErr = nil
 			go func() {
-				srvErr = srv.Read(connOut, buf, testtool.NewTestInputContext(nil))
+				srvErr = srv.Read(context.Background(), forwarder, connOut)
 			}()
 		})
 		AfterEach(func() {

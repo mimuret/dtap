@@ -16,7 +16,7 @@
 package main
 
 import (
-	"github.com/mimuret/dtap/v2/pkg/cmd"
+	"github.com/mimuret/dtap/v3/pkg/cmd"
 )
 
 func main() {

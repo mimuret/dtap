@@ -16,94 +16,87 @@
 package tcp_test
 
 import (
+	"context"
 	"net"
+	"strconv"
+	"time"
 
-	"github.com/goccy/go-json"
-	"golang.org/x/net/nettest"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/input/tcp"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input/tcp"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("input/tcp", func() {
-	Context("SetupTCPSocket", func() {
-		var (
-			err error
-			p   types.InputPlugin
-		)
-		BeforeEach(func() {
+var _ = Describe("TCPSocket", func() {
+	var (
+		ctx       context.Context
+		cancel    context.CancelFunc
+		forwarder *plugin.Forwarder
+		tcpSocket *tcp.TCPSocket
+	)
+
+	BeforeEach(func() {
+		ctx, cancel = context.WithCancel(context.Background())
+		forwarder = &plugin.Forwarder{}
+	})
+
+	AfterEach(func() {
+		cancel()
+	})
+
+	Context("Setup", func() {
+		It("should successfully setup with valid HCL", func() {
+			plugin, err := tcp.Setup(testtool.MustInputBlock("tcp", "test_tcp", `
+address = "127.0.0.1"
+port = 12345
+`))
+			Expect(err).To(Succeed())
+			Expect(plugin).ToNot(BeNil())
+
+			tcpSocket = plugin.(*tcp.TCPSocket)
+			Expect(tcpSocket.Address).To(Equal("127.0.0.1"))
+			Expect(tcpSocket.Port).To(Equal(uint16(12345)))
+			Expect(tcpSocket.Format).To(Equal("DNSTAP"))
 		})
-		When("Type missmatch", func() {
-			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name": "tcp","ID":"id1","Address": 0}`))
-			})
-			It("returns error", func() {
-				Expect(p).To(BeNil())
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
-		When("Port is an empty", func() {
-			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id2","Address":"0.0.0.0"}`))
-			})
-			It("returns error", func() {
-				Expect(p).To(BeNil())
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Port"))
-			})
-		})
-		When("valid config", func() {
-			BeforeEach(func() {
-				p, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id3","Port": 10053}`))
-			})
-			It("returns error", func() {
-				Expect(err).To(Succeed())
-				Expect(p.(*tcp.TCPSocket).Address).To(Equal(""))
-				Expect(p.(*tcp.TCPSocket).Port).To(Equal(uint16(10053)))
-			})
+
+		It("should return an error if Port is missing", func() {
+			plugin, err := tcp.Setup(testtool.MustInputBlock("tcp", "test_tcp", `
+address = "127.0.0.1"
+`))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(`Missing required argument; The argument "port" is required`))
+			Expect(plugin).To(BeNil())
 		})
 	})
-	Context("Listen", func() {
-		var (
-			err error
-			ip  types.InputPlugin
-			p   *tcp.TCPSocket
-		)
-		BeforeEach(func() {
-			ln, lerr := nettest.NewLocalListener("tcp")
-			Expect(lerr).To(Succeed())
-			addr, ok := ln.Addr().(*net.TCPAddr)
-			Expect(ok).To(BeTrue())
-			ln.Close()
 
-			ip, err = tcp.SetupTCPSocket(json.RawMessage(`{"Name":"tcp","ID":"id4","Port": 10053}`))
+	Context("Start", func() {
+		It("should start and stop the server successfully", func() {
+			p, err := tcp.Setup(testtool.MustInputBlock("tcp", "test_tcp", `
+address = "127.0.0.1"
+port = 12345
+format = "DNSTAP"
+`))
 			Expect(err).To(Succeed())
-			p = ip.(*tcp.TCPSocket)
-			p.Port = uint16(addr.Port)
-		})
-		When("failed to listen", func() {
-			BeforeEach(func() {
-				p.Address = "example.jp"
-				err = p.Listen()
-			})
-			It("returns error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to listen"))
-			})
-		})
-		When("open socket", func() {
-			BeforeEach(func() {
-				err = p.Listen()
-			})
-			AfterEach(func() {
-				p.Close()
-			})
-			It("succeed", func() {
+
+			tcpSocket := p.(*tcp.TCPSocket)
+			go func() {
+				err := tcpSocket.Start(ctx, forwarder)
 				Expect(err).To(Succeed())
-			})
+			}()
+
+			// Wait for the server to start
+			time.Sleep(1 * time.Second)
+
+			// Connect to the server
+			conn, err := net.Dial("tcp", net.JoinHostPort(tcpSocket.Address, strconv.Itoa(int(tcpSocket.Port))))
+			Expect(err).To(Succeed())
+			Expect(conn).ToNot(BeNil())
+			conn.Close()
+
+			// Stop the server
+			cancel()
+			time.Sleep(1 * time.Second) // Allow time for the server to shut down
 		})
 	})
 })

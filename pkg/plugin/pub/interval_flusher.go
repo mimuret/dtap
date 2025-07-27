@@ -1,30 +1,33 @@
 package pub
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type intervalFlusher struct {
-	sec     uint
-	stopCh  chan struct{}
-	closeCh chan struct{}
+	interval time.Duration
+	stopCh   chan struct{}
+	closeCh  chan struct{}
 }
 
-func newIntervalFlusher(sec uint) *intervalFlusher {
+func newIntervalFlusher(interval time.Duration) *intervalFlusher {
 	return &intervalFlusher{
-		sec:     sec,
-		stopCh:  make(chan struct{}),
-		closeCh: make(chan struct{}),
+		interval: interval,
+		stopCh:   make(chan struct{}),
+		closeCh:  make(chan struct{}),
 	}
 }
 
-func (i *intervalFlusher) Start(p Publisher) {
+func (i *intervalFlusher) Start(ctx context.Context, p Publisher) {
 	go func() {
-		ticker := time.NewTicker(time.Duration(i.sec) * time.Second)
+		ticker := time.NewTicker(i.interval)
 		defer ticker.Stop()
 	LOOP:
 		for {
 			select {
 			case <-ticker.C:
-				_ = p.Publish()
+				_ = p.Publish(ctx)
 			case <-i.stopCh:
 				break LOOP
 			}
@@ -33,7 +36,7 @@ func (i *intervalFlusher) Start(p Publisher) {
 	}()
 }
 
-func (i *intervalFlusher) Close() {
+func (i *intervalFlusher) Close(ctx context.Context) {
 	close(i.stopCh)
 	<-i.closeCh
 }
