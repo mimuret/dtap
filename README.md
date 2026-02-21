@@ -12,4 +12,5 @@ go install github.com/mimuret/dtap/v3@latest
 
 ## Documents
 
-- [configuration](./configuration.md)
+- [configuration](./doc/configuration.md)
+- [configuration(ja)](./doc/configuration.ja.md)
