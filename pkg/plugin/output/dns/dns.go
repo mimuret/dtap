@@ -76,7 +76,8 @@ func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
 	}
 	p.cl = dig.NewDig()
 	p.cl.Client = &dns.Client{
-		Net: string(p.Protocol),
+		Net:     string(p.Protocol),
+		Timeout: p.Timeout,
 	}
 	op := &dig.OptionTarget{Target: p.Host}
 	if err := op.Option(p.cl); err != nil {
@@ -139,6 +140,9 @@ type DNS struct {
 	// WorkerNum is the number of workers that process messages.
 	WorkerNum uint `hcl:"worker_num,optional"`
 
+	// UseResponseQuestion is a flag to use the question in the response message.
+	UseResponseQuestion bool `hcl:"use_response_question,optional"`
+
 	sem *semaphore.Weighted
 	cl  *dig.Dig
 
@@ -165,14 +169,31 @@ func (o *DNS) Write(ctx context.Context, dm *types.DnstapMessage) error {
 
 func (o *DNS) write(dm *types.DnstapMessage) error {
 	msg := dm.GetMessage()
-	// skip response
-	if msg.Response {
+	// UseResponseQuestion flag to use the question in the response message
+	if msg.Response && !o.UseResponseQuestion {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout)
-	defer cancel()
+	if len(msg.Question) == 0 {
+		return nil
+	}
+	req := &dns.Msg{}
+	req.SetQuestion(msg.Question[0].Name, msg.Question[0].Qtype)
+	req.RecursionDesired = msg.RecursionDesired
+	req.CheckingDisabled = msg.CheckingDisabled
+	for _, rr := range msg.Extra {
+		if rr.Header().Rrtype == dns.TypeOPT {
+			edns0, ok := rr.(*dns.OPT)
+			if !ok {
+				break
+			}
+			if edns0.Do() {
+				req.SetEdns0(edns0.UDPSize(), true)
+			}
+			break
+		}
+	}
 	o.outCounter.Inc()
-	res, err := o.cl.ExchangeContext(ctx, msg)
+	res, err := o.cl.Exchange(req)
 	if err != nil {
 		o.errCounter.Inc()
 		return err

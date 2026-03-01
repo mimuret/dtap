@@ -358,6 +358,7 @@ DNSTAP メッセージからDNSクエリを抽出し、指定されたDNSサー�
 - `port` (uint16) - 必須: DNSサーバーのポート番号
 - `protocol` (string) - オプション: 送信時のTransportプロトコル、udp,tcp,tcp-tls,https,https-get,https-postが指定できます。デフォルトはudp
 - `timeout` (duration) - オプション: クエリのタイムアウト時間
+- `use_response_question` (bool) - Optional: レスポンスメッセージ内のQuestion Sectionを利用する。デフォルトはfalse
 
 ##### 並列実行
 

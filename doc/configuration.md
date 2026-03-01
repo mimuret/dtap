@@ -476,7 +476,8 @@ Extracts DNS queries from DNSTAP messages and forwards them to specified servers
 - `host` (string) - Required: DNS server hostname or IP address
 - `port` (uint16) - Required: DNS server port number
 - `timeout` (duration) - Optional: Query timeout duration
-
+- `use_response_question` (bool) - Optional: Use the question in the response message. default is false.
+ 
 ##### Parallel Processing
 Yes, parallel processing is supported.
 
