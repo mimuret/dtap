@@ -16,63 +16,79 @@
 package unix
 
 import (
+	"context"
 	"io"
+	"math"
 	"net"
 	"time"
 
-	"github.com/goccy/go-json"
+	"errors"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "unix"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("unix", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	s := &Unix{}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	p := &Unix{
+		OutputBlock: *cfg,
 	}
-	if s.Path == "" {
-		return nil, errors.New("missing parameter Path")
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup unix plugin: %w", errors.Join(diags.Errs()...))
 	}
-	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil), s.MaxRetry)
-	return s, nil
+	p.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(p, time.Second, nil), p.MaxRetry)
+	return p, nil
 }
 
 var _ types.OutputPlugin = &Unix{}
 var _ output.SocketOutput = &Unix{}
 
 // The unix plugin outputs messages to unix socket.
+// Example configuration:
+// ```hcl
+//
+//	output "unix" "unix_test" {
+//	  path = "/var/run/dtap.sock"
+//	  max_retry = 3
+//	}
+//
+// ```
 type Unix struct {
-	plugin.PluginCommon
+	config.OutputBlock
 	*output.DnstapOutput
 
 	// unix socket path
-	Path string
+	Path string `hcl:"path"`
 
-	oc *types.OutputContext
-	w  net.Conn
+	// MaxRetry is the maximum number of retries to open the unix socket.
+	MaxRetry uint `hcl:"max_retry,optional"`
+
+	w net.Conn
 }
 
-func (f *Unix) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (f *Unix) NewConnect() (io.Writer, error) {
+func (p *Unix) NewConnect(context.Context) (io.Writer, error) {
 	var err error
-	f.w, err = net.Dial("unix", f.Path)
+	p.w, err = net.Dial("unix", p.Path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect unix socket, path: %s", f.Path)
+		return nil, plugin.PluginError(p, "failed to connect unix socket, path: %s: err: %w", p.Path, err)
 	}
-	return f.w, nil
+	return p.w, nil
 }
 
-func (f *Unix) Close() {
+func (f *Unix) Close(context.Context) {
 	f.w.Close()
+}
+
+func (p *Unix) MaxConcurrent() uint {
+	return math.MaxUint32
 }

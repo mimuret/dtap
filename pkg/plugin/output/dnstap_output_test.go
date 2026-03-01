@@ -20,10 +20,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/mimuret/dtap/v2/pkg/buffer"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/buffer"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -44,17 +44,15 @@ type handler struct {
 	Msg      *types.DnstapMessage
 }
 
-func (h *handler) SetOutputContext(*types.OutputContext) {
-}
-func (h *handler) Open() error {
+func (h *handler) Open(context.Context) error {
 	h.Opened = true
 	return h.ErrOpen
 }
-func (h *handler) Write(msg *types.DnstapMessage) error {
+func (h *handler) Write(ctx context.Context, msg *types.DnstapMessage) error {
 	h.Msg = msg
 	return h.ErrWrite
 }
-func (h *handler) Close() {
+func (h *handler) Close(ctx context.Context) {
 	h.Closed = true
 }
 
@@ -82,7 +80,7 @@ var _ = Describe("DnstapOutput", func() {
 				buf.Write(msg)
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
+					err := out.Start(ctx, buf)
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()
@@ -102,7 +100,7 @@ var _ = Describe("DnstapOutput", func() {
 			BeforeEach(func() {
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
+					err := out.Start(ctx, buf)
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()
@@ -119,7 +117,7 @@ var _ = Describe("DnstapOutput", func() {
 				h.ErrOpen = errors.New("dummy")
 				wg.Add(1)
 				go func() {
-					err := out.Start(ctx, testtool.NewTestOutputContext(buf))
+					err := out.Start(ctx, buf)
 					Expect(err).To(Succeed())
 					wg.Done()
 				}()

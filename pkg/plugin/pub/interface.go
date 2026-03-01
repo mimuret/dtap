@@ -1,9 +1,13 @@
 package pub
 
-import "github.com/mimuret/dtap/v2/pkg/types"
+import (
+	"context"
+
+	"github.com/mimuret/dtap/v3/pkg/types"
+)
 
 type PublisherHandler interface {
-	Publish([]byte) error
+	Publish(context.Context, []byte) error
 }
 
 type ConsumerHandler interface {
@@ -11,8 +15,8 @@ type ConsumerHandler interface {
 }
 
 type Publisher interface {
-	Write(*types.DnstapMessage) error
-	Start()
-	Close() error
-	Publish() error
+	Write(context.Context, *types.DnstapMessage) error
+	Start(context.Context)
+	Close(context.Context) error
+	Publish(context.Context) error
 }

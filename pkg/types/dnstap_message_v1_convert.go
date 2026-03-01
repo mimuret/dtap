@@ -16,6 +16,7 @@
 package types
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -229,4 +230,30 @@ func getName(labels []string, i int) string {
 		res = strings.Join(labels, ".")
 	}
 	return res
+}
+
+func (d *DnstapMessage) SetAttributesToMap(res map[string]string, keys []string) error {
+	values, err := d.ConvertV1MapString()
+	if err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if val, ok := values[k]; ok {
+			res[k] = fmt.Sprintf("%s", val)
+		}
+	}
+	return nil
+}
+
+func (d *DnstapMessage) SetLabelToMap(res map[string]string, keys []string) {
+	for _, k := range keys {
+		if val, ok := d.Labels[k]; ok {
+			res[k] = val
+		}
+	}
+}
+
+func (d *DnstapMessage) SetOuputAttributes(res map[string]string, keys []string) error {
+	d.SetLabelToMap(res, keys)
+	return d.SetAttributesToMap(res, keys)
 }

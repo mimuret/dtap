@@ -16,20 +16,20 @@
 package unix_test
 
 import (
+	"context"
 	"math"
 	"os"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/input/unix"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input/unix"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"golang.org/x/net/nettest"
 )
 
 var _ = Describe("input/unix", func() {
-	Context("SetupUnixSocket", func() {
+	Context("Setup", func() {
 		var (
 			path string
 			err  error
@@ -37,43 +37,39 @@ var _ = Describe("input/unix", func() {
 		)
 		BeforeEach(func() {
 		})
-		When("Path is an empty", func() {
+		When("Path is empty", func() {
 			BeforeEach(func() {
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix", "ID": "id1"}`))
+				p, err = unix.Setup(testtool.MustInputBlock("unix", "test_unix", ``))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Path"))
+				Expect(err.Error()).To(MatchRegexp(`Missing required argument; The argument "path" is required`))
 			})
 		})
-		When("Path is not string", func() {
-			BeforeEach(func() {
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name": "unix", "ID": "id2", "Path": 0}`))
-			})
-			It("returns error", func() {
-				Expect(p).To(BeNil())
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
-		When("User missing", func() {
+		When("User is missing", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id3","Path":"` + path + `","User":"missing"}`))
+				p, err = unix.Setup(testtool.MustInputBlock("unix", "test_unix", `
+path = "`+path+`"
+user = "missing"
+`))
 			})
 			It("returns error", func() {
 				Expect(p).To(BeNil())
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to get owner name"))
+				Expect(err.Error()).To(MatchRegexp("failed to lookup user"))
 			})
 		})
-		When("Path is string, User empty", func() {
+		When("Path is a string and User is empty", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id4","Path":"` + path + `"}`))
+
+				p, err = unix.Setup(testtool.MustInputBlock("unix", "test_unix", `
+path = "`+path+`"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -82,11 +78,15 @@ var _ = Describe("input/unix", func() {
 				Expect(unix.GetGid(p.(*unix.UnixSocket))).To(BeNil())
 			})
 		})
-		When("Path is string, User exist", func() {
+		When("Path is a string and User exists", func() {
 			BeforeEach(func() {
 				path, err = nettest.LocalPath()
 				Expect(err).To(Succeed())
-				p, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id5","Path":"` + path + `","User":"root"}`))
+
+				p, err = unix.Setup(testtool.MustInputBlock("unix", "test_unix", `
+path = "`+path+`"
+user = "root"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -106,7 +106,11 @@ var _ = Describe("input/unix", func() {
 		BeforeEach(func() {
 			path, err = nettest.LocalPath()
 			Expect(err).To(Succeed())
-			ip, err = unix.SetupUnixSocket(json.RawMessage(`{"Name":"unix","ID":"id6","Path":"` + path + `"}`))
+
+			ip, err = unix.Setup(testtool.MustInputBlock("unix", "test_unix", `
+			path = "`+path+`"
+			`))
+
 			p = ip.(*unix.UnixSocket)
 
 			path, err = nettest.LocalPath()
@@ -115,7 +119,7 @@ var _ = Describe("input/unix", func() {
 		When("failed to listen", func() {
 			BeforeEach(func() {
 				p.Path = "/hogehoge/hugahuga"
-				err = p.Listen()
+				err = p.Start(context.Background(), nil)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -126,7 +130,7 @@ var _ = Describe("input/unix", func() {
 			BeforeEach(func() {
 				unix.SetUid(p, math.MinInt)
 				unix.SetGid(p, math.MinInt)
-				err = p.Listen()
+				err = p.Start(context.Background(), nil)
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -134,16 +138,28 @@ var _ = Describe("input/unix", func() {
 			})
 		})
 		When("open socket", func() {
+			var (
+				ctx    context.Context
+				cancel context.CancelFunc
+			)
 			BeforeEach(func() {
-				err = p.Listen()
-			})
-			AfterEach(func() {
-				p.Close()
-				_, err = os.Stat(path)
-				Expect(os.IsNotExist(err)).To(BeTrue())
+				p.Path = path
+				ctx, cancel = context.WithCancel(context.Background())
+				go func() {
+					err = p.Start(ctx, nil)
+					Expect(err).To(Succeed())
+				}()
 			})
 			It("succeed", func() {
-				Expect(err).To(Succeed())
+				Eventually(func() error {
+					_, err = os.Stat(path)
+					return err
+				}, "1s", "100ms").Should(Succeed())
+				cancel()
+				Eventually(func() error {
+					_, err = os.Stat(path)
+					return err
+				}, "1s", "100ms").ShouldNot(Succeed())
 			})
 		})
 	})

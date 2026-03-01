@@ -16,123 +16,41 @@
 package plugin
 
 import (
-	json "github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/mimuret/dtap/v3/pkg/buffer"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/promauto"
+	"github.com/mimuret/dtap/v3/pkg/types"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
-type PluginCommon struct {
-	// Plugin type name
-	Name string `json:"Name"`
-	// Plugin type id
-	ID string `json:"ID"`
-	// Maximum number of retries. A value of 0 means infinite.
-	MaxRetry uint `json:"MaxRetry"`
+const defaultBufferSize = 10000
+
+func NewBuffer(namespace, subsystem string, bufferSize uint, fullName string) types.Buffer {
+	inCounter := promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   namespace,
+		Subsystem:   subsystem,
+		Name:        "recv_frames_total",
+		Help:        "The total number of received frames",
+		ConstLabels: prometheus.Labels{"plugin": fullName},
+	})
+
+	lostCounter := promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   namespace,
+		Subsystem:   subsystem,
+		Name:        "lost_frames_total",
+		Help:        "The total number of lost frames from buffer",
+		ConstLabels: prometheus.Labels{"plugin": fullName},
+	})
+	if bufferSize == 0 {
+		bufferSize = defaultBufferSize
+	}
+	return buffer.NewRingBuffer(bufferSize, inCounter, lostCounter)
 }
 
-func (p *PluginCommon) GetName() string {
-	return p.Name
+func NewBufferFromOutput(p *config.OutputBlock) types.Buffer {
+	return NewBuffer("dtap", "output", p.GetBufferSize(), p.GetFullName())
 }
 
-func (p *PluginCommon) GetID() string {
-	return p.ID
-}
-
-// Input plugin slices
-// If multiple Plugins are specified, they are started in order, but input processing is performed in parallel.
-type InputPlugins []types.InputPlugin
-
-func (c *InputPlugins) UnmarshalJSON(bs []byte) error {
-	res := InputPlugins{}
-	raws := []json.RawMessage{}
-	if err := json.Unmarshal(bs, &raws); err != nil {
-		return errors.Wrap(err, "invalid json Input")
-	}
-	for i, raw := range raws {
-		cc := &PluginCommon{}
-		if err := json.Unmarshal(raw, cc); err != nil {
-			return errors.Wrapf(err, "invalid json Input[%d]", i)
-		}
-		if cc.ID == "" {
-			return errors.Errorf("Input[%d].ID must not be empty", i)
-		}
-		ip, err := registry.CreateInputPlugin(cc.Name, raw)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create input plugin, no %d, name is `%s`", i, cc.Name)
-		}
-		res = append(res, ip)
-	}
-	*c = res
-	return nil
-}
-
-// Output plugin slices
-// If multiple plugins are specified, they are started in sequence and output processing is performed in parallel.
-// In other words, a message is processed only by one of the plugins.
-type OutputPlugins []types.OutputPlugin
-
-func (c *OutputPlugins) UnmarshalJSON(bs []byte) error {
-	res := OutputPlugins{}
-	raws := []json.RawMessage{}
-	if err := json.Unmarshal(bs, &raws); err != nil {
-		return errors.Wrap(err, "invalid json Output")
-	}
-
-	for i, raw := range raws {
-		cc := &PluginCommon{}
-		if err := json.Unmarshal(raw, cc); err != nil {
-			return errors.Wrapf(err, "invalid json Output[%d]", i)
-		}
-		if cc.ID == "" {
-			return errors.Errorf("Outputs[%d].ID must not be empty", i)
-		}
-		op, err := registry.CreateOutputPlugin(cc.Name, raw)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create output plugin, no %d, name is `%s`", i, cc.Name)
-		}
-		res = append(res, op)
-	}
-	*c = res
-	return nil
-}
-
-// If multiple plugins are specified, they are filtered in sequence;
-// a single message is processed in series, not in parallel.
-type FilterPlugins []types.FilterPlugin
-
-func (c *FilterPlugins) UnmarshalJSON(bs []byte) error {
-	res := FilterPlugins{}
-	raws := []json.RawMessage{}
-	if err := json.Unmarshal(bs, &raws); err != nil {
-		return errors.Wrap(err, "invalid json Filter")
-	}
-
-	for i, raw := range raws {
-		cc := &PluginCommon{}
-		if err := json.Unmarshal(raw, cc); err != nil {
-			return errors.Wrapf(err, "invalid json Filter[%d]", i)
-		}
-		if cc.ID == "" {
-			return errors.Errorf("Filters[%d].ID must not be empty", i)
-		}
-		fp, err := registry.CreateFilterPlugin(cc.Name, raw)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create filter plugin, no %d, name is `%s`", i, cc.Name)
-		}
-		res = append(res, fp)
-	}
-	*c = res
-	return nil
-}
-
-func (c FilterPlugins) Filter(dm *types.DnstapMessage) *types.DnstapMessage {
-	for _, filterPlugin := range c {
-		dm = filterPlugin.Filter(dm)
-		if dm == nil {
-			return nil
-		}
-	}
-	return dm
+func NewBufferFromFilterPlugin(p *config.FilterBlock) types.Buffer {
+	return NewBuffer("dtap", "filter", p.GetBufferSize(), p.GetFullName())
 }

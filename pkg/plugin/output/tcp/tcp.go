@@ -16,70 +16,97 @@
 package tcp
 
 import (
+	"context"
 	"io"
+	"math"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/goccy/go-json"
+	"errors"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "tcp"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("tcp", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	s := &TCP{}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	p := &TCP{
+		OutputBlock: *cfg,
 	}
-	if s.Host == "" {
-		return nil, errors.Errorf("missing parameter Host")
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup tcp plugin: %w", errors.Join(diags.Errs()...))
 	}
-	if s.Port == 0 {
-		return nil, errors.Errorf("missing parameter Port")
-	}
-	s.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(s, time.Second, nil), s.MaxRetry)
-	return s, nil
+	p.DnstapOutput = output.NewDnstapOutput(output.NewDnstapFstrmSocketOutput(p, time.Second, nil), p.MaxRetry)
+	return p, nil
 }
 
 var _ types.OutputPlugin = &TCP{}
 var _ output.SocketOutput = &TCP{}
 
 // The TCP plugin outputs messages to the tcp server.
+// Eample configuration:
+// ```hcl
+//
+//	output "tcp" "tcp_test" {
+//	  host = "127.0.0.1"
+//	  port = 12345
+//	  max_retry = 3
+//	}
+//
+//	output "tcp" "tcp_test_tls" {
+//		 host = "127.0.0.1"
+//		 port = 12346
+//	  max_retry = 3
+//	  tls_config {}
+//	}
+//
+// ```
 type TCP struct {
-	plugin.PluginCommon
+	config.OutputBlock
 	*output.DnstapOutput
+
 	// TCP server hostname. Must not be empty.
-	Host string
+	Host string `hcl:"host"`
+
 	// TCP server port number. Must not be empty.
-	Port uint16
+	Port uint16 `hcl:"port"`
 
-	w net.Conn
+	// MaxRetry is the maximum number of retries to open the unix socket.
+	MaxRetry uint `hcl:"max_retry,optional"`
 
-	oc *types.OutputContext
+	TLSConfig *config.TLSClientConfig `hcl:"tls_config,block"`
+	w         net.Conn
 }
 
-func (f *TCP) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (t *TCP) NewConnect() (io.Writer, error) {
+func (p *TCP) NewConnect(context.Context) (io.Writer, error) {
 	var err error
-	target := net.JoinHostPort(t.Host, strconv.Itoa(int(t.Port)))
-	t.w, err = net.Dial("tcp", target)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to connect tcp socket, address: %s", target)
+	target := net.JoinHostPort(p.Host, strconv.Itoa(int(p.Port)))
+	if p.TLSConfig != nil {
+		p.w, err = p.TLSConfig.Dial(target)
+	} else {
+		p.w, err = net.Dial("tcp", target)
 	}
-	return t.w, nil
+	if err != nil {
+		return nil, plugin.PluginError(p, "failed to connect tcp socket, address: %s: err: %w", target, err)
+	}
+	return p.w, nil
 }
 
-func (t *TCP) Close() {
-	t.w.Close()
+func (p *TCP) Close(context.Context) {
+	p.w.Close()
+}
+
+func (p *TCP) MaxConcurrent() uint {
+	return math.MaxUint32
 }

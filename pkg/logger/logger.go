@@ -5,10 +5,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	stdLogger *zap.Logger
-)
-
 func New(levelStr string) (*zap.Logger, error) {
 	level, err := zap.ParseAtomicLevel(levelStr)
 	if err != nil {
@@ -22,18 +18,6 @@ func New(levelStr string) (*zap.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	stdLogger = zapLog
-	return stdLogger, nil
-}
-
-func GetLogger() *zap.Logger {
-	return stdLogger
-}
-
-func init() {
-	var err error
-	stdLogger, err = New("info")
-	if err != nil {
-		panic("failed to create logger")
-	}
+	zap.ReplaceGlobals(zapLog)
+	return zapLog, nil
 }

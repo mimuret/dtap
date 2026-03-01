@@ -18,7 +18,7 @@ package buffer
 import (
 	"sync"
 
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
 var _ types.Buffer = &RingBuffer{}

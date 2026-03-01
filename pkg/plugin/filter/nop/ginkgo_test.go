@@ -24,5 +24,5 @@ import (
 
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "static package test suite")
+	RunSpecs(t, "nop package test suite")
 }

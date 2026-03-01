@@ -1,12 +1,19 @@
 name: "build image"
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
+  workflow_run:
+    workflows: ["Go check"]
+    types:
+      - completed
+    branches: ["main", "v2", "v3"]
 
 jobs:
   release-linux-amd64:
     name: release linux/amd64
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -33,4 +40,4 @@ jobs:
         platforms: linux/amd64,linux/arm64
         tags: |
           ghcr.io/${{ github.repository_owner }}/dtap:${{ steps.get_tag.outputs.TAG_NAME }}
-          ghcr.io/${{ github.repository_owner }}/dtap:v2
+          ghcr.io/${{ github.repository_owner }}/dtap:v3

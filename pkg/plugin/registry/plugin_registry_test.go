@@ -17,20 +17,20 @@
 package registry_test
 
 import (
-	json "github.com/goccy/go-json"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func testInputPluginFunc(json.RawMessage) (types.InputPlugin, error) {
+func testInputPluginFunc(*config.InputBlock) (types.InputPlugin, error) {
 	return nil, nil
 }
-func testOutputPluginFunc(json.RawMessage) (types.OutputPlugin, error) {
+func testOutputPluginFunc(*config.OutputBlock) (types.OutputPlugin, error) {
 	return nil, nil
 }
-func testFilterPluginFunc(json.RawMessage) (types.FilterPlugin, error) {
+func testFilterPluginFunc(*config.FilterBlock) (types.FilterPlugin, error) {
 	return nil, nil
 }
 

@@ -17,23 +17,25 @@
 package loki
 
 import (
-	"sync"
+	"context"
+	"errors"
+	"fmt"
+	"math"
 	"time"
 
-	json "github.com/goccy/go-json"
 	"github.com/grafana/dskit/backoff"
-	"github.com/pkg/errors"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/prometheus/client_golang/prometheus"
-	prometheusconfig "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"go.uber.org/zap"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/mimuret/dtap/v2/pkg/utils"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/types"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
 
 	"github.com/go-kit/log"
 	"github.com/grafana/dskit/flagext"
@@ -41,6 +43,8 @@ import (
 	"github.com/grafana/loki/v3/clients/pkg/promtail/client"
 	"github.com/grafana/loki/v3/pkg/logproto"
 )
+
+const PLUGIN_NAME = "loki"
 
 var _ log.Logger = &loggerWrapper{}
 
@@ -58,25 +62,38 @@ const DnstapFstrmControlHeaderSize = 42
 const DnstapFstrmMsgHeaderSize = 4
 
 func init() {
-	_ = registry.RegisterOutputPlugin("loki", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
-	s := &Loki{
-		MaxStream:   0,
-		MaxLineSize: 4096,
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	p := &Loki{
+		OutputBlock: *cfg,
 	}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	s := &LokiConfig{
+		MaxStream:     0,
+		MaxLineSize:   4096,
+		ConstLabels:   map[string]string{"level": "info"},
+		OutputFilters: &types.OutputFilters{},
 	}
-	s.metrics = client.NewMetrics(prometheus.DefaultRegisterer)
-	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
+	diags := gohcl.DecodeBody(cfg.Body, nil, s)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup loki plugin: %w", errors.Join(diags.Errs()...))
+	}
+	p.DnstapOutput = output.NewDnstapOutput(p, s.MaxRetry)
 
 	urlvalue := flagext.URLValue{}
 	if err := urlvalue.Set(s.URL); err != nil {
-		return nil, errors.Wrap(err, "failed to set URL")
+		return nil, fmt.Errorf("failed to set URL: %w", err)
 	}
-	s.lokiConfig = client.Config{
+
+	p.outputFilters = *s.OutputFilters
+	p.messageLabels = s.MessageLabels
+	p.constLabels = s.ConstLabels
+	p.maxStream = s.MaxStream
+	p.maxLineSize = s.MaxLineSize
+	p.maxLineSizeTruncate = s.MaxLineSizeTruncate
+
+	p.lokiConfig = client.Config{
 		URL: urlvalue,
 		BackoffConfig: backoff.Config{
 			MaxBackoff: client.MaxBackoff,
@@ -87,57 +104,92 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 		BatchWait: client.BatchWait,
 		Timeout:   client.Timeout,
 	}
-	s.lokiConfig.Client = s.ClientConfig
-	return s, nil
+
+	// Openが複数呼ばれると、registryのメトリクスが重複して登録されるため、ここで初期化する。
+	p.metrics = client.NewMetrics(prometheus.DefaultRegisterer)
+
+	return p, nil
 }
 
 var _ output.OutputHandler = &Loki{}
 var _ types.OutputPlugin = &Loki{}
 
-// The loki plugin outputs messages to the loki server.
-type Loki struct {
-	plugin.PluginCommon
-	sync.Mutex
-
-	MaxStream           int
-	MaxLineSize         int
-	MaxLineSizeTruncate bool
-
+type LokiConfig struct {
+	// MaxStream is the maximum number of streams to be sent to loki.
+	MaxStream int `hcl:"max_stream,optional"`
+	// MaxLineSize is the maximum size of a line to be sent to loki.
+	MaxLineSize int `hcl:"max_line_size,optional"`
+	// MaxLineSizeTruncate indicates whether to truncate the line if it exceeds MaxLineSize.
+	MaxLineSizeTruncate bool `hcl:"max_line_size_truncate,optional"`
 	// loki body filter
-	OutputFilters types.OutputFilters
+	OutputFilters *types.OutputFilters `hcl:"output_filters,block"`
 	// loki labels from DNSTAP value
-	DNSTAPLabels []string
+	MessageLabels []string `hcl:"message_labels,optional"`
 	// loki labels
-	Labels map[string]string
+	ConstLabels map[string]string `hcl:"const_labels,optional"`
 	// loki url
-	URL          string
-	ClientConfig prometheusconfig.HTTPClientConfig
+	URL string `hcl:"url"`
+	// MaxRetry is the maximum number of retries to connect nats server.
+	MaxRetry uint `hcl:"max_retry,optional"`
+}
 
-	lokiConfig client.Config
+// The loki plugin outputs messages to the loki server.
+// Example configuration:
+// ```hcl
+// output "loki" "example" {
+//   url = "http://localhost:3100/loki/api/v1/push"
+//   max_stream = 1000
+//   max_line_size = 4096
+//   max_line_size_truncate = true
+//   output_filters {
+//     include = ["type", "query", "response_code"]
+//     exclude = ["query_time", "response_time"]
+//   }
+//   message_labels = ["type", "query", "response_code"]
+//   const_labels = {
+//     "app": "dtap",
+//     "env": "production"
+//   }
+//   max_retry = 3
+// }
+// ```
+
+type Loki struct {
+	config.OutputBlock
+
+	// OutputFilters is the list of filters to apply to the output.
+	outputFilters types.OutputFilters
+
+	// MessageLabels Labels are the labels to be added to all log entries.
+	messageLabels []string
+
+	// const_labels are the constant labels to be added to all log entries.
+	constLabels map[string]string
+
+	maxStream           int
+	maxLineSize         int
+	maxLineSizeTruncate bool
+	lokiConfig          client.Config
+
 	lokiClient client.Client
 
 	metrics *client.Metrics
 	*output.DnstapOutput
-	oc *types.OutputContext
 }
 
-func (f *Loki) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (f *Loki) Open() error {
+func (f *Loki) Open(ctx context.Context) error {
 	var (
 		err error
 	)
-	f.lokiClient, err = client.New(f.metrics, f.lokiConfig, f.MaxStream, f.MaxLineSize, f.MaxLineSizeTruncate, &loggerWrapper{f.oc.Logger.Sugar()})
+	f.lokiClient, err = client.New(f.metrics, f.lokiConfig, f.maxStream, f.maxLineSize, f.maxLineSizeTruncate, &loggerWrapper{ctxzap.Extract(ctx).Sugar()})
 	if err != nil {
-		return errors.Wrap(err, "failed to create loki client")
+		return fmt.Errorf("failed to create loki client: %w", err)
 	}
 	return nil
 }
 
-func (f *Loki) Write(dm *types.DnstapMessage) error {
-	jsonRaw, err := dm.ConvertV1JSONWithFilter(f.OutputFilters)
+func (f *Loki) Write(ctx context.Context, dm *types.DnstapMessage) error {
+	jsonRaw, err := dm.ConvertV1JSONWithFilter(f.outputFilters)
 	if err != nil {
 		return err
 	}
@@ -157,29 +209,25 @@ func (f *Loki) Write(dm *types.DnstapMessage) error {
 	return nil
 }
 
-func (f *Loki) Close() {
+func (f *Loki) Close(ctx context.Context) {
 	f.lokiClient.Stop()
 }
 
 func (f *Loki) ToLabelSet(dm *types.DnstapMessage) model.LabelSet {
 	set := make(model.LabelSet)
-	set[model.LabelName("level")] = "info"
-	kv, err := dm.ConvertV1MapString()
-	if err != nil {
-		return set
+	for k, v := range f.constLabels {
+		set[model.LabelName(k)] = model.LabelValue(v)
 	}
-	for _, k := range f.DNSTAPLabels {
-		if v, ok := dm.Labels[k]; ok {
-			set[model.LabelName(k)] = model.LabelValue(v)
-		}
-		if v, ok := kv[k]; ok {
-			if v, err := utils.ToString(v); err == nil {
-				set[model.LabelName(k)] = model.LabelValue(v)
-			}
-		}
+	labels := make(map[string]string, len(f.messageLabels))
+	if err := dm.SetOuputAttributes(labels, f.messageLabels); err != nil {
+		return nil
 	}
-	for k, v := range f.Labels {
+	for k, v := range labels {
 		set[model.LabelName(k)] = model.LabelValue(v)
 	}
 	return set
+}
+
+func (p *Loki) MaxConcurrent() uint {
+	return math.MaxUint32
 }

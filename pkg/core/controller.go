@@ -22,54 +22,50 @@ import (
 	"net/http/pprof"
 	"sync"
 
-	"github.com/mimuret/dtap/v2/pkg/config"
-	"github.com/mimuret/dtap/v2/pkg/logger"
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/logger"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/promauto"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
-	"golang.org/x/sync/semaphore"
 )
 
-type OutputGroup struct {
-	name    string
-	buffer  types.Buffer
-	filters plugin.FilterPlugins
-	outputs plugin.OutputPlugins
-
-	filterdCounter prometheus.Counter
+type Options struct {
+	ManageHTTPSServer string
+	Debug             bool
+	LogLevel          string
 }
 
 type controller struct {
 	config *config.Config
 	logger *zap.Logger
 
-	inputPlugins plugin.InputPlugins
-	inputBuffer  types.Buffer
+	options *Options
 
-	filterPlugins plugin.FilterPlugins
+	inputRunners  map[string]*plugin.InputRunner
+	filterRunners map[string]*plugin.FilterRunner
+	outputRunners map[string]*plugin.OutputRunner
 
 	filterdCounter prometheus.Counter
-	registery      *prometheus.Registry
 
-	outputGroups []OutputGroup
-
-	debug bool
+	registery *prometheus.Registry
 
 	reloadCh chan struct{}
+
+	ready bool
 }
 
-func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) *controller {
+func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus.Registry, reloadCh chan struct{}, options *Options) *controller {
 	return &controller{
 		config:    cfg,
 		logger:    logger,
 		registery: registery,
 		reloadCh:  reloadCh,
-		debug:     debug,
+		options:   options,
 		filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: "dtap",
 			Subsystem: "global",
@@ -79,85 +75,84 @@ func newController(cfg *config.Config, logger *zap.Logger, registery *prometheus
 	}
 }
 
-// setup Output Plugin
-func (c *controller) setupOutputGroup() error {
-	var outputGroups []OutputGroup
-	for i, ogc := range c.config.OutputGroups {
-		if len(ogc.Outputs) == 0 {
-			return fmt.Errorf("empty output plugin OutputGroup[%d]", i)
-		}
-		ob, err := NewBufferFromBufferConfig(ogc.BufferConfig,
-			promauto.NewCounter(
-				prometheus.CounterOpts{
-					Namespace:   "dtap",
-					Subsystem:   "output",
-					Name:        "recv_frames_total",
-					Help:        "The total number of output frames",
-					ConstLabels: prometheus.Labels{"og": ogc.Name},
-				},
-			),
-			promauto.NewCounter(
-				prometheus.CounterOpts{
-					Namespace:   "dtap",
-					Subsystem:   "output",
-					Name:        "lost_frames_total",
-					Help:        "The total number of lost output frames from buffer",
-					ConstLabels: prometheus.Labels{"og": ogc.Name},
-				},
-			),
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create output buffer")
-		}
-		outputGroups = append(outputGroups, OutputGroup{
-			name:    ogc.Name,
-			filters: ogc.Filters,
-			outputs: ogc.Outputs,
-			buffer:  ob,
-			filterdCounter: promauto.NewCounter(prometheus.CounterOpts{
-				Namespace:   "dtap",
-				Subsystem:   "output",
-				Name:        "filtered_total",
-				Help:        "The total number of output group filtered frames",
-				ConstLabels: prometheus.Labels{"og": ogc.Name},
-			}),
-		})
+func (c *controller) setupInputPlugins() error {
+	var err error
+	c.inputRunners, err = plugin.SetupInputRunners(c.config.InputBlocks)
+	if err != nil {
+		return err
 	}
-	c.outputGroups = outputGroups
 	return nil
 }
 
+func (c *controller) setupOutputPlugins() error {
+	var err error
+	c.outputRunners, err = plugin.SetupOutputRunners(c.config.OutputBlocks)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *controller) setupFilterPlugins() error {
+	var err error
+	c.filterRunners, err = plugin.SetupFilterRunners(c.config.FilterBlocks)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *controller) setupForwardTo() error {
+	// setup forwardTo for output plugins
+	receivers := make(map[string]types.Receiver, len(c.outputRunners)+len(c.filterRunners))
+	for name, p := range c.outputRunners {
+		receivers[name] = p
+	}
+	for name, p := range c.filterRunners {
+		receivers[name] = p
+	}
+
+	// setup forwardTo for input plugins
+	for _, block := range c.config.InputBlocks {
+		forwardTo := make([]types.Writer, 0, len(block.ForwardToString))
+		for _, name := range block.ForwardToString {
+			if receiver, ok := receivers[name]; ok {
+				forwardTo = append(forwardTo, receiver)
+			} else {
+				return plugin.PluginError(block, "forward_to %s not found in output or filter plugins", name)
+			}
+		}
+		c.inputRunners[block.GetFullName()].SetupForwardTo(forwardTo)
+	}
+	// setup forwardTo for filter plugins
+	for _, block := range c.config.FilterBlocks {
+		forwardTo := make([]types.Writer, 0, len(block.ForwardToString))
+		for _, name := range block.ForwardToString {
+			if receiver, ok := receivers[name]; ok {
+				forwardTo = append(forwardTo, receiver)
+			} else {
+				return fmt.Errorf("forward_to %s not found in output or filter plugins", name)
+			}
+		}
+		c.filterRunners[block.GetFullName()].SetupForwardTo(forwardTo)
+	}
+	return nil
+}
+
+// setup Output Plugin
 // setup controller by config
 func (c *controller) setup() error {
-	// setup plugins
-	inputBuf, err := NewBufferFromBufferConfig(c.config.InputBufferConfig,
-		promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: "dtap",
-			Subsystem: "input",
-			Name:      "recv_frames_total",
-			Help:      "The total number of input frames",
-		}),
-		promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: "dtap",
-			Subsystem: "input",
-			Name:      "lost_frames_total",
-			Help:      "The total number of lost input frames from buffer",
-		}),
-	)
-	if err != nil {
-		return errors.Wrap(err, "faield to create input buffer")
+	if err := c.setupInputPlugins(); err != nil {
+		return err
 	}
-	c.inputBuffer = inputBuf
-	c.inputPlugins = c.config.Inputs
-	c.filterPlugins = c.config.Filters
-	if err := c.setupOutputGroup(); err != nil {
-		return errors.Wrap(err, "failed to create output plugin")
+	if err := c.setupOutputPlugins(); err != nil {
+		return err
 	}
-	if len(c.inputPlugins) == 0 {
-		return errors.New("Input plugin configuration does not exist")
+	if err := c.setupFilterPlugins(); err != nil {
+		return err
 	}
-	if len(c.outputGroups) == 0 {
-		return errors.New("Output plugin configuration does not exist")
+	if err := c.setupForwardTo(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -167,6 +162,15 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 	mux.Handle("/metrics", promhttp.InstrumentMetricHandler(
 		c.registery, promhttp.HandlerFor(c.registery, promhttp.HandlerOpts{}),
 	))
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
+		if c.ready {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("not ready"))
+		}
+	})
 	mux.HandleFunc("/reload", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			w.WriteHeader(http.StatusBadRequest)
@@ -175,7 +179,7 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 		c.reloadCh <- struct{}{}
 		w.WriteHeader(http.StatusAccepted)
 	})
-	if c.debug {
+	if c.options.Debug {
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -183,11 +187,11 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	}
 	srv := &http.Server{
-		Addr:    c.config.ManageHTTPSServer,
+		Addr:    c.options.ManageHTTPSServer,
 		Handler: mux,
 	}
 	var errCh = make(chan error)
-	c.logger.Info("Start manage http server", zap.String("address", c.config.ManageHTTPSServer))
+	c.logger.Debug("Starting management HTTP server", zap.String("address", c.options.ManageHTTPSServer))
 	go func() {
 		errCh <- srv.ListenAndServe()
 	}()
@@ -208,131 +212,137 @@ func (c *controller) startManageHTTPServer(ctx context.Context) {
 	}
 }
 
+func (c *controller) startRunners(ctx context.Context, runners map[string]plugin.Runner, errCh chan error) (context.CancelFunc, *sync.WaitGroup) {
+	wg := &sync.WaitGroup{}
+	ctx, cancel := context.WithCancel(ctx)
+	for _, p := range runners {
+		wg.Add(1)
+		rctx := ctxzap.ToContext(ctx, c.logger.With(
+			zap.String("plugin", p.GetFullName()),
+		))
+		go func(r plugin.Runner, ctx context.Context) {
+			ctxzap.Debug(ctx, "start plugin")
+			r.Start(ctx, errCh)
+			ctxzap.Debug(ctx, "finish plugin")
+			wg.Done()
+		}(p, rctx)
+	}
+	return cancel, wg
+}
+
+// startOutputPlugins starts all output plugins and returns a cancel function and a wait group
+func (c *controller) startOutputRunners(ctx context.Context, errCh chan error) (context.CancelFunc, *sync.WaitGroup) {
+	runners := make(map[string]plugin.Runner, len(c.outputRunners))
+	for name, runner := range c.outputRunners {
+		runners[name] = runner
+	}
+	return c.startRunners(ctx, runners, errCh)
+}
+
+// startOutputPlugins starts all output plugins and returns a cancel function and a wait group
+func (c *controller) startFilterRunners(ctx context.Context, errCh chan error) (context.CancelFunc, *sync.WaitGroup) {
+	runners := make(map[string]plugin.Runner, len(c.filterRunners))
+	for name, runner := range c.filterRunners {
+		runners[name] = runner
+	}
+	return c.startRunners(ctx, runners, errCh)
+}
+
+// startOutputPlugins starts all output plugins and returns a cancel function and a wait group
+func (c *controller) startInputRunners(ctx context.Context, errCh chan error) (context.CancelFunc, *sync.WaitGroup) {
+	runners := make(map[string]plugin.Runner, len(c.filterRunners))
+	for name, runner := range c.inputRunners {
+		runners[name] = runner
+	}
+	return c.startRunners(ctx, runners, errCh)
+}
+
 // main running function
 func (c *controller) Run(ctx context.Context) error {
 	go c.startManageHTTPServer(ctx)
-	errCh := make(chan error, 128)
+	filterErrCh := make(chan error, 128)
+	inputErrCh := make(chan error, 128)
+	outputErrCh := make(chan error, 128)
+	fCancel, fwg := c.startFilterRunners(ctx, filterErrCh)
+	iCancel, iwg := c.startInputRunners(ctx, inputErrCh)
+	oCancel, owg := c.startOutputRunners(ctx, outputErrCh)
 
-	// start inputPlugin
-	iwg := sync.WaitGroup{}
-	iCtx, iCancel := context.WithCancel(ctx)
-	for _, inputPlugin := range c.inputPlugins {
-		iwg.Add(1)
-		ic := &types.InputContext{
-			Logger: c.logger.With(zap.String("name", inputPlugin.GetName()), zap.String("id", inputPlugin.GetID())),
-			Writer: c.inputBuffer,
-		}
-		go func(ip types.InputPlugin, ic *types.InputContext) {
-			ic.Logger.Info("start input plugin")
-			err := ip.Start(iCtx, ic)
-			ic.Logger.Info("finish input plugin")
-			if err != nil {
-				errCh <- err
-			}
-			iwg.Done()
-		}(inputPlugin, ic)
-	}
+	c.ready = true
 
-	// start outputPlugin
-	owg := sync.WaitGroup{}
-	oCtx, oCancel := context.WithCancel(ctx)
-	for _, og := range c.outputGroups {
-		for _, outputPlugin := range og.outputs {
-			owg.Add(1)
-			oc := &types.OutputContext{
-				OutputGroup: og.name,
-				Logger:      c.logger.With(zap.String("og", og.name), zap.String("name", outputPlugin.GetName()), zap.String("id", outputPlugin.GetID())),
-				Reader:      og.buffer,
-			}
-			go func(op types.OutputPlugin, oc *types.OutputContext) {
-				oc.Logger.Info("start output plugin")
-				err := op.Start(oCtx, oc)
-				oc.Logger.Info("finish output plugin")
-				if err != nil {
-					errCh <- err
-				}
-				owg.Done()
-			}(outputPlugin, oc)
-		}
-	}
 	defer func() {
-		c.logger.Info("The shutdown process is started.")
-		c.logger.Info("Input plugins start the shutdown process.")
+		c.logger.Info("Shutdown process has started.")
+		c.logger.Debug("Starting shutdown process for input plugins.")
 		iCancel()
-		c.logger.Debug("Waiting for the input shutdown process.")
+		c.logger.Debug("Waiting for input plugins to shut down.")
 		iwg.Wait()
-		c.logger.Debug("Input plugins shutdown process is completed.")
-		c.logger.Info("Output plugin starts the shutdown process")
+		close(inputErrCh)
+		for err := range inputErrCh {
+			c.logger.Error("Plugin error", zap.Error(err))
+		}
+		c.logger.Debug("Input plugins have been shut down.")
+
+		c.logger.Debug("Starting shutdown process for filter plugins.")
+		fCancel()
+		c.logger.Debug("Waiting for filter plugins to shut down.")
+		fwg.Wait()
+		close(filterErrCh)
+		for err := range filterErrCh {
+			c.logger.Error("Plugin error", zap.Error(err))
+		}
+
+		c.logger.Debug("Filter plugins have been shut down.")
+
+		c.logger.Debug("Starting shutdown process for output plugins.")
 		oCancel()
-		c.logger.Debug("Waiting for the output shutdown process.")
+		c.logger.Debug("Waiting for output plugins to shut down.")
 		owg.Wait()
-		c.logger.Debug("Output plugins shutdown process is completed.")
-		c.logger.Info("Shutdown process is completed.")
+		close(outputErrCh)
+		for err := range outputErrCh {
+			c.logger.Error("Plugin error", zap.Error(err))
+		}
+		c.logger.Debug("Output plugins have been shut down.")
+
+		c.logger.Info("Shutdown process has completed.")
 	}()
+	mainCtx, cancelFunc := context.WithCancel(ctx)
 
 	// start main loop
-	c.logger.Info("semaphore", zap.Uint("num-worker", c.config.InputFilterWorkerNum))
-	iFilterSemaphore := semaphore.NewWeighted(int64(c.config.InputFilterWorkerNum))
-	c.logger.Info("Start main loop")
-	mainCtx, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
 LOOP:
 	for {
 		select {
 		case <-mainCtx.Done():
-			c.logger.Info("cancel recieved")
+			c.ready = false
+			c.logger.Info("Cancellation signal received.")
 			break LOOP
-		case err := <-errCh:
-			c.logger.Error("plugin error", zap.Error(err))
-			return fmt.Errorf("plugin error: %w", err)
-		// read from input plugin
-		case dm := <-c.inputBuffer.Read():
-			if dm == nil {
-				continue
-			}
-			// get filter semaphore
-			if err := iFilterSemaphore.Acquire(mainCtx, 1); err != nil {
-				c.logger.Error("failed to acquire semaphore", zap.Error(err))
-				continue
-			}
-			// input filtering and send outBuffer
-			go func() {
-				defer func() {
-					iFilterSemaphore.Release(1)
-				}()
-				// input filter
-				dm = c.filterPlugins.Filter(dm)
-				if dm == nil {
-					c.filterdCounter.Inc()
-					return
-				}
-				for _, og := range c.outputGroups {
-					ogdm := dm.DeepCopy()
-					// output filter
-					ogdm = og.filters.Filter(ogdm)
-					if ogdm == nil {
-						og.filterdCounter.Inc()
-						continue
-					}
-					og.buffer.Write(ogdm)
-				}
-			}()
+		case err := <-inputErrCh:
+			c.ready = false
+			c.logger.Error("Plugin error", zap.Error(err))
+			return fmt.Errorf("error occurred in plugin")
+		case err := <-filterErrCh:
+			c.ready = false
+			c.logger.Error("Plugin error", zap.Error(err))
+			return fmt.Errorf("error occurred in plugin")
+		case err := <-outputErrCh:
+			c.ready = false
+			c.logger.Error("Plugin error", zap.Error(err))
+			return fmt.Errorf("error occurred in plugin")
 		}
 	}
 	return nil
 }
 
 // main running function
-func NewRunner(ctx context.Context, cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}, debug bool) (*controller, *zap.Logger, error) {
+func NewRunner(cfgFile string, registery *prometheus.Registry, reloadCh chan struct{}, options *Options) (*controller, *zap.Logger, error) {
 	c, err := config.LoadConfig(afero.NewOsFs(), cfgFile)
 	if err != nil {
 		return nil, nil, err
 	}
-	l, err := logger.New(c.LogLevel)
+	l, err := logger.New(options.LogLevel)
 	if err != nil {
 		return nil, nil, err
 	}
-	ctl := newController(c, l, registery, reloadCh, debug)
+	ctl := newController(c, l, registery, reloadCh, options)
 	if err := ctl.setup(); err != nil {
 		return nil, nil, fmt.Errorf("failed to setup: %w", err)
 	}

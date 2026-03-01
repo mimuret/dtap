@@ -2,27 +2,34 @@ name: "Go check"
 
 on:
   push:
-    branches:
-      - main
-      - v2
+    branches: ["main", "v2", "v3"]
   pull_request:
-    branches:
-      - main
-      - v2
+    branches: ["main", "v2", "v3"]
+  workflow_call:
+    outputs:
+      test-result:
+        description: "Test result"
+        value: ${{ steps.test.outputs.result }}
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
-    - run: sudo apt update && sudo apt install -y libpcap-dev
     - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version-file: go.mod
+    - uses: actions/golangci-lint@v8
     - name: Set environment variable for PCAP interface
       run: echo "DTAP_TEST_PCAP_IFNAME=eth0" >> $GITHUB_ENV
     - name: Test
+      id: test
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo
-        ginkgo run --label-filter='!privileged' ./...
+        if ginkgo run --label-filter='!privileged' ./... ; then
+          echo "result=success" >> $GITHUB_OUTPUT
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi

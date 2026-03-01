@@ -5,7 +5,7 @@ import (
 
 	dnstap "github.com/dnstap/golang-dnstap"
 	"github.com/miekg/dns"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/protobuf/proto"

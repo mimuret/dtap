@@ -16,11 +16,10 @@
 package registry
 
 import (
-	json "github.com/goccy/go-json"
-
 	"github.com/pkg/errors"
 
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
 var (
@@ -29,9 +28,9 @@ var (
 	filterPlugins = map[string]FilterPluginSetupFunc{}
 )
 
-type InputPluginSetupFunc func(json.RawMessage) (types.InputPlugin, error)
-type OutputPluginSetupFunc func(json.RawMessage) (types.OutputPlugin, error)
-type FilterPluginSetupFunc func(json.RawMessage) (types.FilterPlugin, error)
+type InputPluginSetupFunc func(cfg *config.InputBlock) (types.InputPlugin, error)
+type OutputPluginSetupFunc func(cfg *config.OutputBlock) (types.OutputPlugin, error)
+type FilterPluginSetupFunc func(cfg *config.FilterBlock) (types.FilterPlugin, error)
 
 func RegisterInputPlugin(name string, setupFunc InputPluginSetupFunc) error {
 	if name == "" {
@@ -66,26 +65,26 @@ func RegisterFilterPlugin(name string, setupFunc FilterPluginSetupFunc) error {
 	return nil
 }
 
-func CreateInputPlugin(name string, bs []byte) (types.InputPlugin, error) {
-	f, ok := inputPlugins[name]
+func CreateInputPlugin(cfg *config.InputBlock) (types.InputPlugin, error) {
+	f, ok := inputPlugins[cfg.GetType()]
 	if !ok {
-		return nil, errors.Errorf("unknown plugin name `%s`", name)
+		return nil, errors.Errorf("unknown plugin name `%s`", cfg.GetFullName())
 	}
-	return f(bs)
+	return f(cfg)
 }
 
-func CreateFilterPlugin(name string, bs []byte) (types.FilterPlugin, error) {
-	f, ok := filterPlugins[name]
+func CreateFilterPlugin(cfg *config.FilterBlock) (types.FilterPlugin, error) {
+	f, ok := filterPlugins[cfg.GetType()]
 	if !ok {
-		return nil, errors.Errorf("unknown plugin name `%s`", name)
+		return nil, errors.Errorf("unknown plugin name `%s`", cfg.GetFullName())
 	}
-	return f(bs)
+	return f(cfg)
 }
 
-func CreateOutputPlugin(name string, bs []byte) (types.OutputPlugin, error) {
-	f, ok := outputPlugins[name]
+func CreateOutputPlugin(cfg *config.OutputBlock) (types.OutputPlugin, error) {
+	f, ok := outputPlugins[cfg.GetType()]
 	if !ok {
-		return nil, errors.Errorf("unknown plugin name `%s`", name)
+		return nil, errors.Errorf("unknown plugin name `%s`", cfg.GetFullName())
 	}
-	return f(bs)
+	return f(cfg)
 }

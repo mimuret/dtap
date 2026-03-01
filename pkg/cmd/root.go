@@ -18,14 +18,15 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"github.com/mimuret/dtap/v2/pkg/core"
-	_ "github.com/mimuret/dtap/v2/pkg/core/plugins"
-	"github.com/mimuret/dtap/v2/pkg/promauto"
+	"github.com/mimuret/dtap/v3/pkg/core"
+	_ "github.com/mimuret/dtap/v3/pkg/core/plugins"
+	"github.com/mimuret/dtap/v3/pkg/promauto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -38,12 +39,20 @@ type Runner interface {
 var cfgFile string
 var runnerCh chan Runner
 var debug bool
+var options core.Options
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "dtap",
 	Short: "dtap - DNSTAP message router",
 	Long:  `dtap - DNSTAP message router`,
+}
+
+var runCmd = &cobra.Command{
+	Use:           "run",
+	Short:         "Run dtap",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,10 +113,26 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var checkCmd = &cobra.Command{
+	Use:           "check",
+	Short:         "check config",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		reloadCh := make(chan struct{}, 1)
+		_, err := makeRunner(cfgFile, reloadCh)
+		if err != nil {
+			return err
+		}
+		cmd.Println("Config is valid.")
+		return nil
+	},
+}
+
 func makeRunner(cfgFile string, reloadCh chan struct{}) (*zap.Logger, error) {
 	registery := prometheus.NewRegistry()
 	promauto.Set(registery)
-	runner, l, err := core.NewRunner(context.Background(), cfgFile, registery, reloadCh, debug)
+	runner, l, err := core.NewRunner(cfgFile, registery, reloadCh, &options)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +143,21 @@ func makeRunner(cfgFile string, reloadCh chan struct{}) (*zap.Logger, error) {
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	err := rootCmd.Execute()
+	if err != nil {
+		printErr(err)
+		os.Exit(1)
+	}
+}
+
+func printErr(err error) {
+	if errs, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range errs.Unwrap() {
+			printErr(e)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+	}
 }
 
 func init() {
@@ -126,7 +165,13 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file")
-	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "", false, "enable profile api")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "/etc/dtap", "config file or directory")
+	rootCmd.PersistentFlags().BoolVarP(&options.Debug, "debug", "", false, "enable profile api")
+	rootCmd.PersistentFlags().StringVarP(&options.LogLevel, "loglevel", "", "info", "log level")
+	rootCmd.PersistentFlags().StringVarP(&options.ManageHTTPSServer, "manage-server-addr", "", ":9520", "manege server address")
+
+	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(checkCmd)
+
 	runnerCh = make(chan Runner, 1)
 }

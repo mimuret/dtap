@@ -13,71 +13,71 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package static_test
 
 import (
-	_ "embed"
+	"context"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/filter/static"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/filter/static"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Static", func() {
+	var (
+		ctx context.Context
+		msg *types.DnstapMessage
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		msg = &types.DnstapMessage{
+			Labels: map[string]string{
+				"example_label": "example_value",
+			},
+		}
+	})
+
 	Context("Setup", func() {
-		var (
-			err error
-			fp  types.FilterPlugin
-		)
-		When("invalid json", func() {
-			BeforeEach(func() {
-				fp, err = static.Setup(json.RawMessage(`{"Name": "static", "Deny": 1}`))
-			})
-			It("returns static", func() {
-				Expect(err).To(HaveOccurred())
-			})
+		It("should successfully setup with valid HCL", func() {
+			plugin, err := static.Setup(testtool.MustFilterBlock("static", "test_static", `deny = true`))
+			Expect(err).To(Succeed())
+			Expect(plugin).ToNot(BeNil())
 		})
-		When("valid json", func() {
-			BeforeEach(func() {
-				fp, err = static.Setup(json.RawMessage(`{"Name": "static", "Deny": true}`))
-			})
-			It("returns static", func() {
-				Expect(err).To(Succeed())
-				Expect(fp).To(Equal(&static.Static{PluginCommon: plugin.PluginCommon{Name: "static"}, Deny: true}))
-			})
+
+		It("should return an error for invalid HCL", func() {
+			plugin, err := static.Setup(testtool.MustFilterBlock("static", "test_static", `deny = "invalid_value"`))
+			Expect(err).To(HaveOccurred())
+			Expect(plugin).To(BeNil())
 		})
 	})
+
 	Context("Filter", func() {
 		var (
-			fp  *static.Static
-			dm1 *types.DnstapMessage
-			dm2 *types.DnstapMessage
+			err    error
+			plugin types.FilterPlugin
 		)
+
 		BeforeEach(func() {
-			fp = &static.Static{}
-			dm1 = &types.DnstapMessage{}
+			plugin, err = static.Setup(testtool.MustFilterBlock("static", "test_static", `deny = true`))
+			Expect(err).To(Succeed())
 		})
-		When("Deny is false", func() {
-			BeforeEach(func() {
-				fp.Deny = false
-				dm2 = fp.Filter(dm1)
-			})
-			It("through", func() {
-				Expect(dm2).To(Equal(dm1))
-			})
+
+		It("should deny the message when deny is true", func() {
+			result := plugin.Filter(ctx, msg)
+			Expect(result).To(BeNil())
 		})
-		When("Deny is true", func() {
-			BeforeEach(func() {
-				fp.Deny = true
-				dm2 = fp.Filter(dm1)
-			})
-			It("filtered", func() {
-				Expect(dm2).To(BeNil())
-			})
+
+		It("should allow the message when deny is false", func() {
+			// Reconfigure the plugin with deny = false
+			plugin, err := static.Setup(testtool.MustFilterBlock("static", "test_static", `deny = false`))
+			Expect(err).To(Succeed())
+
+			result := plugin.Filter(ctx, msg)
+			Expect(result).To(Equal(msg))
 		})
 	})
 })

@@ -18,12 +18,10 @@ package nop_test
 import (
 	"context"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/buffer"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output/nop"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/buffer"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output/nop"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -35,7 +33,7 @@ var _ = Describe("output/nop", func() {
 			err error
 		)
 		BeforeEach(func() {
-			op, err = nop.Setup(json.RawMessage(`{"Name": "nop"}`))
+			op, err = nop.Setup(testtool.MustOutputBlock("nop", "nop_test", ``))
 		})
 		It("returns error", func() {
 			Expect(err).To(Succeed())
@@ -56,12 +54,12 @@ var _ = Describe("output/nop", func() {
 				buf.Write(&types.DnstapMessage{})
 			}
 			Expect(len(buf.Read())).To(Equal(100))
-			op, err = nop.Setup(json.RawMessage(`{"Name": "nop"}`))
+			op, err = nop.Setup(testtool.MustOutputBlock("nop", "nop_test", ``))
 			Expect(err).To(Succeed())
 			ctx, cancelFunc = context.WithCancel(context.Background())
 
 			go func() {
-				err := op.Start(ctx, testtool.NewTestOutputContext(buf))
+				err := op.Start(ctx, buf)
 				Expect(err).To(Succeed())
 			}()
 		})

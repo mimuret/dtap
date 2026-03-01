@@ -16,14 +16,15 @@
 package tcp_test
 
 import (
+	"context"
 	"io"
 	"net"
 
-	"github.com/goccy/go-json"
 	"golang.org/x/net/nettest"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin/output/tcp"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output/tcp"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -36,18 +37,9 @@ var _ = Describe("output/tcp", func() {
 		)
 		BeforeEach(func() {
 		})
-		When("type mismatch", func() {
-			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id1","Host": 0}`))
-			})
-			It("returns error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
 		When("Host is an empty", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id2"}`))
+				op, err = tcp.Setup(testtool.MustOutputBlock("tcp", "tcp_test", ``))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -56,7 +48,7 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("Port is an empty", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id3","Host": "127.0.0.1"}`))
+				op, err = tcp.Setup(testtool.MustOutputBlock("tcp", "tcp_test", `host = "127.0.0.1" `))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -65,7 +57,10 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("valid config", func() {
 			BeforeEach(func() {
-				op, err = tcp.Setup(json.RawMessage(`{"Name":"tcp","ID":"id4","Host": "127.0.0.1","Port": 10053}`))
+				op, err = tcp.Setup(testtool.MustOutputBlock("tcp", "tcp_test", `
+				host = "127.0.0.1"
+				port = 10053
+				`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -86,7 +81,10 @@ var _ = Describe("output/tcp", func() {
 			Expect(err).To(Succeed())
 			addr, ok := ln.Addr().(*net.TCPAddr)
 			Expect(ok).To(BeTrue())
-			op, err = tcp.Setup(json.RawMessage(`{"Name": "tcp","ID":"id5","Host": "127.0.0.1","Port": 10053}`))
+			op, err = tcp.Setup(testtool.MustOutputBlock("tcp", "tcp_test", `
+			host = "127.0.0.1"
+			port = 10053
+			`))
 			Expect(err).To(Succeed())
 			p = op.(*tcp.TCP)
 			p.Port = uint16(addr.Port)
@@ -97,7 +95,7 @@ var _ = Describe("output/tcp", func() {
 		When("failed to connect", func() {
 			BeforeEach(func() {
 				p.Port = 20053
-				conn, err = p.NewConnect()
+				conn, err = p.NewConnect(context.Background())
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -106,7 +104,7 @@ var _ = Describe("output/tcp", func() {
 		})
 		When("valid", func() {
 			BeforeEach(func() {
-				conn, err = p.NewConnect()
+				conn, err = p.NewConnect(context.Background())
 			})
 			It("Succeed", func() {
 				Expect(err).To(Succeed())

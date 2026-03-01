@@ -22,105 +22,121 @@ import (
 	"os/user"
 	"strconv"
 
-	"github.com/goccy/go-json"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"go.uber.org/zap"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/input"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"errors"
+
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/input"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 )
 
+const PLUGIN_NAME = "unix"
+
 func init() {
-	_ = registry.RegisterInputPlugin("unix", SetupUnixSocket)
+	_ = registry.RegisterInputPlugin(PLUGIN_NAME, Setup)
 }
 
-func SetupUnixSocket(bs json.RawMessage) (types.InputPlugin, error) {
-	var err error
+func Setup(cfg *config.InputBlock) (types.InputPlugin, error) {
 	p := &UnixSocket{
-		FormatMeta: input.FormatMeta{
-			Format: input.FormatDNSTAP,
-		},
+		InputBlock: *cfg,
 	}
-
-	if err = json.Unmarshal(bs, p); err != nil {
-		return nil, errors.Wrapf(err, "failed to decode config")
+	// Decode the HCL body into the UnixSocket struct.
+	diags := gohcl.DecodeBody(cfg.Body, nil, p)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(p, "failed to setup unix plugin: %w", errors.Join(diags.Errs()...))
 	}
 	if p.Path == "" {
-		return nil, errors.New("missing parameter Path")
+		return nil, plugin.PluginError(p, "missing required parameter: Path")
 	}
 	if p.User != "" {
 		u, err := user.Lookup(p.User)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get owner name %s", p.User)
+			return nil, plugin.PluginError(p, "failed to lookup user '%s' err: %w", p.User, err)
 		}
 		uid, err := strconv.Atoi(u.Uid)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get uid")
+			return nil, plugin.PluginError(p, "failed to get uid user: %s err: %w", p.User, err)
 		}
 		gid, err := strconv.Atoi(u.Gid)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get gid")
+			return nil, plugin.PluginError(p, "failed to get gid:user: %s err: %w", p.User, err)
 		}
 		p.uid = &uid
 		p.gid = &gid
 	}
-	p.is = input.NewInputServer(p, nil)
+	p.is = input.NewInputServer(p, p.Format, nil)
 	if p.is == nil {
-		return nil, errors.Errorf("invalid format")
+		return nil, plugin.PluginError(p, "invalid format: %s", p.Format)
 	}
 	return p, nil
 }
 
 var _ types.InputPlugin = &UnixSocket{}
 
-var _ input.PluginWithFormat = &UnixSocket{}
-
 // The UnixSocket plugin get messages from the unix socket.
+
+// Example HCL configuration:
+// ```hcl
+//
+// filter "unix" "default" {
+//   path = "/var/run/dnstap.sock"
+//   user = "dnstap"
+// }
+//
+// ```
+
+// UnixSocket represents a plugin that listens for DNSTAP messages over a Unix socket.
 type UnixSocket struct {
-	plugin.PluginCommon
+	config.InputBlock
 
-	// message format
-	input.FormatMeta
+	// Path specifies the Unix socket file path.
+	Path string `hcl:"path"`
 
-	// Socket path
-	Path string
-	// Socket owner
-	User string
+	// User specifies the owner of the Unix socket file. Optional.
+	User string `hcl:"user,optional"`
 
-	ln  net.Listener
+	// Format specifies the message format. Optional, defaults to "DNSTAP".
+	Format string `hcl:"format,optional"`
+
+	// uid and gid store the user ID and group ID for the socket owner.
 	uid *int
 	gid *int
 
+	// is is the input server instance.
 	is *input.InputServer
 }
 
-func (p *UnixSocket) Listen() error {
-	var err error
-	p.ln, err = net.Listen("unix", p.Path)
+func (p *UnixSocket) Listen() (net.Listener, error) {
+	ln, err := net.Listen("unix", p.Path)
 	if err != nil {
-		return errors.Wrapf(err, "failed to listen %s", p.Path)
+		return nil, plugin.PluginError(p, "failed to listen %s: err: %w", p.Path, err)
 	}
 	if p.uid != nil && p.gid != nil {
 		if err := os.Chown(p.Path, *p.uid, *p.gid); err != nil {
-			p.ln.Close()
-			return errors.Wrapf(err, "failed to change owner %s (%d:%d)", p.User, p.uid, p.gid)
+			ln.Close()
+			os.Remove(p.Path) // ソケットファイルを削除
+			return nil, plugin.PluginError(p, "failed to change owner %s (%d:%d): %w", p.User, *p.uid, *p.gid, err)
 		}
 	}
-	return nil
+	return ln, nil
 }
 
-func (p *UnixSocket) Close() error {
-	return p.ln.Close()
-}
-
-func (p *UnixSocket) Start(ctx context.Context, ic *types.InputContext) error {
-	if err := p.Listen(); err != nil {
+func (p *UnixSocket) Start(ctx context.Context, forwarder types.Forwarder) error {
+	ln, err := p.Listen()
+	if err != nil {
 		return err
 	}
 	go func() {
 		<-ctx.Done()
-		p.Close()
+		if err := ln.Close(); err != nil {
+			ctxzap.Error(ctx, "failed to close UnixSocket listener", zap.String("path", p.Path), zap.Error(err))
+		}
+		os.Remove(p.Path)
 	}()
-	return p.is.Serve(p, p.ln, ic.Writer, ic)
+	return p.is.Serve(ctx, forwarder, ln)
 }

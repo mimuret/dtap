@@ -18,14 +18,13 @@ package types
 
 import (
 	"context"
-
-	"go.uber.org/zap"
 )
 
 type Buffer interface {
 	Writer
 	Reader
 }
+
 type Writer interface {
 	Write(*DnstapMessage)
 }
@@ -38,35 +37,36 @@ type Counter interface {
 	Inc()
 }
 
+// plugin interfaes
+
 type Plugin interface {
+	GetFullName() string
 	GetName() string
-	GetID() string
+	GetType() string
 }
 
-type InputContext struct {
-	No     int
-	Logger *zap.Logger
-	Writer Writer
+type Receiver interface {
+	Writer
+}
+
+type Forwarder interface {
+	SetupForwardTo([]Writer)
+	Forward(*DnstapMessage)
 }
 
 type InputPlugin interface {
 	Plugin
-	Start(context.Context, *InputContext) error
+	Start(context.Context, Forwarder) error
 }
 
 type FilterPlugin interface {
 	Plugin
-	Filter(*DnstapMessage) *DnstapMessage
-}
-
-type OutputContext struct {
-	OutputGroup string
-	No          int
-	Logger      *zap.Logger
-	Reader      Reader
+	Filter(context.Context, *DnstapMessage) *DnstapMessage
 }
 
 type OutputPlugin interface {
 	Plugin
-	Start(context.Context, *OutputContext) error
+	Start(context.Context, Reader) error
+	// 同時実行可能数を取得する
+	MaxConcurrent() uint
 }

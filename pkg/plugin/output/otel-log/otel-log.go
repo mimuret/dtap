@@ -3,42 +3,49 @@ package oteltrace
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 
-	"github.com/goccy/go-json"
+	"errors"
 
-	"github.com/mimuret/dtap/v2/pkg/plugin"
-	"github.com/mimuret/dtap/v2/pkg/plugin/output"
-	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
-	"github.com/mimuret/dtap/v2/pkg/types"
-	"github.com/pkg/errors"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/mimuret/dtap/v3/pkg/config"
+	"github.com/mimuret/dtap/v3/pkg/plugin"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output"
+	"github.com/mimuret/dtap/v3/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	otellog "go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
 
+const PLUGIN_NAME = "otel-log"
+
 func init() {
-	_ = registry.RegisterOutputPlugin("otel-log", Setup)
+	_ = registry.RegisterOutputPlugin(PLUGIN_NAME, Setup)
 }
 
-func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
+func Setup(cfg *config.OutputBlock) (types.OutputPlugin, error) {
 	s := &OtelLog{
+		OutputBlock:        *cfg,
 		ResourceAttributes: map[string]string{},
+		OutputFilters:      &types.OutputFilters{},
 	}
-	if err := json.Unmarshal(bs, s); err != nil {
-		return nil, errors.Wrap(err, "failed to decode config")
+	diags := gohcl.DecodeBody(cfg.Body, nil, s)
+	if diags.HasErrors() {
+		return nil, plugin.PluginError(s, "failed to setup otel-log plugin: %w", errors.Join(diags.Errs()...))
 	}
 	if s.LoggerName == "" {
 		s.LoggerName = "dtap"
 	}
 	if s.OTLP != nil {
 		if err := s.OTLP.Validate(); err != nil {
-			return nil, errors.Wrap(err, "OTLP config error")
+			return nil, plugin.PluginError(s, "OTLP config error: %w", err)
 		}
 	}
 	if s.OTLPHTTP != nil {
 		if err := s.OTLPHTTP.Validate(); err != nil {
-			return nil, errors.Wrap(err, "OTLPHTTP config error")
+			return nil, plugin.PluginError(s, "OTLPHTTP config error: %w", err)
 		}
 	}
 	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
@@ -46,9 +53,9 @@ func Setup(bs json.RawMessage) (types.OutputPlugin, error) {
 }
 
 type OTLPConfig struct {
-	Endpoint string
-	Insecure bool
-	Headers  map[string]string
+	Endpoint string            `hcl:"endpoint"`
+	Insecure bool              `hcl:"insecure,optional"`
+	Headers  map[string]string `hcl:"headers,optional"`
 }
 
 func (c *OTLPConfig) Validate() error {
@@ -60,9 +67,9 @@ func (c *OTLPConfig) Validate() error {
 }
 
 type OTLPHTTPConfig struct {
-	Endpoint string
-	Insecure bool
-	Headers  map[string]string
+	Endpoint string            `hcl:"endpoint"`
+	Insecure bool              `hcl:"insecure,optional"`
+	Headers  map[string]string `hcl:"headers,optional"`
 }
 
 func (c *OTLPHTTPConfig) Validate() error {
@@ -78,30 +85,34 @@ func (c *OTLPHTTPConfig) Validate() error {
 
 // The otel-trace plugin outputs messages to the OpenTelemetry collector.
 type OtelLog struct {
-	plugin.PluginCommon
-	OutputFilters  types.OutputFilters
-	AttributeNames []string
+	config.OutputBlock
+
+	// OutputFilters is the list of filters to apply to the output.
+	OutputFilters *types.OutputFilters `hcl:"output_filters,block"`
+
+	// AttributeNames is the list of attribute names to be included in the log record.
+	AttributeNames []string `hcl:"attribute_names,optional"`
 
 	// service name
-	LoggerName         string
-	ResourceAttributes map[string]string
+	LoggerName string `hcl:"logger_name,optional"`
+
+	// Resource attributes
+	ResourceAttributes map[string]string `hcl:"resource_attributes,optional"`
 
 	// OTLP Config
-	OTLP *OTLPConfig
+	OTLP *OTLPConfig `hcl:"otlp,block,optional"`
 	// OTLPHTTP Config
-	OTLPHTTP *OTLPHTTPConfig
+	OTLPHTTP *OTLPHTTPConfig `hcl:"otlp_http,block,optional"`
+
+	// MaxRetry is the maximum number of retries to open the OTLP connection.
+	MaxRetry uint `hcl:"max_retry,optional"`
 
 	*output.DnstapOutput
 	lp     *sdklog.LoggerProvider
 	logger otellog.Logger
-	oc     *types.OutputContext
 }
 
-func (f *OtelLog) SetOutputContext(oc *types.OutputContext) {
-	f.oc = oc
-}
-
-func (f *OtelLog) Open() error {
+func (f *OtelLog) Open(context.Context) error {
 	var (
 		err      error
 		exporter sdklog.Exporter
@@ -114,7 +125,7 @@ func (f *OtelLog) Open() error {
 		exporter, err = GetSTDOUTExporter()
 	}
 	if err != nil {
-		return fmt.Errorf("failed to create trace exporter: %w", err)
+		return plugin.PluginError(f, "failed to create trace exporter: %w", err)
 	}
 	f.lp = sdklog.NewLoggerProvider(
 		sdklog.WithProcessor(sdklog.NewSimpleProcessor(exporter)),
@@ -125,12 +136,12 @@ func (f *OtelLog) Open() error {
 	return nil
 }
 
-func (f *OtelLog) Write(dm *types.DnstapMessage) error {
+func (f *OtelLog) Write(ctx context.Context, dm *types.DnstapMessage) error {
 	attributes, err := f.GetAttributes(dm)
 	if err != nil {
 		return err
 	}
-	bs, err := dm.ConvertV1JSONWithFilter(f.OutputFilters)
+	bs, err := dm.ConvertV1JSONWithFilter(*f.OutputFilters)
 	if err != nil {
 		return err
 	}
@@ -138,12 +149,12 @@ func (f *OtelLog) Write(dm *types.DnstapMessage) error {
 	record.SetBody(otellog.StringValue(string(bs)))
 	record.SetEventName(dm.GetDnstap().Message.GetType().String())
 	record.AddAttributes(attributes...)
-	f.logger.Emit(context.Background(), otellog.Record{})
+	f.logger.Emit(ctx, otellog.Record{})
 	return nil
 }
 
-func (f *OtelLog) Close() {
-	f.lp.Shutdown(context.Background())
+func (f *OtelLog) Close(ctx context.Context) {
+	f.lp.Shutdown(ctx)
 }
 
 // Retrieve the attribute specified by AttributeNames from DNSTAP.
@@ -171,4 +182,8 @@ func (f *OtelLog) GetAttributes(dm *types.DnstapMessage) ([]otellog.KeyValue, er
 		}
 	}
 	return res, nil
+}
+
+func (p *OtelLog) MaxConcurrent() uint {
+	return math.MaxUint32
 }

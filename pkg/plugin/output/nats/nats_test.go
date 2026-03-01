@@ -16,14 +16,13 @@
 package nats_test
 
 import (
+	"context"
 	"time"
 
-	"github.com/goccy/go-json"
-
-	"github.com/mimuret/dtap/v2/pkg/plugin/output/nats"
-	"github.com/mimuret/dtap/v2/pkg/plugin/pub"
-	"github.com/mimuret/dtap/v2/pkg/testtool"
-	"github.com/mimuret/dtap/v2/pkg/types"
+	"github.com/mimuret/dtap/v3/pkg/plugin/output/nats"
+	"github.com/mimuret/dtap/v3/pkg/plugin/pub"
+	"github.com/mimuret/dtap/v3/pkg/testtool"
+	"github.com/mimuret/dtap/v3/pkg/types"
 	"github.com/nats-io/nats-server/v2/server"
 	natsio "github.com/nats-io/nats.go"
 	. "github.com/onsi/ginkgo/v2"
@@ -36,18 +35,13 @@ var _ = Describe("output/nats", func() {
 			op  types.OutputPlugin
 			err error
 		)
-		When("type mismatch", func() {
-			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats","ID":"id1","Hosts": 0}`))
-			})
-			It("returns error", func() {
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("failed to decode config"))
-			})
-		})
 		When("vaild", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id2","Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = ["127.0.0.1:4222"]
+subject = "dnstap"
+format = "json/v1"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(Succeed())
@@ -56,25 +50,48 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Host is an empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id3","Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+subject = "dnstap"
+format = "json/v1"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Hosts"))
+				Expect(err.Error()).To(MatchRegexp(`The argument "hosts" is required`))
+			})
+		})
+		When("Host is an not set", func() {
+			BeforeEach(func() {
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = []
+subject = "dnstap"
+format = "json/v1"
+`))
+			})
+			It("returns error", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(MatchRegexp("missing parameter hosts"))
 			})
 		})
 		When("Subject is an empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id4","Hosts": ["127.0.0.1:4222"],  "Format": "json/v1"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = ["127.0.0.1:4222"]
+format = "json/v1"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(MatchRegexp("missing parameter Subject"))
+				Expect(err.Error()).To(MatchRegexp(`argument "subject" is required`))
 			})
 		})
 		When("Format is empty", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id5","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Format": ""}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = ["127.0.0.1:4222"]
+subject = "dnstap"
+format = ""
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -83,7 +100,11 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Format is invalid", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id6","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"],  "Format": "hoge"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = ["127.0.0.1:4222"]
+subject = "dnstap"
+format = "invalid"
+`))
 			})
 			It("returns error", func() {
 				Expect(err).To(HaveOccurred())
@@ -92,7 +113,12 @@ var _ = Describe("output/nats", func() {
 		})
 		When("Token exist", func() {
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id7","Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Token": "token"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+hosts = ["127.0.0.1:4222"]
+subject = "dnstap"
+format = "json/v1"
+token = "hoge"
+`))
 			})
 			It("succeed", func() {
 				Expect(err).To(Succeed())
@@ -102,7 +128,13 @@ var _ = Describe("output/nats", func() {
 			When("User exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id8", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user","Password":"pass"}`))
+						op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+						hosts = ["127.0.0.1:4222"]
+						subject = "dnstap"
+						format = "json/v1"
+						user = "user"
+						password = "pass"
+						`))
 					})
 					It("succeed", func() {
 						Expect(err).To(Succeed())
@@ -110,21 +142,32 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Password not exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id9", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","User":"user"}`))
+						op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+						hosts = ["127.0.0.1:4222"]
+						subject = "dnstap"
+						format = "json/v1"
+						user = "user"
+						`))
 					})
 					It("returns error", func() {
 						Expect(err).To(HaveOccurred())
-						Expect(err.Error()).To(MatchRegexp("missing parameter Password"))
+						Expect(err.Error()).To(MatchRegexp("missing parameter password"))
 					})
 				})
 			})
 			When("User not exist", func() {
 				When("Password exist", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id10", "Subject": "dnstap", "Hosts": ["127.0.0.1:4222"], "Subject": "dnstap", "Format": "json/v1","Password":"pass"}`))
+						op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+						hosts = ["127.0.0.1:4222"]
+						subject = "dnstap"
+						format = "json/v1"
+						password = "pass"
+						`))
 					})
 					It("succeed", func() {
-						Expect(err).To(Succeed())
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(MatchRegexp("missing parameter user"))
 					})
 				})
 			})
@@ -179,10 +222,14 @@ var _ = Describe("output/nats", func() {
 			)
 			When("failed to connect", func() {
 				BeforeEach(func() {
-					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id11", "Hosts": ["127.0.0.1:15222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+					hosts = ["127.0.0.1:15222"]
+					subject = "dnstap"
+					format = "json/v1"
+					`))
 					Expect(err).To(Succeed())
 					p = op.(*nats.Nats)
-					err = p.Open()
+					err = p.Open(context.Background())
 					Expect(err).To(HaveOccurred())
 				})
 				It("returns error", func() {
@@ -192,10 +239,14 @@ var _ = Describe("output/nats", func() {
 			})
 			When("valid", func() {
 				BeforeEach(func() {
-					op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id12", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+					op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+					hosts = ["127.0.0.1:14222"]
+					subject = "dnstap"
+					format = "json/v1"
+					`))
 					Expect(err).To(Succeed())
 					p = op.(*nats.Nats)
-					err = p.Open()
+					err = p.Open(context.Background())
 				})
 				It("Succeed", func() {
 					Expect(err).To(Succeed())
@@ -208,7 +259,11 @@ var _ = Describe("output/nats", func() {
 				err error
 			)
 			BeforeEach(func() {
-				op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id13", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+				op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+				hosts = ["127.0.0.1:14222"]
+				subject = "dnstap"
+				format = "json/v1"
+				`))
 				Expect(err).To(Succeed())
 				p = op.(*nats.Nats)
 			})
@@ -218,15 +273,19 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is json/v1", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id14", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "json/v1"}`))
+						op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+						hosts = ["127.0.0.1:14222"]
+						subject = "dnstap"
+						format = "json/v1"
+						`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})
 					BeforeEach(func() {
-						Expect(p.Open()).To(Succeed())
+						Expect(p.Open(context.Background())).To(Succeed())
 					})
 					AfterEach(func() {
-						p.Close()
+						p.Close(context.Background())
 					})
 					When("write messages ", func() {
 						BeforeEach(func() {
@@ -235,7 +294,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize - 2) / (len(data) + 1)
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -251,7 +310,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-2)/(len(data)+1) + 1
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -268,7 +327,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-2)/(len(data)+1)*2 + 2
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -281,22 +340,26 @@ var _ = Describe("output/nats", func() {
 				})
 				When("Format is DNSTAP", func() {
 					BeforeEach(func() {
-						op, err = nats.Setup(json.RawMessage(`{"Name": "nats", "ID":"id15", "Hosts": ["127.0.0.1:14222"], "Subject": "dnstap", "Format": "dnstap"}`))
+						op, err = nats.Setup(testtool.MustOutputBlock("nats", "nats_test", `
+						hosts = ["127.0.0.1:14222"]
+						subject = "dnstap"
+						format = "dnstap"
+						`))
 						Expect(err).To(Succeed())
 						p = op.(*nats.Nats)
 					})
 					BeforeEach(func() {
-						Expect(p.Open()).To(Succeed())
+						Expect(p.Open(context.Background())).To(Succeed())
 					})
 					AfterEach(func() {
-						p.Close()
+						p.Close(context.Background())
 					})
 					When("write one message ", func() {
 						BeforeEach(func() {
 							p.Format = pub.FormatDNSTAP
-							err = p.Write(dm)
+							err = p.Write(context.Background(), dm)
 							Expect(err).To(Succeed())
-							err = nats.GetPublisher(p).Publish()
+							err = nats.GetPublisher(p).Publish(context.Background())
 							Expect(err).To(Succeed())
 						})
 						It("succeed", func() {
@@ -311,7 +374,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize - pub.DnstapFstrmControlHeaderSize*2) / (len(data) + 4)
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -328,7 +391,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-pub.DnstapFstrmControlHeaderSize*2)/(len(data)+4) + 1
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
@@ -345,7 +408,7 @@ var _ = Describe("output/nats", func() {
 							Expect(err).To(Succeed())
 							maxMsg := (nats.DefaultMaxPayloadSize-pub.DnstapFstrmControlHeaderSize*2)/(len(data)+4)*2 + 2
 							for i := 0; i < maxMsg; i++ {
-								err = p.Write(dm)
+								err = p.Write(context.Background(), dm)
 								Expect(err).To(Succeed())
 							}
 						})
