@@ -46,6 +46,9 @@ func (c *BufferConfig) GetName() string {
 }
 
 func (c *BufferConfig) GetSize() uint {
+	if c.Size == 0 {
+		return DefaultInputBufferSize
+	}
 	return c.Size
 }
 
