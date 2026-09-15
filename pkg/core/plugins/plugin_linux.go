@@ -1,4 +1,4 @@
-// go:build linux
+//go:build linux
 
 /*
  * Copyright (c) 2022 Manabu Sonoda

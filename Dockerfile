@@ -1,6 +1,6 @@
 FROM golang:1.27-alpine as base
 WORKDIR /build
-RUN apk --update --no-cache add git gcc musl-dev libpcap-dev
+RUN apk --update --no-cache add git gcc musl-dev
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
@@ -10,7 +10,6 @@ WORKDIR /build
 COPY . .
 
 ENV CGO_ENABLED=1
-ENV CGO_LDFLAGS="-Wl,-Bstatic -lpcap -Wl,-Bdynamic"
 
 RUN go build \
     -buildmode=pie \
