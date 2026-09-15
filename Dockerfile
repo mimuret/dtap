@@ -8,11 +8,17 @@ RUN go mod download
 FROM base as builder
 WORKDIR /build
 COPY . .
-RUN go build -ldflags '-extldflags=-static' 
 
-FROM alpine:3.18
+ENV CGO_ENABLED=1
+ENV CGO_LDFLAGS="-Wl,-Bstatic -lpcap -Wl,-Bdynamic"
 
-COPY entrypoint.sh /
+RUN go build \
+    -buildmode=pie \
+    -ldflags "-s -w -extldflags '-static-pie'" \
+    -o dtap .
+
+FROM scratch
+
 COPY --from=builder /build/dtap /usr/bin/dtap
 
 ENTRYPOINT [ "/usr/bin/dtap" ]
