@@ -16,6 +16,7 @@
 package stdout
 
 import (
+	"bufio"
 	"text/template"
 
 	json "github.com/goccy/go-json"
@@ -86,6 +87,7 @@ type Output struct {
 
 	t  *template.Template
 	oc *types.OutputContext
+	w  *bufio.Writer
 }
 
 func (f *Output) SetOutputContext(oc *types.OutputContext) {
@@ -93,20 +95,29 @@ func (f *Output) SetOutputContext(oc *types.OutputContext) {
 }
 
 func (o *Output) Open() error {
+	o.w = bufio.NewWriterSize(o.Logger, 256*1024)
 	return nil
 }
 
 func (o *Output) Write(dm *types.DnstapMessage) error {
 	switch o.Format {
 	case OutputFormatJsonV1:
-		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
+		var (
+			buf []byte
+			err error
+		)
+		if len(o.OutputFilters.IncludeKeys) == 0 && len(o.OutputFilters.ExcludeKeys) == 0 {
+			buf, err = dm.ConvertV1JSON()
+		} else {
+			buf, err = dm.ConvertV1JSONWithFilter(o.OutputFilters)
+		}
 		if err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write(buf); err != nil {
+		if _, err := o.w.Write(buf); err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	case OutputFormatGoTpl:
@@ -114,16 +125,19 @@ func (o *Output) Write(dm *types.DnstapMessage) error {
 		if err != nil {
 			return err
 		}
-		if err := o.t.Execute(o.Logger, data); err != nil {
+		if err := o.t.Execute(o.w, data); err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	}
-	return nil
+	return o.w.Flush()
 }
 
 func (o *Output) Close() {
+	if o.w != nil {
+		o.w.Flush()
+	}
 	o.Logger.Close()
 }
