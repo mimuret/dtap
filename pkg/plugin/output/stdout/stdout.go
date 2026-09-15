@@ -94,7 +94,15 @@ func (o *Stdout) Open() error {
 func (o *Stdout) Write(dm *types.DnstapMessage) error {
 	switch o.Type {
 	case OutputFormatJsonV1:
-		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
+		var (
+			buf []byte
+			err error
+		)
+		if len(o.OutputFilters.IncludeKeys) == 0 && len(o.OutputFilters.ExcludeKeys) == 0 {
+			buf, err = dm.ConvertV1JSON()
+		} else {
+			buf, err = dm.ConvertV1JSONWithFilter(o.OutputFilters)
+		}
 		if err != nil {
 			return err
 		}
