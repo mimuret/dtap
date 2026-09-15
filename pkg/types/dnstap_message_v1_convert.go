@@ -213,6 +213,9 @@ func (d *DnstapMessage) ConvertV1MapStringWithFilter(kf OutputFilters) (map[stri
 }
 
 func (d *DnstapMessage) ConvertV1JSONWithFilter(kf OutputFilters) ([]byte, error) {
+	if len(kf.IncludeKeys) == 0 && len(kf.ExcludeKeys) == 0 {
+		return d.ConvertV1JSON()
+	}
 	res, err := d.ConvertV1MapStringWithFilter(kf)
 	if err != nil {
 		return nil, err

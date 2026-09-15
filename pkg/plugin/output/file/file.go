@@ -102,15 +102,7 @@ func (o *Output) Open() error {
 func (o *Output) Write(dm *types.DnstapMessage) error {
 	switch o.Format {
 	case OutputFormatJsonV1:
-		var (
-			buf []byte
-			err error
-		)
-		if len(o.OutputFilters.IncludeKeys) == 0 && len(o.OutputFilters.ExcludeKeys) == 0 {
-			buf, err = dm.ConvertV1JSON()
-		} else {
-			buf, err = dm.ConvertV1JSONWithFilter(o.OutputFilters)
-		}
+		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
 		if err != nil {
 			return err
 		}
