@@ -1,12 +1,6 @@
 module github.com/mimuret/dtap/v2
 
-go 1.23.0
-
-toolchain go1.23.1
-
-require go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
-
-require github.com/nats-io/nats-server/v2 v2.11.6
+go 1.27.1
 
 require (
 	github.com/Shopify/sarama v1.30.0
@@ -22,6 +16,7 @@ require (
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.62
 	github.com/mimuret/dnsutils v1.11.0
+	github.com/nats-io/nats-server/v2 v2.11.6
 	github.com/nats-io/nats.go v1.43.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.2
@@ -203,6 +198,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.24.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.108.1 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
