@@ -25,7 +25,6 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func init() {
@@ -39,6 +38,12 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
+	}
+	if s.Logger == nil {
+		return nil, errors.New("missing parameter Logger")
+	}
+	if s.Logger.Filename == "" {
+		return nil, errors.New("missing parameter Logger.Filename")
 	}
 	switch s.Format {
 	case OutputFormatGoTpl:
@@ -66,6 +71,25 @@ var (
 
 var _ types.OutputPlugin = &Output{}
 
+type CompressType string
+
+const (
+	CompressTypeGzip CompressType = "gzip"
+	CompressTypeZstd CompressType = "zstd"
+)
+
+type Logger struct {
+	Filename   string `json:"filename" yaml:"filename"`
+	MaxSize    int    `json:"maxsize" yaml:"maxsize"`
+	MaxAge     int    `json:"maxage" yaml:"maxage"`
+	MaxBackups int    `json:"maxbackups" yaml:"maxbackups"`
+	LocalTime  bool   `json:"localtime" yaml:"localtime"`
+	Compress   bool   `json:"compress" yaml:"compress"`
+
+	CompressType    CompressType `json:"compress_type" yaml:"compress_type"`
+	CompressWorkers int          `json:"compress_workers" yaml:"compress_workers"`
+}
+
 // This is an experimental implementation.
 // The file plug-in outputs the message to a file.
 type Output struct {
@@ -73,8 +97,7 @@ type Output struct {
 	*output.DnstapOutput
 
 	// File output config
-	// see https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2#Logger
-	Logger *lumberjack.Logger
+	Logger *Logger
 
 	// File format
 	Format OutputFormat
@@ -87,6 +110,7 @@ type Output struct {
 
 	t  *template.Template
 	oc *types.OutputContext
+	rw *rotatingWriter
 	w  *bufio.Writer
 }
 
@@ -95,7 +119,12 @@ func (f *Output) SetOutputContext(oc *types.OutputContext) {
 }
 
 func (o *Output) Open() error {
-	o.w = bufio.NewWriterSize(o.Logger, 256*1024)
+	rw, err := newRotatingWriter(o.Logger)
+	if err != nil {
+		return err
+	}
+	o.rw = rw
+	o.w = bufio.NewWriterSize(rw, 256*1024)
 	return nil
 }
 
@@ -131,5 +160,7 @@ func (o *Output) Close() {
 	if o.w != nil {
 		o.w.Flush()
 	}
-	o.Logger.Close()
+	if o.rw != nil {
+		o.rw.Close()
+	}
 }

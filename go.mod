@@ -13,6 +13,7 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/grafana/dskit v0.0.0-20241007172036-53283a0f6b41
 	github.com/grafana/loki/v3 v3.4.3
+	github.com/klauspost/compress v1.18.0
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.62
 	github.com/mimuret/dnsutils v1.11.0
@@ -40,7 +41,6 @@ require (
 	golang.org/x/net v0.40.0
 	golang.org/x/sync v0.15.0
 	google.golang.org/protobuf v1.36.5
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -142,7 +142,6 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/linkedin/goavro/v2 v2.11.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
