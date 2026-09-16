@@ -17,7 +17,8 @@ import (
 const defaultFilenameTimeFormat = "%Y-%m-%dT%H-%M-%S"
 
 type rotatingWriter struct {
-	filename           string
+	filenamePattern    string // strftime パターン (設定値そのまま)
+	filename           string // 現在開いているファイルパス (展開済み)
 	maxSize            int64
 	maxAge             int
 	maxBackups         int
@@ -49,7 +50,7 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 		maxSizeMB = 100 // default 100MB
 	}
 	rw := &rotatingWriter{
-		filename:           cfg.Filename,
+		filenamePattern:    cfg.Filename,
 		maxSize:            int64(maxSizeMB) * 1024 * 1024,
 		maxAge:             cfg.MaxAge,
 		maxBackups:         cfg.MaxBackups,
@@ -60,7 +61,7 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 		filenameTimeFormat: timeFormat,
 		compressCh:         make(chan string, 1000),
 	}
-	if err := rw.openOrCreate(); err != nil {
+	if err := rw.openFile(rw.evaluateFilename(rw.now())); err != nil {
 		return nil, err
 	}
 	for i := 0; i < workers; i++ {
@@ -70,11 +71,30 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 	return rw, nil
 }
 
-func (rw *rotatingWriter) openOrCreate() error {
-	if err := os.MkdirAll(filepath.Dir(rw.filename), 0755); err != nil {
+func (rw *rotatingWriter) now() time.Time {
+	t := time.Now()
+	if !rw.localTime {
+		return t.UTC()
+	}
+	return t
+}
+
+// evaluateFilename は filenamePattern を時刻で展開する。
+// パターンに strftime ディレクティブが含まれない場合はそのまま返す。
+func (rw *rotatingWriter) evaluateFilename(t time.Time) string {
+	name, err := strftime.Format(rw.filenamePattern, t)
+	if err != nil {
+		return rw.filenamePattern
+	}
+	return name
+}
+
+// openFile は指定パスのファイルを開き、rw.filename を更新する。
+func (rw *rotatingWriter) openFile(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(rw.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -84,6 +104,7 @@ func (rw *rotatingWriter) openOrCreate() error {
 		return err
 	}
 	rw.file = f
+	rw.filename = path
 	rw.currentSize = info.Size()
 	return nil
 }
@@ -91,46 +112,76 @@ func (rw *rotatingWriter) openOrCreate() error {
 func (rw *rotatingWriter) Write(p []byte) (int, error) {
 	rw.mu.Lock()
 	defer rw.mu.Unlock()
-	if rw.currentSize+int64(len(p)) > rw.maxSize {
-		if err := rw.rotate(); err != nil {
+
+	// 時刻ベースローテーション: パターン展開結果が変わったら新ファイルへ切り替え
+	newFilename := rw.evaluateFilename(rw.now())
+	if newFilename != rw.filename {
+		if err := rw.rotateByTime(newFilename); err != nil {
 			return 0, err
 		}
 	}
+
+	// サイズベースローテーション
+	if rw.currentSize+int64(len(p)) > rw.maxSize {
+		if err := rw.rotateBySize(); err != nil {
+			return 0, err
+		}
+	}
+
 	n, err := rw.file.Write(p)
 	rw.currentSize += int64(n)
 	return n, err
 }
 
-func (rw *rotatingWriter) rotate() error {
+// rotateByTime は時刻境界でのローテーション。
+// 現在ファイルは既に日時を含む名前なのでリネーム不要。新ファイルを開く。
+func (rw *rotatingWriter) rotateByTime(newFilename string) error {
+	oldFilename := rw.filename
 	if rw.file != nil {
 		if err := rw.file.Close(); err != nil {
 			return err
 		}
 		rw.file = nil
 	}
-	rotatedPath := rw.rotatedFilename()
-	if err := os.Rename(rw.filename, rotatedPath); err != nil && !os.IsNotExist(err) {
+	if rw.compress {
+		select {
+		case rw.compressCh <- oldFilename:
+		default:
+		}
+	}
+	go rw.cleanup()
+	return rw.openFile(newFilename)
+}
+
+// rotateBySize はサイズ超過でのローテーション。現在ファイルをタイムスタンプ付きにリネームする。
+func (rw *rotatingWriter) rotateBySize() error {
+	oldFilename := rw.filename
+	if rw.file != nil {
+		if err := rw.file.Close(); err != nil {
+			return err
+		}
+		rw.file = nil
+	}
+	rotatedPath := rw.rotatedFilename(oldFilename)
+	if err := os.Rename(oldFilename, rotatedPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	if rw.compress {
 		select {
 		case rw.compressCh <- rotatedPath:
 		default:
-			// チャネルが満杯の場合は圧縮をスキップし、書き込みをブロックしない
 		}
 	}
 	go rw.cleanup()
-	return rw.openOrCreate()
+	// サイズローテーション後は同じパターンで新ファイルを開く
+	return rw.openFile(rw.evaluateFilename(rw.now()))
 }
 
-func (rw *rotatingWriter) rotatedFilename() string {
-	ext := filepath.Ext(rw.filename)
-	prefix := strings.TrimSuffix(rw.filename, ext)
-	t := time.Now()
-	if !rw.localTime {
-		t = t.UTC()
-	}
-	suffix, _ := strftime.Format(rw.filenameTimeFormat, t)
+// rotatedFilename はサイズローテーション時のリネーム先パスを返す。
+func (rw *rotatingWriter) rotatedFilename(current string) string {
+	ext := filepath.Ext(current)
+	prefix := strings.TrimSuffix(current, ext)
+	suffix, _ := strftime.Format(rw.filenameTimeFormat, rw.now())
 	return prefix + "-" + suffix + ext
 }
 
@@ -210,12 +261,20 @@ func compressZstd(path string) {
 	os.Remove(path)
 }
 
+// filenameStaticPrefix は strftime パターンの静的プレフィックス部分を返す。
+// 例: "/var/log/cor.%Y%m%d" → "/var/log/cor."
+func filenameStaticPrefix(pattern string) string {
+	if idx := strings.IndexByte(pattern, '%'); idx >= 0 {
+		return pattern[:idx]
+	}
+	return pattern
+}
+
 // cleanup は MaxAge と MaxBackups に基づいて古いバックアップファイルを削除する。
 func (rw *rotatingWriter) cleanup() {
-	dir := filepath.Dir(rw.filename)
-	base := filepath.Base(rw.filename)
-	ext := filepath.Ext(base)
-	prefix := strings.TrimSuffix(base, ext) + "-"
+	staticPrefix := filenameStaticPrefix(rw.filenamePattern)
+	dir := filepath.Dir(staticPrefix)
+	basePrefix := filepath.Base(staticPrefix)
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -227,7 +286,11 @@ func (rw *rotatingWriter) cleanup() {
 		if e.IsDir() {
 			continue
 		}
-		if strings.HasPrefix(e.Name(), prefix) {
+		// 現在アクティブなファイルは対象外
+		if filepath.Join(dir, e.Name()) == rw.filename {
+			continue
+		}
+		if strings.HasPrefix(e.Name(), basePrefix) {
 			backups = append(backups, e)
 		}
 	}
