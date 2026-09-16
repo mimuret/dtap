@@ -16,6 +16,7 @@
 package stdout
 
 import (
+	"bufio"
 	"os"
 	"text/template"
 
@@ -23,8 +24,10 @@ import (
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
@@ -53,6 +56,18 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 		return nil, errors.New("Type is an invalid value")
 	}
 	s.DnstapOutput = output.NewDnstapOutput(s, s.MaxRetry)
+	s.writeMessageCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_stdout",
+		Name:        "write_messages_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.writeMessageErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_stdout",
+		Name:        "write_errors_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
 	return s, nil
 }
 
@@ -81,6 +96,10 @@ type Stdout struct {
 
 	t  *template.Template
 	oc *types.OutputContext
+	w  *bufio.Writer
+
+	writeMessageCounter    prometheus.Counter
+	writeMessageErrCounter prometheus.Counter
 }
 
 func (f *Stdout) SetOutputContext(oc *types.OutputContext) {
@@ -88,20 +107,28 @@ func (f *Stdout) SetOutputContext(oc *types.OutputContext) {
 }
 
 func (o *Stdout) Open() error {
+	o.w = bufio.NewWriterSize(os.Stdout, 256*1024)
 	return nil
 }
 
-func (o *Stdout) Write(dm *types.DnstapMessage) error {
+func (o *Stdout) Write(dm *types.DnstapMessage) (err error) {
+	defer func() {
+		if err != nil {
+			o.writeMessageErrCounter.Inc()
+		} else {
+			o.writeMessageCounter.Inc()
+		}
+	}()
 	switch o.Type {
 	case OutputFormatJsonV1:
 		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write(buf); err != nil {
+		if _, err := o.w.Write(buf); err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	case OutputFormatGoTpl:
@@ -109,16 +136,18 @@ func (o *Stdout) Write(dm *types.DnstapMessage) error {
 		if err != nil {
 			return err
 		}
-		if err := o.t.Execute(os.Stdout, data); err != nil {
+		if err := o.t.Execute(o.w, data); err != nil {
 			return err
 		}
-		if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	}
-	return nil
+	return o.w.Flush()
 }
 
 func (o *Stdout) Close() {
-
+	if o.w != nil {
+		o.w.Flush()
+	}
 }

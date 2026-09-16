@@ -46,9 +46,10 @@ type ExchangeContextInterface interface {
 
 func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	s := &DNS{
-		Protocol:  DNSProtocolUDP,
-		Timeout:   time.Second,
-		WorkerNum: 4,
+		Protocol:            DNSProtocolUDP,
+		Timeout:             types.Duration(time.Second),
+		WorkerNum:           4,
+		UseResponseQuestion: false,
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
@@ -70,7 +71,8 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	}
 	s.cl = dig.NewDig()
 	s.cl.Client = &dns.Client{
-		Net: string(s.Protocol),
+		Net:     string(s.Protocol),
+		Timeout: time.Duration(s.Timeout),
 	}
 	op := &dig.OptionTarget{Target: s.Host}
 	if err := op.Option(s.cl); err != nil {
@@ -124,9 +126,11 @@ type DNS struct {
 	// Transport Protocol
 	Protocol DNSProtocol
 	// Timeout setting (duration)
-	Timeout time.Duration
+	Timeout types.Duration
 	// SendOnly flag
 	WorkerNum uint
+	// Use response message contains question section
+	UseResponseQuestion bool
 
 	sem *semaphore.Weighted
 	cl  *dig.Dig
@@ -159,14 +163,30 @@ func (o *DNS) Write(dm *types.DnstapMessage) error {
 
 func (o *DNS) write(dm *types.DnstapMessage) error {
 	msg := dm.GetMessage()
-	// skip response
-	if msg.Response {
+	if !o.UseResponseQuestion && msg.Response {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), o.Timeout)
-	defer cancel()
+	if len(msg.Question) == 0 {
+		return nil
+	}
+	req := &dns.Msg{}
+	req.SetQuestion(msg.Question[0].Name, msg.Question[0].Qtype)
+	req.RecursionDesired = msg.RecursionDesired
+	req.CheckingDisabled = msg.CheckingDisabled
+	for _, rr := range msg.Extra {
+		if rr.Header().Rrtype == dns.TypeOPT {
+			edns0, ok := rr.(*dns.OPT)
+			if !ok {
+				break
+			}
+			if edns0.Do() {
+				req.SetEdns0(edns0.UDPSize(), true)
+			}
+			break
+		}
+	}
 	o.outCounter.Inc()
-	res, err := o.cl.ExchangeContext(ctx, msg)
+	res, err := o.cl.Exchange(req)
 	if err != nil {
 		o.errCounter.Inc()
 		return err

@@ -16,15 +16,19 @@
 package stdout
 
 import (
+	"bufio"
 	"text/template"
+	"time"
 
 	json "github.com/goccy/go-json"
+	"github.com/lestrrat-go/strftime"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
+	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/mimuret/dtap/v2/pkg/types"
 	"github.com/pkg/errors"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func init() {
@@ -38,6 +42,23 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	}
 	if err := json.Unmarshal(bs, s); err != nil {
 		return nil, errors.Wrap(err, "failed to decode config")
+	}
+	if s.Logger == nil {
+		return nil, errors.New("missing parameter Logger")
+	}
+	if s.Logger.Filename == "" {
+		return nil, errors.New("missing parameter Logger.Filename")
+	}
+	testTime := time.Now()
+	if _, err := strftime.Format(s.Logger.Filename, testTime); err != nil {
+		return nil, errors.Wrap(err, "Logger.Filename contains invalid strftime format")
+	}
+	timeFormat := s.Logger.FilenameTimeFormat
+	if timeFormat == "" {
+		timeFormat = defaultFilenameTimeFormat
+	}
+	if _, err := strftime.Format(timeFormat, testTime); err != nil {
+		return nil, errors.Wrap(err, "Logger.FilenameTimeFormat contains invalid strftime format")
 	}
 	switch s.Format {
 	case OutputFormatGoTpl:
@@ -53,6 +74,18 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 		return nil, errors.New("Type is an invalid value")
 	}
 	s.DnstapOutput = output.NewDnstapOutput(s, 0)
+	s.writeMessageCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_file",
+		Name:        "write_messages_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
+	s.writeMessageErrCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   "dtap",
+		Subsystem:   "output_file",
+		Name:        "write_errors_total",
+		ConstLabels: prometheus.Labels{"ID": s.GetID()},
+	})
 	return s, nil
 }
 
@@ -65,6 +98,29 @@ var (
 
 var _ types.OutputPlugin = &Output{}
 
+type CompressType string
+
+const (
+	CompressTypeGzip CompressType = "gzip"
+	CompressTypeZstd CompressType = "zstd"
+)
+
+type Logger struct {
+	Filename   string `json:"filename" yaml:"filename"`
+	MaxSize    int    `json:"maxsize" yaml:"maxsize"`
+	MaxAge     int    `json:"maxage" yaml:"maxage"`
+	MaxBackups int    `json:"maxbackups" yaml:"maxbackups"`
+	LocalTime  bool   `json:"localtime" yaml:"localtime"`
+	Compress   bool   `json:"compress" yaml:"compress"`
+
+	CompressType    CompressType `json:"compress_type" yaml:"compress_type"`
+	CompressWorkers int          `json:"compress_workers" yaml:"compress_workers"`
+
+	// ローテーション後のファイル名に付与する日時フォーマット (strftime 形式)
+	// デフォルト: "%Y-%m-%dT%H-%M-%S"
+	FilenameTimeFormat string `json:"filename_time_format" yaml:"filename_time_format"`
+}
+
 // This is an experimental implementation.
 // The file plug-in outputs the message to a file.
 type Output struct {
@@ -72,8 +128,7 @@ type Output struct {
 	*output.DnstapOutput
 
 	// File output config
-	// see https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2#Logger
-	Logger *lumberjack.Logger
+	Logger *Logger
 
 	// File format
 	Format OutputFormat
@@ -86,6 +141,11 @@ type Output struct {
 
 	t  *template.Template
 	oc *types.OutputContext
+	rw *rotatingWriter
+	w  *bufio.Writer
+
+	writeMessageCounter    prometheus.Counter
+	writeMessageErrCounter prometheus.Counter
 }
 
 func (f *Output) SetOutputContext(oc *types.OutputContext) {
@@ -93,20 +153,33 @@ func (f *Output) SetOutputContext(oc *types.OutputContext) {
 }
 
 func (o *Output) Open() error {
+	rw, err := newRotatingWriter(o.Logger)
+	if err != nil {
+		return err
+	}
+	o.rw = rw
+	o.w = bufio.NewWriterSize(rw, 256*1024)
 	return nil
 }
 
-func (o *Output) Write(dm *types.DnstapMessage) error {
+func (o *Output) Write(dm *types.DnstapMessage) (err error) {
+	defer func() {
+		if err != nil {
+			o.writeMessageErrCounter.Inc()
+		} else {
+			o.writeMessageCounter.Inc()
+		}
+	}()
 	switch o.Format {
 	case OutputFormatJsonV1:
 		buf, err := dm.ConvertV1JSONWithFilter(o.OutputFilters)
 		if err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write(buf); err != nil {
+		if _, err := o.w.Write(buf); err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	case OutputFormatGoTpl:
@@ -114,16 +187,21 @@ func (o *Output) Write(dm *types.DnstapMessage) error {
 		if err != nil {
 			return err
 		}
-		if err := o.t.Execute(o.Logger, data); err != nil {
+		if err := o.t.Execute(o.w, data); err != nil {
 			return err
 		}
-		if _, err := o.Logger.Write([]byte("\n")); err != nil {
+		if err := o.w.WriteByte('\n'); err != nil {
 			return err
 		}
 	}
-	return nil
+	return o.w.Flush()
 }
 
 func (o *Output) Close() {
-	o.Logger.Close()
+	if o.w != nil {
+		o.w.Flush()
+	}
+	if o.rw != nil {
+		o.rw.Close()
+	}
 }

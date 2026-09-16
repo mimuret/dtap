@@ -1,12 +1,6 @@
 module github.com/mimuret/dtap/v2
 
-go 1.23.0
-
-toolchain go1.23.1
-
-require go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
-
-require github.com/nats-io/nats-server/v2 v2.11.6
+go 1.27.1
 
 require (
 	github.com/Shopify/sarama v1.30.0
@@ -19,9 +13,11 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/grafana/dskit v0.0.0-20241007172036-53283a0f6b41
 	github.com/grafana/loki/v3 v3.4.3
+	github.com/klauspost/compress v1.18.0
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/miekg/dns v1.1.62
 	github.com/mimuret/dnsutils v1.11.0
+	github.com/nats-io/nats-server/v2 v2.11.6
 	github.com/nats-io/nats.go v1.43.0
 	github.com/onsi/ginkgo/v2 v2.22.1
 	github.com/onsi/gomega v1.36.2
@@ -45,7 +41,6 @@ require (
 	golang.org/x/net v0.40.0
 	golang.org/x/sync v0.15.0
 	google.golang.org/protobuf v1.36.5
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -147,8 +142,8 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
+	github.com/lestrrat-go/strftime v1.2.0 // indirect
 	github.com/linkedin/goavro/v2 v2.11.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -192,7 +187,7 @@ require (
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
@@ -203,6 +198,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.24.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.108.1 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect

@@ -164,7 +164,9 @@ LOOP:
 			i.fstrmDecordErrCount.Inc()
 			return errors.Wrap(err, "failed to decode DNSTAP message")
 		}
-		dm, err := i.unmarshaler(bs)
+		rawCopy := make([]byte, len(bs))
+		copy(rawCopy, bs)
+		dm, err := i.unmarshaler(rawCopy)
 		if err != nil {
 			i.unmarshalDecordErrCount.Inc()
 			ic.Logger.Debug("input error", zap.Error(err))

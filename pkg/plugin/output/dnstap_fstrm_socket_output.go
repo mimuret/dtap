@@ -44,6 +44,7 @@ type DnstapFstrmSocketOutput struct {
 	encOpt  *framestream.EncoderOptions
 	closeCh chan struct{}
 	wg      *sync.WaitGroup
+	mu      sync.Mutex
 }
 
 func NewDnstapFstrmSocketOutput(handler SocketOutput, flushTimeout time.Duration, encOpt *framestream.EncoderOptions) *DnstapFstrmSocketOutput {
@@ -87,7 +88,10 @@ func (o *DnstapFstrmSocketOutput) Open() error {
 			case <-o.closeCh:
 				return
 			case <-ticker.C:
-				if err := o.enc.Flush(); err != nil {
+				o.mu.Lock()
+				err := o.enc.Flush()
+				o.mu.Unlock()
+				if err != nil {
 					return
 				}
 			}
@@ -97,6 +101,8 @@ func (o *DnstapFstrmSocketOutput) Open() error {
 }
 
 func (o *DnstapFstrmSocketOutput) Write(dm *types.DnstapMessage) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	if _, err := o.enc.Write(dm.GetRaw()); err != nil {
 		return err
 	}
@@ -109,7 +115,9 @@ func (o *DnstapFstrmSocketOutput) Close() {
 	o.wg.Wait()
 
 	// close fstrm
+	o.mu.Lock()
 	o.enc.Close()
+	o.mu.Unlock()
 
 	// close connection
 	o.handler.Close()
