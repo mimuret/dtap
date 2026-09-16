@@ -2,7 +2,6 @@ package stdout
 
 import (
 	"compress/gzip"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,17 +11,21 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/lestrrat-go/strftime"
 )
 
+const defaultFilenameTimeFormat = "%Y-%m-%dT%H-%M-%S"
+
 type rotatingWriter struct {
-	filename        string
-	maxSize         int64
-	maxAge          int
-	maxBackups      int
-	localTime       bool
-	compress        bool
-	compressType    CompressType
-	compressWorkers int
+	filename           string
+	maxSize            int64
+	maxAge             int
+	maxBackups         int
+	localTime          bool
+	compress           bool
+	compressType       CompressType
+	compressWorkers    int
+	filenameTimeFormat string
 
 	mu          sync.Mutex
 	file        *os.File
@@ -37,16 +40,21 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 	if workers <= 0 {
 		workers = 1
 	}
+	timeFormat := cfg.FilenameTimeFormat
+	if timeFormat == "" {
+		timeFormat = defaultFilenameTimeFormat
+	}
 	rw := &rotatingWriter{
-		filename:        cfg.Filename,
-		maxSize:         int64(cfg.MaxSize) * 1024 * 1024,
-		maxAge:          cfg.MaxAge,
-		maxBackups:      cfg.MaxBackups,
-		localTime:       cfg.LocalTime,
-		compress:        cfg.Compress,
-		compressType:    cfg.CompressType,
-		compressWorkers: workers,
-		compressCh:      make(chan string, 1000),
+		filename:           cfg.Filename,
+		maxSize:            int64(cfg.MaxSize) * 1024 * 1024,
+		maxAge:             cfg.MaxAge,
+		maxBackups:         cfg.MaxBackups,
+		localTime:          cfg.LocalTime,
+		compress:           cfg.Compress,
+		compressType:       cfg.CompressType,
+		compressWorkers:    workers,
+		filenameTimeFormat: timeFormat,
+		compressCh:         make(chan string, 1000),
 	}
 	if rw.maxSize == 0 {
 		rw.maxSize = 100 * 1024 * 1024 // default 100MB
@@ -121,7 +129,8 @@ func (rw *rotatingWriter) rotatedFilename() string {
 	if !rw.localTime {
 		t = t.UTC()
 	}
-	return fmt.Sprintf("%s-%s%s", prefix, t.Format("2006-01-02T15-04-05.000"), ext)
+	suffix, _ := strftime.Format(rw.filenameTimeFormat, t)
+	return prefix + "-" + suffix + ext
 }
 
 // compressWorker はチャネルからローテーション済みファイルを受け取り非同期で圧縮する。

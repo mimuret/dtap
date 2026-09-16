@@ -88,6 +88,10 @@ type Logger struct {
 
 	CompressType    CompressType `json:"compress_type" yaml:"compress_type"`
 	CompressWorkers int          `json:"compress_workers" yaml:"compress_workers"`
+
+	// ローテーション後のファイル名に付与する日時フォーマット (strftime 形式)
+	// デフォルト: "%Y-%m-%dT%H-%M-%S"
+	FilenameTimeFormat string `json:"filename_time_format" yaml:"filename_time_format"`
 }
 
 // This is an experimental implementation.
