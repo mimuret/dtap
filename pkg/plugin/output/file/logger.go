@@ -44,9 +44,13 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 	if timeFormat == "" {
 		timeFormat = defaultFilenameTimeFormat
 	}
+	maxSizeMB := cfg.MaxSize
+	if maxSizeMB == 0 {
+		maxSizeMB = 100 // default 100MB
+	}
 	rw := &rotatingWriter{
 		filename:           cfg.Filename,
-		maxSize:            int64(cfg.MaxSize) * 1024 * 1024,
+		maxSize:            int64(maxSizeMB) * 1024 * 1024,
 		maxAge:             cfg.MaxAge,
 		maxBackups:         cfg.MaxBackups,
 		localTime:          cfg.LocalTime,
@@ -55,9 +59,6 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 		compressWorkers:    workers,
 		filenameTimeFormat: timeFormat,
 		compressCh:         make(chan string, 1000),
-	}
-	if rw.maxSize == 0 {
-		rw.maxSize = 100 * 1024 * 1024 // default 100MB
 	}
 	if err := rw.openOrCreate(); err != nil {
 		return nil, err
