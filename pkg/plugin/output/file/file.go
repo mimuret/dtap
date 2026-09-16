@@ -18,8 +18,10 @@ package stdout
 import (
 	"bufio"
 	"text/template"
+	"time"
 
 	json "github.com/goccy/go-json"
+	"github.com/lestrrat-go/strftime"
 	"github.com/mimuret/dtap/v2/pkg/plugin"
 	"github.com/mimuret/dtap/v2/pkg/plugin/output"
 	"github.com/mimuret/dtap/v2/pkg/plugin/registry"
@@ -44,6 +46,17 @@ func setup(bs json.RawMessage) (types.OutputPlugin, error) {
 	}
 	if s.Logger.Filename == "" {
 		return nil, errors.New("missing parameter Logger.Filename")
+	}
+	testTime := time.Now()
+	if _, err := strftime.Format(s.Logger.Filename, testTime); err != nil {
+		return nil, errors.Wrap(err, "Logger.Filename contains invalid strftime format")
+	}
+	timeFormat := s.Logger.FilenameTimeFormat
+	if timeFormat == "" {
+		timeFormat = defaultFilenameTimeFormat
+	}
+	if _, err := strftime.Format(timeFormat, testTime); err != nil {
+		return nil, errors.Wrap(err, "Logger.FilenameTimeFormat contains invalid strftime format")
 	}
 	switch s.Format {
 	case OutputFormatGoTpl:
