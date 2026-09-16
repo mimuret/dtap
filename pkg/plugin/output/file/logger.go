@@ -45,13 +45,18 @@ func newRotatingWriter(cfg *Logger) (*rotatingWriter, error) {
 	if timeFormat == "" {
 		timeFormat = defaultFilenameTimeFormat
 	}
-	maxSizeMB := cfg.MaxSize
-	if maxSizeMB == 0 {
-		maxSizeMB = 100 // default 100MB
+	var maxSize int64
+	switch {
+	case cfg.MaxSize == -1:
+		maxSize = 0 // 0 = サイズローテーション無効
+	case cfg.MaxSize == 0:
+		maxSize = 100 * 1024 * 1024 // default 100MB
+	default:
+		maxSize = int64(cfg.MaxSize) * 1024 * 1024
 	}
 	rw := &rotatingWriter{
 		filenamePattern:    cfg.Filename,
-		maxSize:            int64(maxSizeMB) * 1024 * 1024,
+		maxSize:            maxSize,
 		maxAge:             cfg.MaxAge,
 		maxBackups:         cfg.MaxBackups,
 		localTime:          cfg.LocalTime,
@@ -121,8 +126,8 @@ func (rw *rotatingWriter) Write(p []byte) (int, error) {
 		}
 	}
 
-	// サイズベースローテーション
-	if rw.currentSize+int64(len(p)) > rw.maxSize {
+	// サイズベースローテーション (maxSize == 0 は無効)
+	if rw.maxSize > 0 && rw.currentSize+int64(len(p)) > rw.maxSize {
 		if err := rw.rotateBySize(); err != nil {
 			return 0, err
 		}
