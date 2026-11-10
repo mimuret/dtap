@@ -24,7 +24,6 @@ import (
 	"syscall"
 
 	"github.com/mimuret/dtap/v2/pkg/core"
-	_ "github.com/mimuret/dtap/v2/pkg/core/plugins"
 	"github.com/mimuret/dtap/v2/pkg/promauto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
