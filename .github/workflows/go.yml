@@ -21,7 +21,7 @@ jobs:
       with:
         go-version-file: 'go.mod'
     - name: Set environment variable for PCAP interface
-      run: echo "DTAP_TEST_PCAP_IFNAME=eth0" >> $GITHUB_ENV
+      run: echo "DTAP_TEST_PCAP_IFNAME=$(ip route show default | awk '{print $5; exit}')" >> $GITHUB_ENV
     - name: Test
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo

@@ -29,7 +29,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
-	gopcapfilter "github.com/packetcap/go-pcap/filter"
+	"github.com/pgaskin/go-pcapfilter"
 	"go.uber.org/zap"
 	"golang.org/x/net/bpf"
 	"golang.org/x/sync/semaphore"
@@ -78,16 +78,12 @@ func Setup(bs json.RawMessage) (types.InputPlugin, error) {
 	}
 
 	p.bpfFilterStr = fmt.Sprintf("(%s) and (%s)", bpfHw, p.BPF)
-	bpfInstructionFilters, err := gopcapfilter.NewExpression(p.bpfFilterStr).Compile().Compile()
+	prog, err := pcapfilter.Compile(p.bpfFilterStr, &pcapfilter.Options{Optimize: true})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create BPF filter")
 	}
-	for _, v := range bpfInstructionFilters {
-		filter, err := v.Assemble()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create BPF filter")
-		}
-		p.bpfInstructionFilters = append(p.bpfInstructionFilters, filter)
+	for _, v := range prog.Instructions() {
+		p.bpfInstructionFilters = append(p.bpfInstructionFilters, bpf.RawInstruction{Op: v.Op, Jt: v.Jt, Jf: v.Jf, K: v.K})
 	}
 	if p.WorkerNum <= 0 {
 		return nil, errors.New("WorkerNum must greater than zero")
